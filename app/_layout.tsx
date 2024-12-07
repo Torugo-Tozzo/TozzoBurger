@@ -5,6 +5,8 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
+import { SQLiteProvider } from 'expo-sqlite';  // Importar o SQLiteProvider
+import { initializeDatabase } from '@/database/initializeDatabase';  // Importe sua função de inicialização
 
 import { useColorScheme } from '@/components/useColorScheme';
 
@@ -42,7 +44,11 @@ export default function RootLayout() {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return (
+    <SQLiteProvider databaseName="database.db" onInit={initializeDatabase}>
+      <RootLayoutNav />
+    </SQLiteProvider>
+  );
 }
 
 function RootLayoutNav() {
