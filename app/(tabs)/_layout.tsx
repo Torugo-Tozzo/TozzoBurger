@@ -22,21 +22,19 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
         headerShown: useClientOnlyValue(false, true),
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: 'Vender',
+          tabBarIcon: ({ color }) => <TabBarIcon name="dollar" color={color} />,
           headerRight: () => (
-            <Link href="/modal" asChild>
+            <Link href="/modais/contaModal" asChild>
               <Pressable>
                 {({ pressed }) => (
                   <FontAwesome
-                    name="info-circle"
+                    name="cart-plus"
                     size={25}
                     color={Colors[colorScheme ?? 'light'].text}
                     style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
@@ -48,10 +46,38 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="two"
+        name="produtos"
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: 'Produtos',
+          tabBarIcon: ({ color }) => <TabBarIcon name="book" color={color} />,
+          headerRight: () => (
+            <Link href="/modais/produtoModal" asChild>
+              <Pressable>
+                {({ pressed }) => (
+                  <FontAwesome
+                    name="plus-circle"
+                    size={25}
+                    color={Colors[colorScheme ?? 'light'].text}
+                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
+                  />
+                )}
+              </Pressable>
+            </Link>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="historico"
+        options={{
+          title: 'Histórico',
+          tabBarIcon: ({ color }) => <TabBarIcon name="clock-o" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="bluetooth"
+        options={{
+          title: 'Bluetooth',
+          tabBarIcon: ({ color }) => <TabBarIcon name="bluetooth" color={color} />,
         }}
       />
     </Tabs>
