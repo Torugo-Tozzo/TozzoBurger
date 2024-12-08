@@ -5,7 +5,7 @@ import { Text, View } from '@/components/Themed';
 export default function ContaModalScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Carrinho da Compra</Text>
+      <Text style={styles.title} lightColor='black' darkColor='white'>Carrinho da Compra</Text>
       <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
 
       {/* Use a light status bar on iOS to account for the black space above the modal */}
