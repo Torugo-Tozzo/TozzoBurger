@@ -69,14 +69,12 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
           preco: parseFloat(preco),
           tipoProdutoId,
         });
-        Alert.alert('Sucesso', 'Produto atualizado com sucesso!');
       } else {
         await create({
           nome,
           preco: parseFloat(preco),
           tipoProdutoId,
         });
-        Alert.alert('Sucesso', 'Produto cadastrado com sucesso!');
       }
       router.back();
     } catch (error) {
