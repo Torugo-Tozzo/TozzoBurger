@@ -1,14 +1,46 @@
-import { StyleSheet } from 'react-native';
-
-import EditScreenInfo from '@/components/EditScreenInfo';
-import { Text, View } from '@/components/Themed';
+import { FlatList, StyleSheet } from 'react-native';
+import { View } from '@/components/Themed';
+import { ProductItemVenda } from '@/components/ProductItemVenda';
+import { FiltroTipos } from '@/components/FiltroTipos';
+import { Input } from '@/components/Input';
+import useProductList from '@/hooks/useProductList';
+import { ProductDatabase } from "@/database/useProductDatabase";
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 
 export default function VendaScreen() {
+  const { products, tiposProduto, tipoProdutoId, filterByTipo, setSearch, search } = useProductList();
+
+  useFocusEffect(
+    useCallback(() => {
+      filterByTipo(null);
+      return;
+    }, [])
+  );
+
+  function handleAddToConta(product: ProductDatabase) {
+    console.log('adicionei no carrim kk');
+  }
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Tab One</Text>
-      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-      <EditScreenInfo path="app/(tabs)/index.tsx" />
+      <Input placeholder="Pesquisar" onChangeText={setSearch} value={search} />
+
+      <FiltroTipos
+        data={tiposProduto}
+        selectedId={Number(tipoProdutoId)}
+        onSelect={filterByTipo}
+      />
+
+      <FlatList
+        data={products}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={({ item }) => (
+          <ProductItemVenda data={item} onAddToCart={handleAddToConta} />
+        )}
+        contentContainerStyle={{ gap: 16 }}
+      />
+
     </View>
   );
 }
@@ -16,8 +48,8 @@ export default function VendaScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 16,
+    backgroundColor: "#fff",
   },
   title: {
     fontSize: 20,
