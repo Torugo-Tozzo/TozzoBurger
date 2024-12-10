@@ -1,25 +1,35 @@
-import React, { useEffect, useState } from "react";
-import { StyleSheet, FlatList, TouchableOpacity, Alert } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { StyleSheet, FlatList, TouchableOpacity, Alert, TextInput } from "react-native";
 import { Text, View } from "@/components/Themed";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useProductDatabase, ProductDatabase } from "@/database/useProductDatabase";
+import { useFocusEffect } from "@react-navigation/native";
+import { Link } from "expo-router";
 
 export default function ProdutosScreen() {
-  const { remove, searchByName } = useProductDatabase(); // Obtem funções de remover e listar produtos.
+  const { remove, searchByName } = useProductDatabase(); 
   const [produtos, setProdutos] = useState<ProductDatabase[]>([]);
+  const [pesquisa, setPesquisa] = useState("");
 
-  useEffect(() => {
-    carregarProdutos();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      carregarProdutos(pesquisa); 
+    }, [pesquisa])
+  );
 
-  async function carregarProdutos() {
+  async function carregarProdutos(filtro: string = "") {
     try {
-      const lista = await searchByName("");
+      const lista = await searchByName(filtro);
       setProdutos(lista);
     } catch (error) {
       Alert.alert("Erro", "Não foi possível carregar os produtos.");
       console.error(error);
     }
+  }
+
+  function handleSearch(text: string) {
+    setPesquisa(text);
+    carregarProdutos(text); 
   }
 
   async function handleRemove(id: number) {
@@ -37,7 +47,7 @@ export default function ProdutosScreen() {
             try {
               await remove(id);
               Alert.alert("Sucesso", "Produto removido com sucesso.");
-              carregarProdutos(); // Recarrega a lista de produtos após remoção.
+              carregarProdutos(pesquisa); // Recarrega a lista de produtos após remoção.
             } catch (error) {
               Alert.alert("Erro", "Não foi possível remover o produto.");
               console.error(error);
@@ -56,9 +66,11 @@ export default function ProdutosScreen() {
           <Text style={styles.produtoPreco}>R$ {item.preco.toFixed(2)}</Text>
         </View>
         <View style={styles.produtoAcoes}>
-          <TouchableOpacity onPress={() => Alert.alert("Editar produto ainda não implementado.")}>
+          <Link href={`/modais/produtoModal?productId=${item.id}`} asChild>
+          <TouchableOpacity>
             <FontAwesome name="edit" size={24} color="blue" style={styles.icon} />
           </TouchableOpacity>
+          </Link>
           <TouchableOpacity onPress={() => handleRemove(item.id)}>
             <FontAwesome name="trash" size={24} color="red" style={styles.icon} />
           </TouchableOpacity>
@@ -70,11 +82,20 @@ export default function ProdutosScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Gerenciamento de Produtos</Text>
+
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Pesquisar produtos..."
+        value={pesquisa}
+        onChangeText={handleSearch}
+      />
+
       <FlatList
         data={produtos}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderProduto}
         style={styles.lista}
+        ListEmptyComponent={<Text style={styles.emptyText}>Nenhum produto encontrado.</Text>}
       />
     </View>
   );
@@ -90,6 +111,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     textAlign: "center",
+    marginBottom: 16,
+  },
+  searchInput: {
+    height: 40,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    paddingHorizontal: 10,
     marginBottom: 16,
   },
   lista: {
@@ -127,5 +156,11 @@ const styles = StyleSheet.create({
   },
   icon: {
     marginLeft: 16,
+  },
+  emptyText: {
+    textAlign: "center",
+    marginTop: 20,
+    fontSize: 16,
+    color: "#666",
   },
 });

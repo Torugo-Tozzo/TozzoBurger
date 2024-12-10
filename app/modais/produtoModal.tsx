@@ -1,15 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import {
-  Platform,
-  StyleSheet,
-  TextInput,
-  Button,
-  Alert,
-} from 'react-native';
+import { Platform, StyleSheet, TextInput, Button, Alert } from 'react-native';
 import { Picker } from "@react-native-picker/picker";
 import { Text, View } from '@/components/Themed';
 import { useProductDatabase } from '@/database/useProductDatabase';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 type ProdutoModalScreenProps = {
   route: {
@@ -18,16 +13,16 @@ type ProdutoModalScreenProps = {
 };
 
 export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
-  const { productId } = route?.params || {};
+  const { productId } = useLocalSearchParams();
   const { show, create, update, getTipoProdutos } = useProductDatabase();
 
   const [nome, setNome] = useState('');
   const [preco, setPreco] = useState('');
   const [tipoProdutoId, setTipoProdutoId] = useState<number | undefined>();
   const [tiposProdutos, setTiposProdutos] = useState<{ id: number; descricao: string }[]>([]);
+  const router = useRouter();
 
   useEffect(() => {
-    // Carrega tipos de produtos no dropdown
     async function fetchTiposProdutos() {
       try {
         const tipos = await getTipoProdutos();
@@ -42,7 +37,7 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
 
   useEffect(() => {
     if (productId != null) {
-      let prodId = productId; 
+      let prodId = Number(productId); 
       async function fetchProduct() {
         try {
           const product = await show(prodId);
@@ -69,7 +64,7 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
 
       if (productId) {
         await update({
-          id: productId,
+          id: Number(productId),
           nome,
           preco: parseFloat(preco),
           tipoProdutoId,
@@ -83,10 +78,12 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
         });
         Alert.alert('Sucesso', 'Produto cadastrado com sucesso!');
       }
+      router.back();
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
       Alert.alert('Erro', 'Houve um erro ao salvar o produto.');
     }
+
   }
 
   return (
