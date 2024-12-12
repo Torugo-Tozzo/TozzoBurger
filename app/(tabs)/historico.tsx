@@ -1,25 +1,60 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, FlatList, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, FlatList, Alert, TouchableOpacity } from 'react-native';
 import { Text, View } from '@/components/Themed';
-import { useVendasDatabase, VendaDatabase } from '@/database/useVendaDatabse'; // Certifique-se de que o hook e os tipos estão corretos
+import { useVendasDatabase, VendaDatabase } from '@/database/useVendaDatabse';
+import { useRouter } from 'expo-router';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 export default function HistoricoScreen() {
-  const [vendas, setVendas] = useState<Record<string, VendaDatabase[]>>({}); // Estado para armazenar as vendas
-  const { listVendasRecentes } = useVendasDatabase(); // Obtendo a função que lista vendas recentes
+  const [vendas, setVendas] = useState<Record<string, VendaDatabase[]>>({});
+  const { listVendasRecentes, removeVenda } = useVendasDatabase();
+  const router = useRouter();
 
   useEffect(() => {
     const fetchVendas = async () => {
       try {
-        const vendasData = await listVendasRecentes(); // Chama a função para obter as vendas
-        setVendas(vendasData); // Atualiza o estado com as vendas
+        const vendasData = await listVendasRecentes();
+        setVendas(vendasData);
       } catch (error) {
         console.error(error);
         Alert.alert('Erro', 'Não foi possível carregar o histórico de vendas.');
       }
     };
 
-    fetchVendas(); // Carrega as vendas quando o componente for montado
+    fetchVendas();
   }, []);
+
+  const handleExcluir = (vendaId: number) => {
+    Alert.alert(
+      'Confirmar Exclusão',
+      'Tem certeza de que deseja excluir esta venda?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Excluir',
+          onPress: async () => {
+            try {
+              await removeVenda(vendaId);
+              setVendas((prevVendas) => {
+                const updatedVendas = { ...prevVendas };
+                Object.entries(updatedVendas).forEach(([data, vendasPorData]) => {
+                  updatedVendas[data] = vendasPorData.filter((venda) => venda.id !== vendaId);
+                });
+                return updatedVendas;
+              });
+            } catch (error) {
+              console.error(error);
+              Alert.alert('Erro', 'Não foi possível excluir a venda.');
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
 
   const renderVendaItem = ({ item }: { item: VendaDatabase }) => (
     <View style={styles.item}>
@@ -29,6 +64,17 @@ export default function HistoricoScreen() {
         Data: {new Date(item.horario).toLocaleDateString()} | Horário: {new Date(item.horario).toLocaleTimeString()}
       </Text>
 
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity onPress={() => handleExcluir(item.id)} style={styles.Redbutton}>
+          <FontAwesome name="trash" size={20} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => router.push(`/modais/contaHistoricoModal?vendaId=${item.id}`)}
+          style={styles.button}
+        >
+          <FontAwesome name="eye" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -52,7 +98,6 @@ export default function HistoricoScreen() {
       {Object.entries(vendas).map(([data, vendasPorData]) =>
         renderVendasPorData(data, vendasPorData)
       )}
-
     </View>
   );
 }
@@ -86,5 +131,26 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginVertical: 10,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    marginTop: 10,
+    
+  },
+  button: {
+    padding: 10,
+    backgroundColor: '#007bff',
+    borderRadius: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  Redbutton: {
+    padding: 10,
+    backgroundColor: 'red',
+    borderRadius: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 5,
   },
 });
