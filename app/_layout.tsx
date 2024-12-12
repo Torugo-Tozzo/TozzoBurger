@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { SQLiteProvider } from 'expo-sqlite';  // Importar o SQLiteProvider
 import { initializeDatabase } from '@/database/initializeDatabase';  // Importe sua função de inicialização
+import { CartProvider } from '@/context/CartContext';
 
 import { useColorScheme } from '@/components/useColorScheme';
 
@@ -46,7 +47,9 @@ export default function RootLayout() {
 
   return (
     <SQLiteProvider databaseName="database.db" onInit={initializeDatabase}>
-      <RootLayoutNav />
+      <CartProvider>
+        <RootLayoutNav />
+      </CartProvider>
     </SQLiteProvider>
   );
 }

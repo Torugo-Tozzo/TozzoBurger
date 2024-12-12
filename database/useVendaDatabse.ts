@@ -49,32 +49,6 @@ export function useVendasDatabase() {
         }
     }
 
-    async function updateVenda(
-        vendaId: number,
-        produtos: { produtoId: number; quantidade: number }[]
-    ) {
-        try {
-            const total = await calculateTotal(produtos);
-
-            await database.execAsync(
-                `UPDATE TB_VENDAS SET total = ${total} WHERE id = ${vendaId}`
-            );
-
-            await database.execAsync(
-                `DELETE FROM RL_VENDA_PRODUTO WHERE vendaId = ${vendaId}`
-            );
-
-            for (const { produtoId, quantidade } of produtos) {
-                await database.execAsync(`
-                    INSERT INTO RL_VENDA_PRODUTO (vendaId, produtoId, quantidade)
-                    VALUES (${vendaId}, ${produtoId}, ${quantidade})
-                `);
-            }
-        } catch (error) {
-            throw error;
-        }
-    }
-
     async function getVendaById(vendaId: number) {
         try {
             const venda = await database.getFirstAsync<VendaDatabase>(
@@ -154,5 +128,5 @@ export function useVendasDatabase() {
         }
     }    
 
-    return { createVenda, updateVenda, removeVenda, listVendasRecentes, getVendaById };
+    return { createVenda, removeVenda, listVendasRecentes, getVendaById };
 }

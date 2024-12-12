@@ -11,6 +11,11 @@ const productImages: Record<number, any> = {
   7: require("../assets/images/7-removebg-preview.png"),
 };
 
+type CartItem = {
+  productId: number;
+  quantidade: number;
+};
+
 type ProductItemVendaProps = {
   data: ProductDatabase;
   onAddToCart: (product: ProductDatabase) => void;
