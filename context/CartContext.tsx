@@ -5,6 +5,7 @@ type CartContextType = {
   cart: ProductDatabase[];
   addToCart: (product: ProductDatabase) => void;
   removeFromCart: (productId: number) => void;
+  updateCartItem: (productId: number, quantidade: number) => void; // Função para atualizar a quantidade do item
   clearCart: () => void;
 };
 
@@ -39,6 +40,21 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       }
       return prevCart.filter((item) => item.id !== productId);
     });
+  };
+
+  const updateCartItem = (productId: number, quantidade: number) => {
+    setCart((prevCart) => {
+      // Se a quantidade for maior que 0, atualiza a quantidade
+      if (quantidade > 0) {
+        return prevCart.map((item) =>
+          item.id === productId
+            ? { ...item, quantidade } // Atualiza a quantidade do item
+            : item
+        );
+      }
+  
+      return prevCart.filter((item) => item.id !== productId);
+    });
   };  
 
   const clearCart = () => {
@@ -46,7 +62,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, clearCart }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateCartItem, clearCart }}>
       {children}
     </CartContext.Provider>
   );

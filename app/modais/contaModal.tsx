@@ -4,9 +4,10 @@ import { Text, View } from '@/components/Themed';
 import { useCart } from '@/context/CartContext';  // Importando corretamente o useCart
 import { useVendasDatabase } from '@/database/useVendaDatabse';
 import { router } from 'expo-router';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 export default function ContaModalScreen() {
-  const { cart, clearCart } = useCart(); // Acessando o carrinho através do hook useCart
+  const { cart, clearCart, updateCartItem } = useCart(); // Acessando o carrinho e a função de atualizar o item
   const { createVenda } = useVendasDatabase();
 
   const total = cart.reduce((sum, item) => {
@@ -47,6 +48,21 @@ export default function ContaModalScreen() {
     }
   };
 
+  // Função para alterar a quantidade de um item no carrinho
+  const alterarQuantidade = (itemId: number, operacao: 'incrementar' | 'decrementar') => {
+    const item = cart.find((cartItem) => cartItem.id === itemId);
+    if (!item) return;
+
+    const novaQuantidade = operacao === 'incrementar' ? (item.quantidade ?? 0) + 1 : (item.quantidade ?? 0) - 1;
+
+    if (novaQuantidade <= 0) {
+      // Se a quantidade for zero ou negativa, removemos o item
+      updateCartItem(itemId, 0);  // A quantidade vira 0 e o item sai do carrinho
+    } else {
+      updateCartItem(itemId, novaQuantidade);  // Atualiza a quantidade
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title} lightColor="black" darkColor="white">
@@ -55,16 +71,33 @@ export default function ContaModalScreen() {
       <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
 
       <FlatList
-        data={cart}
-        keyExtractor={(item) => String(item.id)}  // Garantir que o item tem id
-        renderItem={({ item }) => (
-          <View style={styles.cartItem}>
-            <Text style={styles.itemText}>( {item.quantidade}x )  {item.nome}</Text>
-            <Text style={styles.itemText}>Preço Unitário: {item.preco.toFixed(2)}</Text>
-            <Text style={styles.itemText}> R$ {((item.quantidade ?? 0) * item.preco).toFixed(2)}</Text>
-          </View>
-        )}
-      />
+  data={cart}
+  keyExtractor={(item) => String(item.id)}  // Garantir que o item tem id
+  renderItem={({ item }) => (
+    <View style={styles.cartItem}>
+      <Text style={styles.itemText}>{item.nome}</Text>
+      <Text style={styles.itemText}>R$ {((item.quantidade ?? 0) * item.preco).toFixed(2)}</Text>
+
+      <View style={styles.quantityControls}>
+        <TouchableOpacity
+          onPress={() => alterarQuantidade(item.id, 'decrementar')}
+          style={styles.quantityButton}
+        >
+          <FontAwesome name="minus" size={20} color="white" />
+        </TouchableOpacity>
+        
+        <Text style={styles.itemText}>{item.quantidade}</Text>
+
+        <TouchableOpacity
+          onPress={() => alterarQuantidade(item.id, 'incrementar')}
+          style={styles.quantityButton}
+        >
+          <FontAwesome name="plus" size={20} color="white" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  )}
+/>
 
       <Text style={styles.totalText}>Total: R$ {total.toFixed(2)}</Text>
 
@@ -119,6 +152,21 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginVertical: 20,
+  },
+  quantityControls: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  quantityButton: {
+    backgroundColor: "#007BFF",
+    padding: 5,
+    borderRadius: 5,
+    marginHorizontal: 10,
+  },
+  quantityButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
   },
   buttonContainer: {
     flexDirection: "row",
