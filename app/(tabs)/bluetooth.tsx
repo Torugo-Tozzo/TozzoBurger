@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { StyleSheet, Button, FlatList, Text, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, Button, FlatList, View, TouchableOpacity } from 'react-native';
+import { useColorScheme } from '@/components/useColorScheme';
+import { Text } from '@/components/Themed'
 
 import { listNearbyDevices, connectToDevice, disconnectFromDevice } from '@/useBLE';
 
@@ -11,6 +13,7 @@ interface DeviceItem {
 
 export default function TabTwoScreen() {
   const [devices, setDevices] = useState<DeviceItem[]>([]);
+  const colorScheme = useColorScheme();
 
   const handleListDevices = async () => {
     const nearbyDevices = await listNearbyDevices();
@@ -45,7 +48,7 @@ export default function TabTwoScreen() {
 
   const renderDevice = ({ item }: { item: DeviceItem }) => (
     <View style={styles.deviceItem}>
-      <Text style={styles.deviceText}>
+      <Text style={styles.deviceText} >
         {item.name || 'Dispositivo Desconhecido'} - {item.id}
       </Text>
       {item.connected ? (
@@ -88,7 +91,6 @@ const styles = StyleSheet.create({
   },
   deviceText: {
     flex: 1,
-    fontSize: 16,
-    color: 'white'
+    fontSize: 16
   },
 });

@@ -57,22 +57,22 @@ export default function HistoricoScreen() {
   };
 
   const renderVendaItem = ({ item }: { item: VendaDatabase }) => (
-    <View style={styles.item}>
+    <View style={styles.item} lightColor="whitesmoke" darkColor="grey">
       <Text style={styles.itemText}>Venda ID: {item.id}</Text>
       <Text style={styles.itemText}>Total: R$ {item.total.toFixed(2)}</Text>
       <Text style={styles.itemText}>
         Data: {new Date(item.horario).toLocaleDateString()} | Horário: {new Date(item.horario).toLocaleTimeString()}
       </Text>
 
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity onPress={() => handleExcluir(item.id)} style={styles.Redbutton}>
-          <FontAwesome name="trash" size={20} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity
+      <View style={styles.buttonContainer} lightColor="whitesmoke" darkColor="grey">
+      <TouchableOpacity
           onPress={() => router.push(`/modais/contaHistoricoModal?vendaId=${item.id}`)}
           style={styles.button}
         >
           <FontAwesome name="eye" size={20} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => handleExcluir(item.id)} style={styles.Redbutton}>
+          <FontAwesome name="trash" size={20} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>
@@ -93,7 +93,7 @@ export default function HistoricoScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Histórico de Vendas</Text>
 
-      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
+      <View style={styles.separator}/>
 
       {Object.entries(vendas).map(([data, vendasPorData]) =>
         renderVendasPorData(data, vendasPorData)
@@ -105,8 +105,7 @@ export default function HistoricoScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
+    padding: 20
   },
   title: {
     fontSize: 24,
@@ -116,13 +115,11 @@ const styles = StyleSheet.create({
   separator: {
     marginVertical: 10,
     height: 1,
-    backgroundColor: '#ddd',
   },
   item: {
     marginBottom: 15,
     padding: 10,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 5,
+    borderRadius: 5
   },
   itemText: {
     fontSize: 16,
@@ -134,9 +131,11 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-between', // Coloca os botões nas extremidades
+    alignItems: 'center', // Alinha os botões verticalmente no centro
     marginTop: 10,
-    
-  },
+    paddingHorizontal: 20,
+  },  
   button: {
     padding: 10,
     backgroundColor: '#007bff',
@@ -144,6 +143,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: 5,
+    width: 60
   },
   Redbutton: {
     padding: 10,
@@ -152,5 +152,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: 5,
+    width: 60
   },
 });

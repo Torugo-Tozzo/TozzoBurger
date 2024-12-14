@@ -10,6 +10,7 @@ import { initializeDatabase } from '@/database/initializeDatabase';  // Importe 
 import { CartProvider } from '@/context/CartContext';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { StatusBar } from 'expo-status-bar';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -59,6 +60,11 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <StatusBar 
+        style={colorScheme === 'dark' ? 'light' : 'dark'} 
+        backgroundColor={colorScheme === 'dark' ? '#000' : '#fff'} 
+        translucent={true}
+      />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modais/contaModal" options={{ presentation: 'modal', title: 'Conta' }} />
