@@ -1,5 +1,6 @@
-import { View, Text, Button, Image } from "react-native";
+import { Button, Image } from "react-native";
 import { ProductDatabase } from "@/database/useProductDatabase";
+import { View, Text } from "@/components/Themed";
 
 const productImages: Record<number, any> = {
   1: require("../assets/images/1-removebg-preview.png"),
@@ -23,13 +24,12 @@ type ProductItemVendaProps = {
 
 export function ProductItemVenda({ data, onAddToCart }: ProductItemVendaProps) {
   return (
-    <View
+    <View lightColor="#f9f9f9" darkColor="grey"
       style={{
         padding: 16,
         borderWidth: 1,
         borderColor: "#ccc",
         borderRadius: 8,
-        backgroundColor: "#f9f9f9",
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
@@ -40,7 +40,7 @@ export function ProductItemVenda({ data, onAddToCart }: ProductItemVendaProps) {
         style={{ width: 50, height: 50, marginRight: 16 }}
         resizeMode="contain"
       />
-      <View>
+      <View  lightColor="#f9f9f9" darkColor="grey">
         <Text style={{ fontSize: 18, fontWeight: "bold" }}>{data.nome}</Text>
         <Text style={{ fontSize: 15 }}>Preço: R$ {data.preco.toFixed(2)}</Text>
       </View>

@@ -1,6 +1,10 @@
-import { TextInput, TextInputProps } from "react-native"
+import React from "react";
+import { TextInput, TextInputProps, useColorScheme } from "react-native";
 
 export function Input({ ...rest }: TextInputProps) {
+  const colorScheme = useColorScheme();
+  const placeholderColor = colorScheme === "dark" ? "#ccc" : "#666";
+
   return (
     <TextInput
       style={{
@@ -9,9 +13,11 @@ export function Input({ ...rest }: TextInputProps) {
         borderRadius: 7,
         borderColor: "#999",
         paddingHorizontal: 16,
-        marginBottom: 5
+        marginBottom: 5,
+        color: colorScheme === "dark" ? "#fff" : "#000",
       }}
+      placeholderTextColor={placeholderColor} // Cor do placeholder
       {...rest}
     />
-  )
+  );
 }

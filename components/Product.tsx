@@ -1,6 +1,8 @@
-import { Pressable, PressableProps, Text, TouchableOpacity, View, Image } from "react-native";
+import { Pressable, PressableProps, TouchableOpacity, Image, StyleSheet } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { useColorScheme } from "react-native";
+import { View, Text } from "@/components/Themed";
 
 const productImages: Record<number, any> = {
   1: require("../assets/images/1-removebg-preview.png"),
@@ -23,20 +25,20 @@ type Props = PressableProps & {
 };
 
 export function Product({ data, onDelete, onOpen, ...rest }: Props) {
+  const colorScheme = useColorScheme();
+  const isDarkMode = colorScheme === "dark";
+
+  const containerStyle = {
+    backgroundColor: isDarkMode ? "grey" : "whitesmoke",
+    shadowColor: isDarkMode ? "#000" : "#666",
+  };
+
   return (
     <Pressable
-      style={{
-        backgroundColor: "#F5F5F5",
-        padding: 16,
-        borderRadius: 8,
-        flexDirection: "row",
-        alignItems: "center",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-      }}
+      style={[
+        styles.container,
+        containerStyle, // Adiciona as cores dinâmicas
+      ]}
       {...rest}
     >
       <Image
@@ -45,24 +47,48 @@ export function Product({ data, onDelete, onOpen, ...rest }: Props) {
         resizeMode="contain"
       />
 
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 4 }}>
+      <View style={{ flex: 1 }} lightColor="#f9f9f9" darkColor="grey">
+        <Text
+          style={{
+            fontSize: 16,
+            fontWeight: "bold",
+            marginBottom: 4,
+          }}
+        >
           {data.nome}
         </Text>
-        <Text style={{ fontSize: 14, color: "#666" }}>
+        <Text style={{ fontSize: 14 }}>
           Preço: R$ {data.preco.toFixed(2)}
         </Text>
       </View>
 
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+      <View style={styles.buttonContainer} lightColor="#f9f9f9" darkColor="grey">
         <TouchableOpacity onPress={onOpen}>
-          <FontAwesome name="edit" size={28} color="blue" style={{marginLeft: 16}} />
+          <FontAwesome name="edit" size={28} color="blue" style={{ marginLeft: 16 }} />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={onDelete}>
-          <FontAwesome name="trash" size={24} color="red" style={{marginLeft: 16}} />
+          <FontAwesome name="trash" size={24} color="red" style={{ marginLeft: 16 }} />
         </TouchableOpacity>
       </View>
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 16,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+});
