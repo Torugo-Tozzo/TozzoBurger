@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { StyleSheet, Button, FlatList, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, Button, FlatList } from 'react-native';
 import { useColorScheme } from '@/components/useColorScheme';
-import { Text } from '@/components/Themed'
-
+import { Text, View } from '@/components/Themed';
 import { listNearbyDevices, connectToDevice, disconnectFromDevice } from '@/useBLE';
+import { Device } from 'react-native-ble-plx';
 
 interface DeviceItem {
   id: string;
@@ -11,7 +11,13 @@ interface DeviceItem {
   connected: boolean;
 }
 
-export default function TabTwoScreen() {
+let connectedDevice: Device | null = null; // Exportar o dispositivo conectado
+
+export function getConnectedDevice(): Device | null {
+  return connectedDevice; // Função para recuperar o dispositivo conectado
+}
+
+export default function BluetoothScreen() {
   const [devices, setDevices] = useState<DeviceItem[]>([]);
   const colorScheme = useColorScheme();
 
@@ -27,11 +33,12 @@ export default function TabTwoScreen() {
   };
 
   const handleConnect = async (deviceId: string) => {
-    const connectedDevice = await connectToDevice(deviceId);
-    if (connectedDevice) {
+    const device = await connectToDevice(deviceId);
+    if (device) {
+      connectedDevice = device; // Armazenar o dispositivo conectado
       setDevices((prevDevices) =>
-        prevDevices.map((device) =>
-          device.id === deviceId ? { ...device, connected: true } : device
+        prevDevices.map((item) =>
+          item.id === deviceId ? { ...item, connected: true } : item
         )
       );
     }
@@ -39,17 +46,20 @@ export default function TabTwoScreen() {
 
   const handleDisconnect = async (deviceId: string) => {
     await disconnectFromDevice(deviceId);
+    if (connectedDevice?.id === deviceId) {
+      connectedDevice = null; // Resetar o dispositivo conectado
+    }
     setDevices((prevDevices) =>
-      prevDevices.map((device) =>
-        device.id === deviceId ? { ...device, connected: false } : device
+      prevDevices.map((item) =>
+        item.id === deviceId ? { ...item, connected: false } : item
       )
     );
   };
 
   const renderDevice = ({ item }: { item: DeviceItem }) => (
     <View style={styles.deviceItem}>
-      <Text style={styles.deviceText} >
-        {item.name || 'Dispositivo Desconhecido'} - {item.id}
+      <Text style={styles.deviceText}>
+        {item.name || 'Desconhecido'} - {item.id}
       </Text>
       {item.connected ? (
         <Button title="Desconectar" onPress={() => handleDisconnect(item.id)} />
@@ -91,6 +101,6 @@ const styles = StyleSheet.create({
   },
   deviceText: {
     flex: 1,
-    fontSize: 16
+    fontSize: 16,
   },
 });

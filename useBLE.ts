@@ -108,7 +108,7 @@ const listNearbyDevices = async (): Promise<Device[]> => {
       manager.stopDeviceScan();
       console.log('Parando de escanear');
       resolve(devices);
-    }, 10000);
+    }, 3000);
   });
 };
 
@@ -134,4 +134,47 @@ const disconnectFromDevice = async (deviceId: string): Promise<void> => {
   }
 };
 
-export { listNearbyDevices, connectToDevice, disconnectFromDevice };
+const verificarDispositivoConectado = async (): Promise<Device | null> => {
+  try {
+    const connectedDevices = await manager.connectedDevices([]);
+    if (connectedDevices.length > 0) {
+      console.log(`Dispositivo conectado encontrado: ${connectedDevices[0].id}`);
+      return connectedDevices[0];
+    } else {
+      console.log('Nenhum dispositivo conectado encontrado.');
+      return null;
+    }
+  } catch (error) {
+    console.error('Erro ao verificar dispositivos conectados:', error);
+    return null;
+  }
+};
+
+const imprimir = async (device: Device | null, stringToSend: string): Promise<void> => {
+  if (!device) {
+    console.log('Nenhum dispositivo foi informado.');
+    return;
+  }
+  
+  try {
+    console.log('Buscando serviços e características para envio...');
+    const services = await device.services();
+
+    for (const service of services) {
+      const characteristics = await service.characteristics();
+      for (const characteristic of characteristics) {
+        if (characteristic.isWritableWithResponse || characteristic.isWritableWithoutResponse) {
+          console.log(`Enviando mensagem para característica: ${characteristic.uuid}`);
+          await characteristic.writeWithoutResponse(Buffer.from(stringToSend, 'utf-8').toString('base64'));
+          console.log('Mensagem enviada com sucesso!');
+          return;
+        }
+      }
+    }
+    console.log('Nenhuma característica com suporte à escrita encontrada.');
+  } catch (error) {
+    console.error('Erro ao enviar mensagem para o dispositivo:', error);
+  }
+};
+
+export { listNearbyDevices, connectToDevice, disconnectFromDevice, imprimir, verificarDispositivoConectado };
