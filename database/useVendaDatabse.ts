@@ -104,7 +104,7 @@ export function useVendasDatabase() {
     async function listVendasRecentes() {
         try {
             const seteDiasAtras = new Date();
-            seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
+            seteDiasAtras.setDate(seteDiasAtras.getDate() - 5);
             const seteDiasAtrasISO = seteDiasAtras.toISOString();
     
             const vendas = await database.getAllAsync<VendaDatabase>(
@@ -126,7 +126,23 @@ export function useVendasDatabase() {
         } catch (error) {
             throw error;
         }
-    }    
+    }
+    
+    async function listVendasPorDia(data: string) {
+        try {
+            const inicioDoDia = `${data}T00:00:00.000Z`;
+            const fimDoDia = `${data}T23:59:59.999Z`;
 
-    return { createVenda, removeVenda, listVendasRecentes, getVendaById };
+            const vendas = await database.getAllAsync<VendaDatabase>(
+                "SELECT * FROM TB_VENDAS WHERE horario BETWEEN ? AND ?",
+                [inicioDoDia, fimDoDia]
+            );
+
+            return vendas;
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    return { createVenda, removeVenda, listVendasRecentes, getVendaById, listVendasPorDia };
 }
