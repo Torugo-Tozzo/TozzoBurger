@@ -22,7 +22,8 @@ export async function initializeDatabase(database: SQLiteDatabase) {
     CREATE TABLE IF NOT EXISTS TB_VENDAS (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       total REAL NOT NULL,
-      horario TEXT NOT NULL
+      horario TEXT NOT NULL,
+      cliente TEXT NULL
     );
   `)
 
@@ -36,6 +37,14 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       FOREIGN KEY (produtoId) REFERENCES TB_PRODUTOS (id)
     );
   `)
+
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS TB_IMPRESSORAS (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL,
+      nome TEXT NOT NULL
+    );
+  `);
 
   await seedTipoProduto(database);
 }

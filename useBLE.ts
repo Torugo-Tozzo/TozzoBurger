@@ -1,180 +1,133 @@
 import { BleManager, Device } from 'react-native-ble-plx';
-import { PermissionsAndroid, Platform } from 'react-native';
+import { PermissionsAndroid, Platform, Alert } from 'react-native';
+import { Buffer } from 'buffer';
 
 const manager = new BleManager();
 
+// Verifica e solicita permissões necessárias para o BLE
 const checkAndRequestPermissions = async (): Promise<boolean> => {
   if (Platform.OS === 'android') {
-    // Verificar e solicitar permissão de localização
-    const locationGranted = await PermissionsAndroid.check(
-      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-    );
-    if (!locationGranted) {
-      const locationRequest = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: 'Permissão de Localização Necessária',
-          message: 'Este app precisa de acesso à localização para escanear dispositivos Bluetooth.',
-          buttonNeutral: 'Perguntar depois',
-          buttonNegative: 'Cancelar',
-          buttonPositive: 'OK',
-        }
-      );
-      if (locationRequest !== PermissionsAndroid.RESULTS.GRANTED) {
-        console.log('Permissão de localização foi negada.');
-        return false;
-      }
-    }
+    const permissions = [
+      PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+      PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+    ];
 
-    // Verificar e solicitar permissões de Bluetooth no Android >= 12
-    if (Platform.Version >= 31) {
-      const bluetoothScanGranted = await PermissionsAndroid.check(
-        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN
-      );
-      if (!bluetoothScanGranted) {
-        const bluetoothScanRequest = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-          {
-            title: 'Permissão para escanear Bluetooth',
-            message: 'Este app precisa de permissão para escanear dispositivos Bluetooth.',
-            buttonNeutral: 'Perguntar depois',
-            buttonNegative: 'Cancelar',
-            buttonPositive: 'OK',
-          }
-        );
-        if (bluetoothScanRequest !== PermissionsAndroid.RESULTS.GRANTED) {
-          console.log('Permissão de escaneamento Bluetooth foi negada.');
-          return false;
-        }
-      }
+    const granted = await PermissionsAndroid.requestMultiple(permissions);
+    const allGranted = Object.values(granted).every(value => value === PermissionsAndroid.RESULTS.GRANTED);
 
-      const bluetoothConnectGranted = await PermissionsAndroid.check(
-        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT
-      );
-      if (!bluetoothConnectGranted) {
-        const bluetoothConnectRequest = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-          {
-            title: 'Permissão para conectar Bluetooth',
-            message: 'Este app precisa de permissão para conectar dispositivos Bluetooth.',
-            buttonNeutral: 'Perguntar depois',
-            buttonNegative: 'Cancelar',
-            buttonPositive: 'OK',
-          }
-        );
-        if (bluetoothConnectRequest !== PermissionsAndroid.RESULTS.GRANTED) {
-          console.log('Permissão de conexão Bluetooth foi negada.');
-          return false;
-        }
-      }
-    }
-  } else if (Platform.OS === 'ios') {
-    const bluetoothState = await manager.state();
-    if (bluetoothState !== 'PoweredOn') {
-      console.log('Bluetooth no iOS não está ligado ou disponível.');
+    if (!allGranted) {
+      console.log('Permissões necessárias não foram concedidas.');
       return false;
     }
   }
   return true;
 };
 
+// Escaneia dispositivos Bluetooth próximos
 const listNearbyDevices = async (): Promise<Device[]> => {
-  const devices: Device[] = [];
   const permissionsGranted = await checkAndRequestPermissions();
-
   if (!permissionsGranted) {
-    console.log('As permissões necessárias não foram concedidas.');
-    return devices;
+    return [];
   }
 
-  console.log('Escaneando dispositivos Bluetooth...');
+  console.log('Escaneando dispositivos...');
+  const devices: Device[] = [];
+
   return new Promise((resolve) => {
     manager.startDeviceScan(null, null, (error, device) => {
       if (error) {
-        console.log('Erro ao escanear dispositivos:', error.message);
+        console.error('Erro ao escanear:', error.message);
         manager.stopDeviceScan();
         resolve([]);
         return;
       }
 
-      if (device && !devices.find((d) => d.id === device.id)) {
+      if (device && device.name && !devices.some(d => d.id === device.id)) {
+        console.log(`Dispositivo encontrado: ${device.name} - ${device.id}`);
         devices.push(device);
-        console.log(`Encontrado: ${device.name || 'Desconhecido'} - ${device.id}`);
       }
     });
 
-    // Parar o scan após 10 segundos
     setTimeout(() => {
       manager.stopDeviceScan();
-      console.log('Parando de escanear');
       resolve(devices);
-    }, 3000);
+    }, 3000); // Escaneia por 3 segundos
   });
 };
 
+// Conecta a um dispositivo Bluetooth e registra o UUID e o nome
 const connectToDevice = async (deviceId: string): Promise<Device | null> => {
   try {
-    console.log('tentando conectar...');
+    console.log(`Conectando ao dispositivo: ${deviceId}`);
     const device = await manager.connectToDevice(deviceId);
-    console.log(`Conectado ao dispositivo: ${device.name || 'Desconhecido'} - ${device.id}`);
-    await device.discoverAllServicesAndCharacteristics(); // Necessário para acessar serviços/características
+    await device.discoverAllServicesAndCharacteristics();
+
+    console.log(`Dispositivo conectado: ${device.id}`);
     return device;
   } catch (error) {
-    console.error(`Erro ao conectar ao dispositivo ${deviceId}`);
+    console.error('Erro ao conectar ao dispositivo:', error);
     return null;
   }
 };
 
+// Função para desconectar de um dispositivo
 const disconnectFromDevice = async (deviceId: string): Promise<void> => {
   try {
     await manager.cancelDeviceConnection(deviceId);
-    console.log(`Desconectado do dispositivo: ${deviceId}`);
+    console.log('Desconectado do dispositivo:', deviceId);
   } catch (error) {
-    console.error(`Erro ao desconectar do dispositivo ${deviceId}`);
+    console.error('Erro ao desconectar do dispositivo:', error);
   }
 };
 
-const verificarDispositivoConectado = async (): Promise<Device | null> => {
+// Função para enviar dados (como mensagem) para o dispositivo
+const sendMessageToDevice = async (message: string, printer: any): Promise<void> => {
   try {
-    const connectedDevices = await manager.connectedDevices([]);
-    if (connectedDevices.length > 0) {
-      console.log(`Dispositivo conectado encontrado: ${connectedDevices[0].id}`);
-      return connectedDevices[0];
-    } else {
-      console.log('Nenhum dispositivo conectado encontrado.');
-      return null;
+    if (!printer || !printer.uuid) {
+      console.error('Nenhuma impressora padrão registrada no banco.');
+      return;
     }
-  } catch (error) {
-    console.error('Erro ao verificar dispositivos conectados:', error);
-    return null;
-  }
-};
 
-const imprimir = async (device: Device | null, stringToSend: string): Promise<void> => {
-  if (!device) {
-    console.log('Nenhum dispositivo foi informado.');
-    return;
-  }
-  
-  try {
-    console.log('Buscando serviços e características para envio...');
+    console.log(`Buscando e conectando à impressora com UUID: ${printer.uuid}`);
+
+    // Conectar ao dispositivo com o UUID da impressora
+    const device: Device | null = await connectToDevice(printer.uuid);
+    if (!device) {
+      console.error('Falha ao conectar à impressora.');
+      return;
+    }
+
+    console.log('Conectado à impressora.');
+
+    // Busca os serviços e características e envia a mensagem
     const services = await device.services();
+    let messageSent = false;
 
     for (const service of services) {
       const characteristics = await service.characteristics();
       for (const characteristic of characteristics) {
         if (characteristic.isWritableWithResponse || characteristic.isWritableWithoutResponse) {
-          console.log(`Enviando mensagem para característica: ${characteristic.uuid}`);
-          await characteristic.writeWithoutResponse(Buffer.from(stringToSend, 'utf-8').toString('base64'));
+          console.log(`Enviando mensagem para a característica: ${characteristic.uuid}`);
+          const base64Message = Buffer.from(message, 'utf-8').toString('base64');
+          await characteristic.writeWithResponse(base64Message);
           console.log('Mensagem enviada com sucesso!');
-          return;
+          messageSent = true;
+          break;
         }
       }
+      if (messageSent) break;
     }
-    console.log('Nenhuma característica com suporte à escrita encontrada.');
+
+    if (!messageSent) {
+      console.error('Nenhuma característica disponível para escrita encontrada.');
+    }
+
+    // Desconectar do dispositivo
+    await disconnectFromDevice(printer.uuid);
+    console.log('Desconectado da impressora.');
   } catch (error) {
-    console.error('Erro ao enviar mensagem para o dispositivo:', error);
+    console.error('Erro ao enviar mensagem para a impressora registrada:', error);
   }
 };
 
-export { listNearbyDevices, connectToDevice, disconnectFromDevice, imprimir, verificarDispositivoConectado };
+export { listNearbyDevices, connectToDevice, disconnectFromDevice, sendMessageToDevice };
