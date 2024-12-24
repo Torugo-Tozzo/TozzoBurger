@@ -15,7 +15,7 @@ export default function ContaHistoricoModal() {
   const router = useRouter();
 
   const [venda, setVenda] = useState<VendaDatabase | null>(null);
-  const [produtos, setProdutos] = useState<{ nome: string; quantidade: number }[]>([]);
+  const [produtos, setProdutos] = useState<{ nome: string; quantidade: number; preco: number }[]>([]);
   const [isPrinterConnected, setIsPrinterConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -56,6 +56,7 @@ export default function ContaHistoricoModal() {
               return {
                 nome: produtoData?.nome || 'Produto não encontrado',
                 quantidade: produto.quantidade,
+                preco: produtoData?.preco || 0,
               };
             })
           );
@@ -88,7 +89,7 @@ export default function ContaHistoricoModal() {
   
     // Adicionando os produtos na string de impressão
     produtos.forEach((produto, index) => {
-      printContent += `\n${index + 1}. ( ${produto.quantidade}x ) ${produto.nome}.......valor\n`;
+      printContent += `\n${index + 1}. ( ${produto.quantidade}x ) ${produto.nome}.......${(produto.quantidade * produto.preco).toFixed(2)}\n`;
     });
 
     printContent += `\u001b$a------------------------------\n`;
@@ -109,11 +110,16 @@ export default function ContaHistoricoModal() {
     }
   };  
 
-  const renderItem = ({ item }: { item: { nome: string; quantidade: number } }) => (
-    <View style={styles.item} lightColor="#f9f9f9" darkColor="grey">
-      <Text style={styles.itemText}>
-        ( {item.quantidade}x ) {item.nome}
-      </Text>
+  const renderItem = ({ item }: { item: { nome: string; quantidade: number; preco: number } }) => (
+    <View style={styles.item} darkColor='grey' lightColor='whitesmoke'>
+      <View style={styles.itemRow} darkColor='grey' lightColor='whitesmoke'>
+        <Text style={styles.itemTextLeft}>
+          ({item.quantidade}x) {item.nome}
+        </Text>
+        <Text style={styles.itemTextRight}>
+          R$ {item.preco.toFixed(2)}
+        </Text>
+      </View>
     </View>
   );
 
@@ -136,18 +142,18 @@ export default function ContaHistoricoModal() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Detalhes da Venda</Text>
+      <Text style={styles.title}>Detalhes da Venda {venda.id}</Text>
       <View style={styles.separator} />
 
-      <Text style={styles.detailText}>Venda ID: {venda.id}</Text>
       <Text style={styles.detailText}>
         Data: {new Date(venda.horario).toLocaleDateString()}
       </Text>
       <Text style={styles.detailText}>
         Horário: {new Date(venda.horario).toLocaleTimeString()}
       </Text>
-      <Text style={styles.detailText}>Total: R$ {venda.total.toFixed(2)}</Text>
-
+      <Text style={styles.detailText}>
+        Cliente: {venda.cliente}
+      </Text>
       <View style={styles.separator} />
       <Text style={styles.subtitle}>Produtos</Text>
 
@@ -156,7 +162,7 @@ export default function ContaHistoricoModal() {
         renderItem={renderItem}
         keyExtractor={(item, index) => String(index)}
       />
-
+      <Text style={styles.title}>Total: R$ {venda.total.toFixed(2)}</Text>
       <View style={styles.separator} />
       <Button
         title="Imprimir Conta"
@@ -197,8 +203,19 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     padding: 10,
     borderRadius: 5,
+    //backgroundColor: '#f9f9f9', // Para o tema claro
   },
-  itemText: {
+  itemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  itemTextLeft: {
     fontSize: 16,
+    flex: 1, // Garante que o texto à esquerda tenha espaço suficiente
   },
+  itemTextRight: {
+    fontSize: 16,
+    textAlign: 'right', // Garante alinhamento correto
+  }
 });

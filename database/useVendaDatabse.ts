@@ -4,6 +4,7 @@ export type VendaDatabase = {
     id: number;
     total: number;
     horario: string;
+    cliente?: string;
 };
 
 export type VendaProduto = {
@@ -16,11 +17,9 @@ export type VendaProduto = {
 export function useVendasDatabase() {
     const database = useSQLiteContext();
 
-    async function createVenda(
-        produtos: { produtoId: number; quantidade: number }[]
-    ) {
+    async function createVenda( produtos: { produtoId: number; quantidade: number }[], cliente?: string) {
         const statementVenda = await database.prepareAsync(
-            "INSERT INTO TB_VENDAS (total, horario) VALUES ($total, $horario)"
+            "INSERT INTO TB_VENDAS (total, horario, cliente) VALUES ($total, $horario, $cliente)"
         );
 
         try {
@@ -30,6 +29,7 @@ export function useVendasDatabase() {
             const vendaResult = await statementVenda.executeAsync({
                 $total: total,
                 $horario: horario,
+                $cliente: cliente || "Não informado",
             });
 
             const vendaId = vendaResult.lastInsertRowId;

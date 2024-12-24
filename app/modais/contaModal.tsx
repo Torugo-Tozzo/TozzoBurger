@@ -1,14 +1,19 @@
 import { StatusBar } from 'expo-status-bar';
-import { Platform, StyleSheet, FlatList, Alert, TouchableOpacity } from 'react-native';
+import { Platform, StyleSheet, FlatList, Alert, TouchableOpacity, TextInput, useColorScheme } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useCart } from '@/context/CartContext';  // Importando corretamente o useCart
 import { useVendasDatabase } from '@/database/useVendaDatabse';
 import { router } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useState } from 'react';
 
 export default function ContaModalScreen() {
   const { cart, clearCart, updateCartItem } = useCart(); // Acessando o carrinho e a função de atualizar o item
   const { createVenda } = useVendasDatabase();
+  const [cliente, setCliente] = useState('');
+
+  const colorScheme = useColorScheme();
+  const placeholderColor = colorScheme === "dark" ? "#ccc" : "#666";
 
   const total = cart.reduce((sum, item) => {
     const quantidade = item.quantidade ?? 0; // Se quantidade for null ou undefined, usamos 0
@@ -34,7 +39,7 @@ export default function ContaModalScreen() {
         quantidade: quantidade ?? 0,
       }));
 
-      const { vendaId } = await createVenda(produtos);
+      const { vendaId } = await createVenda(produtos, cliente);
 
       Alert.alert(
         "Compra Finalizada",
@@ -63,41 +68,122 @@ export default function ContaModalScreen() {
     }
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: 20
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: "bold",
+      marginBottom: 20,
+    },
+    separator: {
+      marginVertical: 10,
+      height: 1,
+      width: "100%",
+      backgroundColor: "#ddd",
+    },
+    cartItem: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 10,
+    },
+    itemText: {
+      fontSize: 16,
+    },
+    totalText: {
+      fontSize: 18,
+      fontWeight: "bold",
+      marginVertical: 20,
+    },
+    quantityControls: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    quantityButton: {
+      backgroundColor: "#007BFF",
+      padding: 5,
+      borderRadius: 5,
+      marginHorizontal: 10,
+    },
+    quantityButtonText: {
+      color: "#fff",
+      fontSize: 18,
+      fontWeight: "bold",
+    },
+    buttonContainer: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    button: {
+      backgroundColor: "#007BFF",
+      padding: 10,
+      borderRadius: 8,
+      flex: 1,
+      marginHorizontal: 5,
+      alignItems: "center",
+    },
+    buttonText: {
+      color: "#fff",
+      fontSize: 16,
+      fontWeight: "bold",
+    },
+    buttonDisabled: {
+      backgroundColor: "#A1A1A1",  // Cor de fundo para o botão desabilitado
+    },
+    input: {
+      width: '100%',
+      padding: 10,
+      marginVertical: 10,
+      borderWidth: 1,
+      borderColor: '#ccc',
+      borderRadius: 5,
+      color: colorScheme === "dark" ? "#fff" : "#000"
+    }
+  });
+
   return (
     <View style={styles.container}>
       <Text style={styles.title} lightColor="black" darkColor="white">
         Carrinho de Compras
       </Text>
       <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-
+      <TextInput
+        style={styles.input}
+        placeholder="Nome do Cliente"
+        value={cliente}
+        onChangeText={setCliente}
+        placeholderTextColor={placeholderColor}
+      />
       <FlatList
-  data={cart}
-  keyExtractor={(item) => String(item.id)}  // Garantir que o item tem id
-  renderItem={({ item }) => (
-    <View style={styles.cartItem}>
-      <Text style={styles.itemText}>{item.nome}</Text>
-      <Text style={styles.itemText}>R$ {((item.quantidade ?? 0) * item.preco).toFixed(2)}</Text>
+        data={cart}
+        keyExtractor={(item) => String(item.id)}  // Garantir que o item tem id
+        renderItem={({ item }) => (
+          <View style={styles.cartItem}>
+            <Text style={styles.itemText}>{item.nome}</Text>
+            <Text style={styles.itemText}>R$ {((item.quantidade ?? 0) * item.preco).toFixed(2)}</Text>
 
-      <View style={styles.quantityControls}>
-        <TouchableOpacity
-          onPress={() => alterarQuantidade(item.id, 'decrementar')}
-          style={styles.quantityButton}
-        >
-          <FontAwesome name="minus" size={20} color="white" />
-        </TouchableOpacity>
-        
-        <Text style={styles.itemText}>{item.quantidade}</Text>
+            <View style={styles.quantityControls}>
+              <TouchableOpacity
+                onPress={() => alterarQuantidade(item.id, 'decrementar')}
+                style={styles.quantityButton}
+              >
+                <FontAwesome name="minus" size={20} color="white" />
+              </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => alterarQuantidade(item.id, 'incrementar')}
-          style={styles.quantityButton}
-        >
-          <FontAwesome name="plus" size={20} color="white" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  )}
-/>
+              <Text style={styles.itemText}>{item.quantidade}</Text>
+
+              <TouchableOpacity
+                onPress={() => alterarQuantidade(item.id, 'incrementar')}
+                style={styles.quantityButton}
+              >
+                <FontAwesome name="plus" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      />
 
       <Text style={styles.totalText}>Total: R$ {total.toFixed(2)}</Text>
 
@@ -122,69 +208,3 @@ export default function ContaModalScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-  },
-  separator: {
-    marginVertical: 10,
-    height: 1,
-    width: "100%",
-    backgroundColor: "#ddd",
-  },
-  cartItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  itemText: {
-    fontSize: 16,
-  },
-  totalText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginVertical: 20,
-  },
-  quantityControls: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  quantityButton: {
-    backgroundColor: "#007BFF",
-    padding: 5,
-    borderRadius: 5,
-    marginHorizontal: 10,
-  },
-  quantityButtonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  button: {
-    backgroundColor: "#007BFF",
-    padding: 10,
-    borderRadius: 8,
-    flex: 1,
-    marginHorizontal: 5,
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  buttonDisabled: {
-    backgroundColor: "#A1A1A1",  // Cor de fundo para o botão desabilitado
-  },
-});

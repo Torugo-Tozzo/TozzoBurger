@@ -150,6 +150,7 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
         value={preco}
         keyboardType="numeric"
         onChangeText={setPreco}
+        placeholderTextColor={placeholderColor} 
       />
       <View style={styles.input}>
         <Picker
