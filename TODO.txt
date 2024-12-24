@@ -1,0 +1,3 @@
+// tratamento de erro na impressão bluetooth
+
+// elaborar como vai ser a adição de adicional nos lanches
