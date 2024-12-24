@@ -108,8 +108,18 @@ const sendMessageToDevice = async (message: string, printer: any): Promise<void>
       for (const characteristic of characteristics) {
         if (characteristic.isWritableWithResponse || characteristic.isWritableWithoutResponse) {
           console.log(`Enviando mensagem para a característica: ${characteristic.uuid}`);
+
+          // Dividir a mensagem em blocos menores
           const base64Message = Buffer.from(message, 'utf-8').toString('base64');
-          await characteristic.writeWithResponse(base64Message);
+          const chunkSize = 20; // Limite do tamanho do bloco
+          const chunks = base64Message.match(new RegExp(`.{1,${chunkSize}}`, 'g')) || [];
+
+          // Enviar cada bloco
+          for (const chunk of chunks) {
+            await characteristic.writeWithResponse(chunk); // Ou writeWithoutResponse, se suportado
+            console.log(`Bloco enviado: ${chunk}`);
+          }
+
           console.log('Mensagem enviada com sucesso!');
           messageSent = true;
           break;

@@ -77,38 +77,46 @@ export default function ContaHistoricoModal() {
 
   const handlePrint = async () => {
     if (!venda) return;
-  
-    // Criando uma string com todos os detalhes da venda e dos produtos na ordem correta
+
+    // Início da string de impressão
     let printContent = `
-      \u001b!\u0030\u001bE\u0001TOZZO BURGER\u001bE\u0001\u001b!\u0000
-      \n--- Detalhes da Venda ---
-      \nID da Venda: ${venda.id}
-      \nData: ${new Date(venda.horario).toLocaleDateString()} às ${new Date(venda.horario).toLocaleTimeString()}
-      \n--- Itens da Venda ---
-    `;
-  
-    // Adicionando os produtos na string de impressão
-    produtos.forEach((produto, index) => {
-      printContent += `\n${index + 1}. ( ${produto.quantidade}x ) ${produto.nome}.......${(produto.quantidade * produto.preco).toFixed(2)}\n`;
+  \u001b!\u0030\u001bE\u0001TOZZO BURGER\u001bE\u0001\u001b!\u0000
+  \n------------- Informações da Venda -------------\n
+  Número da Venda: #${venda.id}
+  Cliente: ${venda.cliente}
+  Data: ${new Date(venda.horario).toLocaleDateString()} às ${new Date(venda.horario).toLocaleTimeString()}
+  \n---------------- Itens da Venda ----------------\n\n`;
+
+    produtos.forEach((produto) => {
+      const nomeProduto = produto.nome.length > 30
+        ? produto.nome.slice(0, 27) + "..." // Trunca e adiciona "..."
+        : produto.nome;
+
+      const valorTotal = `R$ ${(produto.quantidade * produto.preco).toFixed(2)}`;
+      const numPontosLinha = 48 - (nomeProduto.length + valorTotal.length + 7); // 7 é para quantidade e espaços
+      const pontos = ".".repeat(numPontosLinha > 0 ? numPontosLinha : 0);
+
+      printContent += `\x1bE1( ${produto.quantidade}x ) ${nomeProduto}${pontos}${valorTotal}\x1bE0\n`; // Negrito no nome do produto e valor total
+      printContent += produto.quantidade > 1
+        ? `    \x1bE1Preço Unitário: R$ ${produto.preco.toFixed(2)}\x1bE0\n\n` // Negrito no preço unitário
+        : '\n';
+
     });
 
-    printContent += `\u001b$a------------------------------\n`;
+    // Total alinhado
+    printContent += `\n---------------- Final da Conta ----------------\n`
+    printContent += `\n\u001b!\u0030\u001bE\u0001TOTAL: R$ ${venda.total.toFixed(2)}\u001bE\u0001\u001b!\u0000\n\n\n\n\n\n`;
 
-    // Total à esquerda, linha pontilhada no meio e valor à direita
-    let totalLinha = `\u001b_TOTAL:\t\tR$ ${venda.total.toFixed(2)}\t\t`; 
-    
-    printContent += `${totalLinha}\n`;
-    printContent += '\n\n-------fim---------\n\n\n\n\n';
-    
     try {
       console.log("String de impressão final:", printContent);
       await sendMessageToDevice(printContent, await getPrinter());
-      Alert.alert('Sucesso', 'Conta enviada para impressão.');
+      Alert.alert("Sucesso", "Conta enviada para impressão.");
     } catch (error) {
-      console.error('Erro ao imprimir:', error);
-      Alert.alert('Erro', 'Falha ao enviar para impressão.');
+      console.error("Erro ao imprimir:", error);
+      Alert.alert("Erro", "Falha ao enviar para impressão.");
     }
-  };  
+  };
+
 
   const renderItem = ({ item }: { item: { nome: string; quantidade: number; preco: number } }) => (
     <View style={styles.item} darkColor='grey' lightColor='whitesmoke'>
