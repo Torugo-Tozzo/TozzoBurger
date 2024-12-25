@@ -108,13 +108,12 @@ export default function ContaHistoricoModal() {
     printContent += `\n\u001b!\u0030\u001bE\u0001TOTAL: R$ ${venda.total.toFixed(2)}\u001bE\u0001\u001b!\u0000\n\n\n\n\n\n`;
 
     try {
-      console.log("String de impressão final:", printContent);
       await sendMessageToDevice(printContent, await getPrinter());
-      Alert.alert("Sucesso", "Conta enviada para impressão.");
     } catch (error) {
-      console.error("Erro ao imprimir:", error);
-      Alert.alert("Erro", "Falha ao enviar para impressão.");
+      Alert.alert("Erro", `${error}`);
+      return;
     }
+    Alert.alert("Sucesso", "Conta enviada para impressão.");
   };
 
 

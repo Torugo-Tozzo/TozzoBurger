@@ -1,6 +1,7 @@
 import { BleManager, Device } from 'react-native-ble-plx';
 import { PermissionsAndroid, Platform, Alert } from 'react-native';
 import { Buffer } from 'buffer';
+import { error } from 'console';
 
 const manager = new BleManager();
 
@@ -82,62 +83,55 @@ const disconnectFromDevice = async (deviceId: string): Promise<void> => {
 
 // Função para enviar dados (como mensagem) para o dispositivo
 const sendMessageToDevice = async (message: string, printer: any): Promise<void> => {
-  try {
-    if (!printer || !printer.uuid) {
-      console.error('Nenhuma impressora padrão registrada no banco.');
-      return;
-    }
-
-    console.log(`Buscando e conectando à impressora com UUID: ${printer.uuid}`);
-
-    // Conectar ao dispositivo com o UUID da impressora
-    const device: Device | null = await connectToDevice(printer.uuid);
-    if (!device) {
-      console.error('Falha ao conectar à impressora.');
-      return;
-    }
-
-    console.log('Conectado à impressora.');
-
-    // Busca os serviços e características e envia a mensagem
-    const services = await device.services();
-    let messageSent = false;
-
-    for (const service of services) {
-      const characteristics = await service.characteristics();
-      for (const characteristic of characteristics) {
-        if (characteristic.isWritableWithResponse || characteristic.isWritableWithoutResponse) {
-          console.log(`Enviando mensagem para a característica: ${characteristic.uuid}`);
-
-          // Dividir a mensagem em blocos menores
-          const base64Message = Buffer.from(message, 'utf-8').toString('base64');
-          const chunkSize = 20; // Limite do tamanho do bloco
-          const chunks = base64Message.match(new RegExp(`.{1,${chunkSize}}`, 'g')) || [];
-
-          // Enviar cada bloco
-          for (const chunk of chunks) {
-            await characteristic.writeWithResponse(chunk); // Ou writeWithoutResponse, se suportado
-            console.log(`Bloco enviado: ${chunk}`);
-          }
-
-          console.log('Mensagem enviada com sucesso!');
-          messageSent = true;
-          break;
-        }
-      }
-      if (messageSent) break;
-    }
-
-    if (!messageSent) {
-      console.error('Nenhuma característica disponível para escrita encontrada.');
-    }
-
-    // Desconectar do dispositivo
-    await disconnectFromDevice(printer.uuid);
-    console.log('Desconectado da impressora.');
-  } catch (error) {
-    console.error('Erro ao enviar mensagem para a impressora registrada:', error);
+  if (!printer || !printer.uuid) {
+    console.error('Nenhuma impressora padrão registrada no banco.');
+    throw new Error('Nenhuma impressora padrão registrada no banco.');
   }
+
+  // Conectar ao dispositivo com o UUID da impressora
+  const device: Device | null = await connectToDevice(printer.uuid);
+  if (!device) {
+    console.error('Falha ao conectar à impressora.');
+    throw new Error('Falha ao conectar à impressora.');
+  }
+
+  // Busca os serviços e características e envia a mensagem
+  const services = await device.services();
+  let messageSent = false;
+
+  for (const service of services) {
+    const characteristics = await service.characteristics();
+    for (const characteristic of characteristics) {
+      if (characteristic.isWritableWithResponse || characteristic.isWritableWithoutResponse) {
+        console.log(`Enviando mensagem para a característica: ${characteristic.uuid}`);
+
+        // Dividir a mensagem em blocos menores
+        const base64Message = Buffer.from(message, 'utf-8').toString('base64');
+        const chunkSize = 20; // Limite do tamanho do bloco
+        const chunks = base64Message.match(new RegExp(`.{1,${chunkSize}}`, 'g')) || [];
+
+        // Enviar cada bloco
+        for (const chunk of chunks) {
+          await characteristic.writeWithResponse(chunk); // Ou writeWithoutResponse, se suportado
+          console.log(`Bloco enviado: ${chunk}`);
+        }
+
+        console.log('Mensagem enviada com sucesso!');
+        messageSent = true;
+        break;
+      }
+    }
+    if (messageSent) break;
+  }
+
+  if (!messageSent) {
+    console.error('Nenhuma característica disponível para escrita encontrada.');
+    throw new Error('Nenhuma característica disponível para escrita encontrada.');
+  }
+
+  // Desconectar do dispositivo
+  await disconnectFromDevice(printer.uuid);
+  console.log('Desconectado da impressora.');
 };
 
 export { listNearbyDevices, connectToDevice, disconnectFromDevice, sendMessageToDevice };
