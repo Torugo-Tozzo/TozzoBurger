@@ -70,6 +70,7 @@ function RootLayoutNav() {
         <Stack.Screen name="modais/contaModal" options={{ presentation: 'modal', title: 'Conta' }} />
         <Stack.Screen name="modais/produtoModal" options={{ presentation: 'modal', title: 'Produto' }} />
         <Stack.Screen name="modais/contaHistoricoModal" options={{ presentation: 'modal', title: 'Conta Fechada' }} />
+        <Stack.Screen name="modais/adicionalModal" options={{ presentation: 'modal', title: 'Adicional' }} />
       </Stack>
     </ThemeProvider>
   );

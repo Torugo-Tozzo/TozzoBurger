@@ -10,7 +10,7 @@ import { Product } from "@/components/Product"
 import { router } from "expo-router"
 
 export default function ProdutosScreen() {
-  const { remove } = useProductDatabase(); 
+  const { remove } = useProductDatabase();
   const { products, tiposProduto, tipoProdutoId, filterByTipo, setSearch } = useProductList()
 
   useFocusEffect(
@@ -30,33 +30,33 @@ export default function ProdutosScreen() {
         onSelect={filterByTipo}
       />
       <FlatList
-  data={products}
-  keyExtractor={(item) => String(item.id)}
-  renderItem={({ item }) => (
-    <Product
-      data={item}
-      onDelete={() => {
-        Alert.alert(
-          'Confirmar Remoção',
-          'Tem certeza que deseja remover este produto?',
-          [
-            { text: 'Cancelar', style: 'cancel' }, 
-            {
-              text: 'Remover',
-              onPress: () => {
-                remove(item.id); 
-                filterByTipo(Number(tipoProdutoId)); 
-              },
-              style: 'destructive', 
-            },
-          ]
-        );
-      }}
-      onOpen={() => router.push(`/modais/produtoModal?productId=${item.id}`)}
-    />
-  )}
-  contentContainerStyle={{ gap: 16 }}
-/>
+        data={products}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={({ item }) => (
+          <Product
+            data={item}
+            onDelete={() => {
+              Alert.alert(
+                'Confirmar Remoção',
+                'Tem certeza que deseja remover este produto?',
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  {
+                    text: 'Remover',
+                    onPress: () => {
+                      remove(item.id);
+                      filterByTipo(Number(tipoProdutoId));
+                    },
+                    style: 'destructive',
+                  },
+                ]
+              );
+            }}
+            onOpen={() => router.push(`/modais/produtoModal?productId=${item.id}`)}
+          />
+        )}
+        contentContainerStyle={{ gap: 16 }}
+      />
     </View>
   );
 }

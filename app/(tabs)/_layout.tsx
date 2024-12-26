@@ -28,16 +28,31 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Vender',
+          headerTitleAlign: 'center',
           tabBarIcon: ({ color }) => <TabBarIcon name="dollar" color={color} />,
+          headerLeft: () => (
+            <Link href="/modais/adicionalModal" asChild>
+              <Pressable>
+                {({ pressed }) => (
+                  <FontAwesome
+                    name="flash"
+                    size={30}
+                    color={Colors[colorScheme ?? 'light'].tint}
+                    style={{ marginLeft: 20, opacity: pressed ? 0.5 : 1 }}
+                  />
+                )}
+              </Pressable>
+            </Link>
+          ),
           headerRight: () => (
             <Link href="/modais/contaModal" asChild>
               <Pressable>
                 {({ pressed }) => (
                   <FontAwesome
                     name="cart-plus"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
+                    size={30}
+                    color={Colors[colorScheme ?? 'light'].tint}
+                    style={{ marginRight: 20, opacity: pressed ? 0.5 : 1 }}
                   />
                 )}
               </Pressable>
@@ -56,8 +71,8 @@ export default function TabLayout() {
                 {({ pressed }) => (
                   <FontAwesome
                     name="plus-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
+                    size={30}
+                    color={Colors[colorScheme ?? 'light'].tint}
                     style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
                   />
                 )}

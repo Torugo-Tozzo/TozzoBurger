@@ -17,7 +17,7 @@ export type VendaProduto = {
 export function useVendasDatabase() {
     const database = useSQLiteContext();
 
-    async function createVenda( produtos: { produtoId: number; quantidade: number }[], cliente?: string) {
+    async function createVenda(produtos: { produtoId: number; quantidade: number }[], cliente?: string) {
         const statementVenda = await database.prepareAsync(
             "INSERT INTO TB_VENDAS (total, horario, cliente) VALUES ($total, $horario, $cliente)"
         );
@@ -55,22 +55,22 @@ export function useVendasDatabase() {
                 "SELECT * FROM TB_VENDAS WHERE id = ?",
                 [vendaId]
             );
-    
+
             if (!venda) {
                 throw new Error(`Venda com ID ${vendaId} não encontrada.`);
             }
-    
+
             const produtos = await database.getAllAsync<VendaProduto>(
                 "SELECT produtoId, quantidade FROM RL_VENDA_PRODUTO WHERE vendaId = ?",
                 [vendaId]
             );
-    
+
             return { ...venda, produtos };
         } catch (error) {
             throw error;
         }
     }
-    
+
 
     async function removeVenda(vendaId: number) {
         try {
@@ -112,9 +112,33 @@ export function useVendasDatabase() {
                 [seteDiasAtrasISO]
             );
     
-            const vendasPorData: Record<string, VendaDatabase[]> = {};
+            const vendasComProdutos = await Promise.all(
+                vendas.map(async (venda) => {
+                    const produtos = await database.getAllAsync<{ nome: string; quantidade: number }>(
+                        `SELECT P.nome, VP.quantidade 
+                         FROM RL_VENDA_PRODUTO VP
+                         JOIN TB_PRODUTOS P ON VP.produtoId = P.id
+                         WHERE VP.vendaId = ?`,
+                        [venda.id]
+                    );
     
-            for (const venda of vendas) {
+                    const nomesProdutos = produtos.map(
+                        (p) => `( ${p.quantidade}x ) ${p.nome}`
+                    );
+    
+                    // Limita os nomes dos produtos a 3 e adiciona "..." se houver mais
+                    const produtosExibidos =
+                        nomesProdutos.length > 3
+                            ? [...nomesProdutos.slice(0, 3), "..."]
+                            : nomesProdutos;
+    
+                    return { ...venda, produtos: produtosExibidos };
+                })
+            );
+    
+            const vendasPorData: Record<string, (VendaDatabase & { produtos: string[] })[]> = {};
+    
+            for (const venda of vendasComProdutos) {
                 const dataVenda = new Date(venda.horario).toLocaleDateString(); // Agrupamento por data
                 if (!vendasPorData[dataVenda]) {
                     vendasPorData[dataVenda] = [];
@@ -122,7 +146,7 @@ export function useVendasDatabase() {
                 vendasPorData[dataVenda].push(venda);
             }
     
-            return vendasPorData; // Retorna vendas agrupadas por data
+            return vendasPorData; // Retorna vendas agrupadas por data com produtos
         } catch (error) {
             throw error;
         }
@@ -132,17 +156,41 @@ export function useVendasDatabase() {
         try {
             const inicioDoDia = `${data}T00:00:00.000Z`;
             const fimDoDia = `${data}T23:59:59.999Z`;
-
+    
             const vendas = await database.getAllAsync<VendaDatabase>(
                 "SELECT * FROM TB_VENDAS WHERE horario BETWEEN ? AND ?",
                 [inicioDoDia, fimDoDia]
             );
-
-            return vendas;
+    
+            const vendasComProdutos = await Promise.all(
+                vendas.map(async (venda) => {
+                    const produtos = await database.getAllAsync<{ nome: string; quantidade: number }>(
+                        `SELECT P.nome, VP.quantidade 
+                         FROM RL_VENDA_PRODUTO VP
+                         JOIN TB_PRODUTOS P ON VP.produtoId = P.id
+                         WHERE VP.vendaId = ?`,
+                        [venda.id]
+                    );
+    
+                    const nomesProdutos = produtos.map(
+                        (p) => `( ${p.quantidade}x ) ${p.nome}`
+                    );
+    
+                    // Limita os nomes dos produtos a 3 e adiciona "..." se houver mais
+                    const produtosExibidos =
+                        nomesProdutos.length > 3
+                            ? [...nomesProdutos.slice(0, 3), "..."]
+                            : nomesProdutos;
+    
+                    return { ...venda, produtos: produtosExibidos };
+                })
+            );
+    
+            return vendasComProdutos; // Retorna vendas do dia com os nomes dos produtos
         } catch (error) {
             throw error;
         }
-    }
+    }    
 
     return { createVenda, removeVenda, listVendasRecentes, getVendaById, listVendasPorDia };
 }

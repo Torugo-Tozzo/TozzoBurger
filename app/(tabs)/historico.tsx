@@ -2,13 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, FlatList, Alert, TouchableOpacity, TextInput, Button, ScrollView, useColorScheme } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useVendasDatabase, VendaDatabase } from '@/database/useVendaDatabse';
+import { useProductDatabase } from '@/database/useProductDatabase';
+import { usePrinterDatabase } from '@/database/usePrinterDatabase';
 import { useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { formatarVendaParaImpressao } from '@/hooks/formatarVendaImpressao';
+import { Produto } from '@/hooks/formatarVendaImpressao';
+import { sendMessageToDevice } from '@/useBLE';
 
 export default function HistoricoScreen() {
   const [vendas, setVendas] = useState<Record<string, VendaDatabase[]>>({});
   const [searchDate, setSearchDate] = useState('');
-  const { listVendasRecentes, listVendasPorDia, removeVenda } = useVendasDatabase();
+  const { listVendasRecentes, listVendasPorDia, removeVenda, getVendaById } = useVendasDatabase();
+  const { show } = useProductDatabase();
+  const { getPrinter } = usePrinterDatabase();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const placeholderColor = colorScheme === "dark" ? "#ccc" : "#666";
@@ -44,6 +51,15 @@ export default function HistoricoScreen() {
     },
     itemText: {
       fontSize: 16,
+      fontWeight: "bold",
+      marginBottom: 5,
+      textAlign: 'center',
+    },
+    itemTextTitle: {
+      fontSize: 18,
+      fontWeight: "bold",
+      margin: 10,
+      textAlign: 'center',
     },
     dateHeader: {
       fontSize: 18,
@@ -60,6 +76,15 @@ export default function HistoricoScreen() {
     button: {
       padding: 10,
       backgroundColor: '#007bff',
+      borderRadius: 5,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginHorizontal: 5,
+      width: 60,
+    },
+    Greenbutton: {
+      padding: 10,
+      backgroundColor: 'green',
       borderRadius: 5,
       justifyContent: 'center',
       alignItems: 'center',
@@ -116,6 +141,36 @@ export default function HistoricoScreen() {
     }
   };  
 
+  const handlePrint = async (vendaId: number) => {
+    let venda = await getVendaById(vendaId); 
+    if (!venda) return;
+
+    const produtos: Produto[] = await Promise.all(
+      venda.produtos.map(async (produto) => {
+        // Fazendo a chamada assíncrona para obter as informações do produto
+        let prodInfos = await show(produto.produtoId);
+        
+        // Retorna o objeto do tipo Produto, com valores padrão caso seja undefined
+        return {
+          nome: prodInfos?.nome ?? "Produto desconhecido", // valor padrão se `nome` for undefined
+          quantidade: produto.quantidade,
+          preco: prodInfos?.preco ?? 0, // valor padrão se `preco` for undefined
+        };
+      })
+    );    
+
+    // Início da string de impressão
+    let printContent = await formatarVendaParaImpressao(venda, produtos);
+
+    try {
+      await sendMessageToDevice(printContent, await getPrinter());
+    } catch (error) {
+      Alert.alert("Erro", `${error}`);
+      return;
+    }
+    Alert.alert("Sucesso", "Conta enviada para impressão.");
+  };
+
   const handleExcluir = (vendaId: number) => {
     Alert.alert(
       'Confirmar Exclusão',
@@ -148,13 +203,14 @@ export default function HistoricoScreen() {
     );
   };
 
-  const renderVendaItem = ({ item }: { item: VendaDatabase }) => (
+  const renderVendaItem = ({ item }: { item: VendaDatabase & { produtos: string[] } }) => (
     <View style={styles.item} lightColor="whitesmoke" darkColor="grey">
-      <Text style={styles.itemText}>Venda ID: {item.id}</Text>
-      <Text style={styles.itemText}>Total: R$ {item.total.toFixed(2)}</Text>
-      <Text style={styles.itemText}>
-        Data: {new Date(item.horario).toLocaleDateString()} | Horário: {new Date(item.horario).toLocaleTimeString()}
-      </Text>
+      <Text style={styles.itemTextTitle}>Venda #{item.id}</Text>
+      <Text style={styles.itemText}>Cliente: {item.cliente} | Horário: {new Date(item.horario).toLocaleTimeString()}</Text>
+      <Text style={styles.itemTextTitle}>Total: R$ {item.total.toFixed(2)}</Text>
+      <Text style={{fontWeight: "bold",}}>Produtos: {item.produtos.join(", ")}</Text>
+
+      
 
       <View style={styles.buttonContainer} lightColor="whitesmoke" darkColor="grey">
         <TouchableOpacity
@@ -163,6 +219,9 @@ export default function HistoricoScreen() {
         >
           <FontAwesome name="eye" size={20} color="#fff" />
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => handlePrint(item.id)} style={styles.Greenbutton}>
+          <FontAwesome name="print" size={20} color="#fff" />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => handleExcluir(item.id)} style={styles.Redbutton}>
           <FontAwesome name="trash" size={20} color="#fff" />
         </TouchableOpacity>
@@ -170,7 +229,7 @@ export default function HistoricoScreen() {
     </View>
   );
 
-  const renderVendasPorData = (data: string, vendas: VendaDatabase[]) => {
+  const renderVendasPorData = (data: string, vendas: (VendaDatabase & { produtos: string[] })[]) => {
     const totalVendas = vendas.reduce((acc, venda) => acc + venda.total, 0).toFixed(2);
   
     const hoje = new Date();
@@ -218,7 +277,10 @@ export default function HistoricoScreen() {
 
       <FlatList
         data={Object.entries(vendas)}
-        renderItem={({ item }) => renderVendasPorData(item[0], item[1])}
+        renderItem={({ item }) => {
+          const [data, vendasDoDia] = item as [string, (VendaDatabase & { produtos: string[] })[]];
+          return renderVendasPorData(data, vendasDoDia);
+        }}
         keyExtractor={(item) => item[0]}
         showsVerticalScrollIndicator={true}
         style={{ flex: 1 }}

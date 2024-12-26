@@ -3,6 +3,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useColorScheme } from "react-native";
 import { View, Text } from "@/components/Themed";
+import Colors from '@/constants/Colors';
 
 const productImages: Record<number, any> = {
   1: require("../assets/images/1-removebg-preview.png"),
@@ -64,7 +65,7 @@ export function Product({ data, onDelete, onOpen, ...rest }: Props) {
 
       <View style={styles.buttonContainer} lightColor="#f9f9f9" darkColor="grey">
         <TouchableOpacity onPress={onOpen}>
-          <FontAwesome name="edit" size={28} color="blue" style={{ marginLeft: 16 }} />
+          <FontAwesome name="edit" size={28} color={Colors[colorScheme ?? 'light'].tint} style={{ marginLeft: 16 }} />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={onDelete}>

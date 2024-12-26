@@ -24,7 +24,7 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
   const router = useRouter();
 
   const colorScheme = useColorScheme();
-  const placeholderColor = colorScheme === "dark" ? "#ccc" : "#666";
+  const placeholderColor = 'grey';
 
   useEffect(() => {
     async function fetchTiposProdutos() {
@@ -90,12 +90,10 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
       padding: 20,
     },
     title: {
-      fontSize: 20,
+      fontSize: 30,
       fontWeight: 'bold',
     },
     separator: {
@@ -113,7 +111,7 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
       color: colorScheme === "dark" ? "#fff" : "#000"
     },
     picker: {
-      color: colorScheme === "dark" ? "#fff" : "#000",
+      color: 'grey',
     },
     buttonContainer: {
       width: '100%',
@@ -136,22 +134,24 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
         {productId ? 'Editar Produto' : 'Cadastrar Produto'}
       </Text>
       <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-      
+      <Text style={{fontSize: 16, margin: 10, fontWeight: "bold"}}>Nome do Produto</Text>
       <TextInput
         style={styles.input}
-        placeholder="Nome do Produto"
+        placeholder="Digite o Nome..."
         value={nome}
         onChangeText={setNome}
         placeholderTextColor={placeholderColor} 
       />
+      <Text style={{fontSize: 16, margin: 10, fontWeight: "bold"}}>Preço do Produto</Text>
       <TextInput
         style={styles.input}
-        placeholder="Preço do Produto"
+        placeholder="Digite o Preço.."
         value={preco}
         keyboardType="numeric"
         onChangeText={setPreco}
         placeholderTextColor={placeholderColor} 
       />
+      <Text style={{fontSize: 16, margin: 10, fontWeight: "bold"}}>Tipo do Produto</Text>
       <View style={styles.input}>
         <Picker
           selectedValue={tipoProdutoId}
