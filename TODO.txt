@@ -1,10 +1,1 @@
-// tratamento de erro na impressão bluetooth
-
-// elaborar como vai ser a adição de adicional nos lanches
-
-//o botão do raio vai buscar no banco : searchOrigemProdutoId(produtoId).
-//vai voltar uma lista de produtos, caso venha vazia ele cria um produto com origemProdutoId = produtoId, 
-//e com as mesmas caracteristicas de preço e tipo. O nome coloca o nome do produto + Mod
-//se a lista voltar produtos a gente faz um foreach e vê se o produtoId existe na conta, se existir passa pro proximo produto.
-//se não existir adiciona esse produto na conta.
-//se chegar ao final do foreach de produtos e nenhum produto tiver sido adicionado por ja existirem na conta, criamos um produto e adicionamos na conta
+//fazer a lista dos lanches do cardapio, fazer uma query que vai popular direto

@@ -8,7 +8,8 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       nome TEXT NOT NULL,
       tipoProdutoId INTEGER NULL,
       preco REAL NOT NULL,
-      origemProdutoId INTEGER NULL
+      origemProdutoId INTEGER NULL,
+      ingredientes TEXT NULL
     );
   `)
 
@@ -66,6 +67,23 @@ async function seedTipoProduto(database: SQLiteDatabase) {
     await database.execAsync(`
       INSERT OR IGNORE INTO TB_TP_PRODUTO (id, descricao)
       VALUES (${tipo.id}, '${tipo.descricao}');
+    `);
+  }
+}
+
+async function seedProdutos(database: SQLiteDatabase) {
+  const produtos = [
+    { id: 1, nome: "Produto A", tipoProdutoId: 1, preco: 10.0, origemProdutoId: null },
+    { id: 2, nome: "Produto B", tipoProdutoId: 2, preco: 15.0, origemProdutoId: null },
+    { id: 3, nome: "Produto C", tipoProdutoId: 3, preco: 20.0, origemProdutoId: null },
+    { id: 4, nome: "Produto D", tipoProdutoId: 4, preco: 25.0, origemProdutoId: null },
+    // Adicione mais produtos conforme necessário
+  ];
+
+  for (const produto of produtos) {
+    await database.execAsync(`
+      INSERT OR IGNORE INTO TB_PRODUTOS (id, nome, tipoProdutoId, preco, origemProdutoId)
+      VALUES (${produto.id}, '${produto.nome}', ${produto.tipoProdutoId}, ${produto.preco}, ${produto.origemProdutoId ?? 'NULL'});
     `);
   }
 }

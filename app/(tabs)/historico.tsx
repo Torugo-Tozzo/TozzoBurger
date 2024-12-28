@@ -14,7 +14,7 @@ export default function HistoricoScreen() {
   const [vendas, setVendas] = useState<Record<string, VendaDatabase[]>>({});
   const [searchDate, setSearchDate] = useState('');
   const { listVendasRecentes, listVendasPorDia, removeVenda, getVendaById } = useVendasDatabase();
-  const { show } = useProductDatabase();
+  const { showAdd } = useProductDatabase();
   const { getPrinter } = usePrinterDatabase();
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -148,7 +148,7 @@ export default function HistoricoScreen() {
     const produtos: Produto[] = await Promise.all(
       venda.produtos.map(async (produto) => {
         // Fazendo a chamada assíncrona para obter as informações do produto
-        let prodInfos = await show(produto.produtoId);
+        let prodInfos = await showAdd(produto.produtoId);
         
         // Retorna o objeto do tipo Produto, com valores padrão caso seja undefined
         return {
@@ -208,7 +208,7 @@ export default function HistoricoScreen() {
       <Text style={styles.itemTextTitle}>Venda #{item.id}</Text>
       <Text style={styles.itemText}>Cliente: {item.cliente} | Horário: {new Date(item.horario).toLocaleTimeString()}</Text>
       <Text style={styles.itemTextTitle}>Total: R$ {item.total.toFixed(2)}</Text>
-      <Text style={{fontWeight: "bold",}}>Produtos: {item.produtos.join(", ")}</Text>
+      <Text style={{fontWeight: "bold",}}>Itens:{item.produtos.join(", ")}</Text>
 
       
 

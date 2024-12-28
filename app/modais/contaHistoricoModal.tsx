@@ -11,7 +11,7 @@ import { formatarVendaParaImpressao } from '@/hooks/formatarVendaImpressao';
 export default function ContaHistoricoModal() {
   const { vendaId } = useLocalSearchParams();
   const { getVendaById } = useVendasDatabase();
-  const { show: getProductById } = useProductDatabase();
+  const { showAdd: getProductById } = useProductDatabase();
   const { getPrinter } = usePrinterDatabase();
   const router = useRouter();
 

@@ -1,9 +1,10 @@
-import { Pressable, PressableProps, TouchableOpacity, Image, StyleSheet } from "react-native";
+import { Pressable, PressableProps, TouchableOpacity, Image, StyleSheet, Modal, Button } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useColorScheme } from "react-native";
 import { View, Text } from "@/components/Themed";
 import Colors from '@/constants/Colors';
+import { useState } from "react";
 
 const productImages: Record<number, any> = {
   1: require("../assets/images/1-removebg-preview.png"),
@@ -20,6 +21,7 @@ type Props = PressableProps & {
     nome: string;
     preco: number;
     tipoProdutoId: number;
+    ingredientes?: string;
   };
   onDelete: () => void;
   onOpen: () => void;
@@ -27,11 +29,16 @@ type Props = PressableProps & {
 
 export function Product({ data, onDelete, onOpen, ...rest }: Props) {
   const colorScheme = useColorScheme();
+  const [modalVisible, setModalVisible] = useState(false);
   const isDarkMode = colorScheme === "dark";
 
   const containerStyle = {
     backgroundColor: isDarkMode ? "grey" : "whitesmoke",
     shadowColor: isDarkMode ? "#000" : "#666",
+  };
+
+  const handleImagePress = () => {
+    setModalVisible(true); // Abre o modal ao pressionar na imagem
   };
 
   return (
@@ -42,11 +49,13 @@ export function Product({ data, onDelete, onOpen, ...rest }: Props) {
       ]}
       {...rest}
     >
-      <Image
-        source={productImages[data.tipoProdutoId]}
-        style={{ width: 50, height: 50, marginRight: 16 }}
-        resizeMode="contain"
-      />
+      <Pressable onPress={handleImagePress}>
+        <Image
+          source={productImages[data.tipoProdutoId]}
+          style={{ width: 50, height: 50, marginRight: 16 }}
+          resizeMode="contain"
+        />
+      </Pressable>
 
       <View style={{ flex: 1 }} lightColor="#f9f9f9" darkColor="grey">
         <Text
@@ -71,6 +80,37 @@ export function Product({ data, onDelete, onOpen, ...rest }: Props) {
         <TouchableOpacity onPress={onDelete}>
           <FontAwesome name="trash" size={24} color="red" style={{ marginLeft: 16 }} />
         </TouchableOpacity>
+        {/* Modal para mostrar os ingredientes */}
+        <Modal
+          visible={modalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setModalVisible(false)} // Fechar o modal
+        >
+          <View
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: useColorScheme() === "dark" ? "#333" : "#fff",
+                padding: 20,
+                borderRadius: 10,
+                width: "80%",
+              }}
+            >
+              <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 15 }}>
+                Ingredientes do {data.nome}:
+              </Text>
+              <Text style={{ marginBottom: 20 }}>{data.ingredientes ?? 'Os ingredientes não foram informados no cadastro deste produto'}</Text>
+              <Button title="Fechar" onPress={() => setModalVisible(false)} />
+            </View>
+          </View>
+        </Modal>
       </View>
     </Pressable>
   );
