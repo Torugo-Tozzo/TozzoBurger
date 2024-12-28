@@ -1,50 +1,53 @@
 import React, { useEffect, useState } from 'react';
-import { Platform, StyleSheet, TextInput, FlatList, Alert, Pressable, Text as RNText } from 'react-native';
+import { StyleSheet, TextInput, Alert, useColorScheme, Pressable, Text as RNText } from 'react-native';
+import { Picker } from "@react-native-picker/picker";
 import { Text, View } from '@/components/Themed';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useColorScheme } from '@/components/useColorScheme';
-
-type Adicional = {
-    id: number;
-    nome: string;
-};
+import { useProductDatabase } from '@/database/useProductDatabase';
+import { useRouter } from 'expo-router';
+import { useCart } from '@/context/CartContext';
 
 export default function AdicionalModalScreen() {
-    const { productId } = useLocalSearchParams();
-    const router = useRouter();
+    const { create, getTipoProdutos } = useProductDatabase();
 
     const [nome, setNome] = useState('');
     const [preco, setPreco] = useState('');
-    const [adicionais, setAdicionais] = useState<Adicional[]>([]);
-    const [adicionaisSelecionados, setAdicionaisSelecionados] = useState<Adicional[]>([]);
+    const router = useRouter();
+    const { addToCart, cart } = useCart();
+
     const colorScheme = useColorScheme();
+    const placeholderColor = 'grey';
 
-    useEffect(() => {
-        if (productId) {
-            // Mock de adicionais disponíveis
-            setAdicionais([
-                { id: 1, nome: 'Adicional 1' },
-                { id: 2, nome: 'Adicional 2' },
-                { id: 3, nome: 'Adicional 3' },
-            ]);
+
+
+    async function handleSave() {
+        try {
+            if (!nome || !preco) {
+                Alert.alert('Erro', 'Por favor, preencha todos os campos.');
+                return;
+            }
+
+            let response = await create({
+                nome,
+                preco: parseFloat(preco),
+                tipoProdutoId: 8,
+            });
+            
+            let produtoCriadoId = Number(response.insertedRowId);
+
+            await addToCart({
+                id: produtoCriadoId,
+                nome,
+                preco: parseFloat(preco),
+                tipoProdutoId: 8,
+                quantidade: 1,
+            });
+
+            router.back();
+
+        } catch (error) {
+            console.error('Erro ao salvar produto:', error);
+            Alert.alert('Erro', 'Houve um erro ao salvar o produto.');
         }
-    }, [productId]);
-
-    function handleToggleAdicional(adicional: Adicional) {
-        setAdicionaisSelecionados((prev) =>
-            prev.some((item) => item.id === adicional.id)
-                ? prev.filter((item) => item.id !== adicional.id)
-                : [...prev, adicional]
-        );
-    }
-
-    function handleSave() {
-        if (!productId) {
-            Alert.alert('Produto Criado', `Nome: ${nome}\nPreço: ${preco}`);
-        } else {
-            Alert.alert('Adicionais Salvos', `Adicionais: ${adicionaisSelecionados.map((a) => a.nome).join(', ')}`);
-        }
-        router.back();
     }
 
     const styles = StyleSheet.create({
@@ -68,27 +71,10 @@ export default function AdicionalModalScreen() {
             borderWidth: 1,
             borderColor: '#ccc',
             borderRadius: 5,
+            color: colorScheme === "dark" ? "#fff" : "#000",
         },
-        adicionalContainer: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: 10,
-            borderBottomWidth: 1,
-            borderColor: '#ccc',
-        },
-        adicionalText: {
-            fontSize: 16,
-        },
-        adicionalButton: {
-            backgroundColor: '#007BFF',
-            paddingVertical: 6,
-            paddingHorizontal: 12,
-            borderRadius: 5,
-        },
-        adicionalButtonText: {
-            color: '#fff',
-            fontSize: 14,
+        picker: {
+            color: 'grey',
         },
         buttonContainer: {
             width: '100%',
@@ -107,54 +93,29 @@ export default function AdicionalModalScreen() {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>{productId ? 'Selecionar Adicionais' : 'Cadastro Rápido'}</Text>
+            <Text style={styles.title} lightColor="black" darkColor="white">
+                Produto Adicional
+            </Text>
             <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-
-            {!productId ? (
-                <>
-                    <Text style={{ fontSize: 16, margin: 10, fontWeight: "bold" }}>Nome do Produto</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Digite o Nome.."
-                        value={nome}
-                        onChangeText={setNome}
-                        placeholderTextColor='grey'
-                    />
-                    <Text style={{ fontSize: 16, margin: 10, fontWeight: "bold" }}>Preço do Produto</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Digite o Preço.."
-                        value={preco}
-                        keyboardType="numeric"
-                        onChangeText={setPreco}
-                        placeholderTextColor='grey'
-                    />
-                </>
-            ) : (
-                <FlatList
-                    data={adicionais}
-                    keyExtractor={(item) => item.id.toString()}
-                    renderItem={({ item }) => (
-                        <View style={styles.adicionalContainer}>
-                            <Text style={styles.adicionalText}>{item.nome}</Text>
-                            <Pressable
-                                style={[
-                                    styles.adicionalButton,
-                                    adicionaisSelecionados.some((a) => a.id === item.id) && { backgroundColor: '#28a745' },
-                                ]}
-                                onPress={() => handleToggleAdicional(item)}
-                            >
-                                <RNText style={styles.adicionalButtonText}>
-                                    {adicionaisSelecionados.some((a) => a.id === item.id) ? 'Remover' : 'Adicionar'}
-                                </RNText>
-                            </Pressable>
-                        </View>
-                    )}
-                />
-            )}
-
+            <Text style={{ fontSize: 16, margin: 10, fontWeight: "bold" }}>Nome do Produto</Text>
+            <TextInput
+                style={styles.input}
+                placeholder="Digite o Nome..."
+                value={nome}
+                onChangeText={setNome}
+                placeholderTextColor={placeholderColor}
+            />
+            <Text style={{ fontSize: 16, margin: 10, fontWeight: "bold" }}>Preço do Produto</Text>
+            <TextInput
+                style={styles.input}
+                placeholder="Digite o Preço..."
+                value={preco}
+                keyboardType="numeric"
+                onChangeText={setPreco}
+                placeholderTextColor={placeholderColor}
+            />
             <Pressable style={styles.buttonContainer} onPress={handleSave}>
-                <RNText style={styles.buttonText}>Adicionar na Conta</RNText>
+                <RNText style={styles.buttonText}>Salvar</RNText>
             </Pressable>
         </View>
     );
