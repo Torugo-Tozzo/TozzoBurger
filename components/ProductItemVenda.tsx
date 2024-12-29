@@ -51,17 +51,17 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart }: Produ
           resizeMode="contain"
         />
       </Pressable>
-      <View lightColor="#f9f9f9" darkColor="grey">
-        <Text style={{ fontSize: 18, fontWeight: "bold" }}>{data.nome}</Text>
+      <View lightColor="#f9f9f9" darkColor="grey" style={{ flex: 1 }}>
+        <Text style={{ fontSize: 18, fontWeight: "bold"  }}>{data.nome}</Text>
         <Text style={{ fontSize: 15 }}>Preço: R$ {data.preco.toFixed(2)}</Text>
       </View>
-      <Pressable onPress={() => onAdicionaltoCart(data, true)}>
+      <Pressable onPress={() => onAdicionaltoCart(data, true)} style={{ flexDirection: "row" }}>
         {({ pressed }) => (
           <FontAwesome
             name="flash"
-            size={20}
+            size={25}
             color={Colors[colorScheme ?? "light"].tint}
-            style={{ marginRight: 10, marginLeft: 10, opacity: pressed ? 0.5 : 1 }}
+            style={{ marginRight: 20, marginLeft: 10, opacity: pressed ? 0.5 : 1 }}
           />
         )}
       </Pressable>

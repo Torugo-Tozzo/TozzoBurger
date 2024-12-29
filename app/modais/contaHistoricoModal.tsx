@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, FlatList, Alert, Button, ActivityIndicator } from 'react-native';
+import { StyleSheet, FlatList, Alert, ActivityIndicator, TouchableOpacity, Text as RNText } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useVendasDatabase, VendaDatabase } from '@/database/useVendaDatabse';
@@ -19,6 +19,7 @@ export default function ContaHistoricoModal() {
   const [produtos, setProdutos] = useState<{ nome: string; quantidade: number; preco: number }[]>([]);
   const [isPrinterConnected, setIsPrinterConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingPrint, setLoadingPrint] = useState<number | null>(null);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -79,28 +80,28 @@ export default function ContaHistoricoModal() {
   const handlePrint = async () => {
     if (!venda) return;
 
-    // Início da string de impressão
+    setLoadingPrint(venda?.id);
+
     let printContent = await formatarVendaParaImpressao(venda, produtos);
 
     try {
       await sendMessageToDevice(printContent, await getPrinter());
     } catch (error) {
-      Alert.alert("Erro", `${error}`);
+      Alert.alert('Erro', `${error}`);
       return;
+    } finally {
+      setLoadingPrint(null); // Desativar carregamento ao finalizar
     }
-    Alert.alert("Sucesso", "Conta enviada para impressão.");
+    Alert.alert('Sucesso', 'Conta enviada para impressão.');
   };
 
-
   const renderItem = ({ item }: { item: { nome: string; quantidade: number; preco: number } }) => (
-    <View style={styles.item} darkColor='grey' lightColor='whitesmoke'>
-      <View style={styles.itemRow} darkColor='grey' lightColor='whitesmoke'>
+    <View style={styles.item} darkColor="grey" lightColor="whitesmoke">
+      <View style={styles.itemRow} darkColor="grey" lightColor="whitesmoke">
         <Text style={styles.itemTextLeft}>
           ({item.quantidade}x) {item.nome}
         </Text>
-        <Text style={styles.itemTextRight}>
-          R$ {item.preco.toFixed(2)}
-        </Text>
+        <Text style={styles.itemTextRight}>R$ {item.preco.toFixed(2)}</Text>
       </View>
     </View>
   );
@@ -133,9 +134,7 @@ export default function ContaHistoricoModal() {
       <Text style={styles.detailText}>
         Horário: {new Date(venda.horario).toLocaleTimeString()}
       </Text>
-      <Text style={styles.detailText}>
-        Cliente: {venda.cliente}
-      </Text>
+      <Text style={styles.detailText}>Cliente: {venda.cliente}</Text>
       <View style={styles.separator} />
       <Text style={styles.subtitle}>Produtos</Text>
 
@@ -146,12 +145,20 @@ export default function ContaHistoricoModal() {
       />
       <Text style={styles.title}>Total: R$ {venda.total.toFixed(2)}</Text>
       <View style={styles.separator} />
-      <Button
-        title="Imprimir Conta"
+
+      <TouchableOpacity
+        style={[
+          styles.button,
+          (!isPrinterConnected) && styles.buttonDisabled,
+        ]}
         onPress={handlePrint}
-        color="#007AFF"
-        disabled={!isPrinterConnected} // Desabilita o botão caso não haja impressora registrada
-      />
+      >
+        {loadingPrint ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <RNText style={styles.buttonText}>Imprimir Conta</RNText>
+        )}
+      </TouchableOpacity>
     </View>
   );
 }
@@ -185,7 +192,6 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     padding: 10,
     borderRadius: 5,
-    //backgroundColor: '#f9f9f9', // Para o tema claro
   },
   itemRow: {
     flexDirection: 'row',
@@ -194,10 +200,24 @@ const styles = StyleSheet.create({
   },
   itemTextLeft: {
     fontSize: 16,
-    flex: 1, // Garante que o texto à esquerda tenha espaço suficiente
+    flex: 1,
   },
   itemTextRight: {
     fontSize: 16,
-    textAlign: 'right', // Garante alinhamento correto
-  }
+    textAlign: 'right',
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  buttonDisabled: {
+    backgroundColor: '#a1a1a1',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });

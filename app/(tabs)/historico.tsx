@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, FlatList, Alert, TouchableOpacity, TextInput, Button, ScrollView, useColorScheme } from 'react-native';
+import { StyleSheet, FlatList, Alert, TouchableOpacity, TextInput, Button, ScrollView, useColorScheme, ActivityIndicator } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useVendasDatabase, VendaDatabase } from '@/database/useVendaDatabse';
 import { useProductDatabase } from '@/database/useProductDatabase';
@@ -20,6 +20,7 @@ export default function HistoricoScreen() {
   const colorScheme = useColorScheme();
   const placeholderColor = colorScheme === "dark" ? "#ccc" : "#666";
   const [title, setTitle] = useState('Histórico de Vendas (Últimos 5 dias)');
+  const [loadingPrint, setLoadingPrint] = useState<number | null>(null);
 
   const styles = StyleSheet.create({
     container: {
@@ -122,15 +123,15 @@ export default function HistoricoScreen() {
       setVendas(await listVendasRecentes());
       return;
     }
-  
+
     const dateParts = searchDate.split('-');
     if (dateParts.length !== 3) {
       Alert.alert('Erro', 'Formato de data inválido. Use DD-MM-YYYY.');
       return;
     }
-  
+
     const formattedDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
-  
+
     try {
       const vendasData = await listVendasPorDia(formattedDate);
       setVendas({ [formattedDate]: vendasData });
@@ -139,36 +140,37 @@ export default function HistoricoScreen() {
       console.error(error);
       Alert.alert('Erro', 'Não foi possível buscar as vendas para a data especificada.');
     }
-  };  
+  };
 
   const handlePrint = async (vendaId: number) => {
-    let venda = await getVendaById(vendaId); 
-    if (!venda) return;
+    setLoadingPrint(vendaId); // Ativar o estado de carregamento
+    let venda = await getVendaById(vendaId);
+    if (!venda) {
+      setLoadingPrint(null); // Desativar carregamento caso venda não exista
+      return;
+    }
 
     const produtos: Produto[] = await Promise.all(
       venda.produtos.map(async (produto) => {
-        // Fazendo a chamada assíncrona para obter as informações do produto
         let prodInfos = await showAdd(produto.produtoId);
-        
-        // Retorna o objeto do tipo Produto, com valores padrão caso seja undefined
         return {
-          nome: prodInfos?.nome ?? "Produto desconhecido", // valor padrão se `nome` for undefined
+          nome: prodInfos?.nome ?? "Produto desconhecido",
           quantidade: produto.quantidade,
-          preco: prodInfos?.preco ?? 0, // valor padrão se `preco` for undefined
+          preco: prodInfos?.preco ?? 0,
         };
       })
-    );    
+    );
 
-    // Início da string de impressão
     let printContent = await formatarVendaParaImpressao(venda, produtos);
 
     try {
       await sendMessageToDevice(printContent, await getPrinter());
+      Alert.alert("Sucesso", "Conta enviada para impressão.");
     } catch (error) {
       Alert.alert("Erro", `${error}`);
-      return;
+    } finally {
+      setLoadingPrint(null); // Desativar carregamento ao finalizar
     }
-    Alert.alert("Sucesso", "Conta enviada para impressão.");
   };
 
   const handleExcluir = (vendaId: number) => {
@@ -208,9 +210,9 @@ export default function HistoricoScreen() {
       <Text style={styles.itemTextTitle}>Venda #{item.id}</Text>
       <Text style={styles.itemText}>Cliente: {item.cliente} | Horário: {new Date(item.horario).toLocaleTimeString()}</Text>
       <Text style={styles.itemTextTitle}>Total: R$ {item.total.toFixed(2)}</Text>
-      <Text style={{fontWeight: "bold",}}>Itens:{item.produtos.join(", ")}</Text>
+      <Text style={{ fontWeight: "bold", }}>Itens:{item.produtos.join(", ")}</Text>
 
-      
+
 
       <View style={styles.buttonContainer} lightColor="whitesmoke" darkColor="grey">
         <TouchableOpacity
@@ -219,9 +221,18 @@ export default function HistoricoScreen() {
         >
           <FontAwesome name="eye" size={20} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => handlePrint(item.id)} style={styles.Greenbutton}>
-          <FontAwesome name="print" size={20} color="#fff" />
+        <TouchableOpacity
+          onPress={() => handlePrint(item.id)}
+          style={styles.Greenbutton}
+          disabled={loadingPrint === item.id}
+        >
+          {loadingPrint === item.id ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <FontAwesome name="print" size={20} color="#fff" />
+          )}
         </TouchableOpacity>
+
         <TouchableOpacity onPress={() => handleExcluir(item.id)} style={styles.Redbutton}>
           <FontAwesome name="trash" size={20} color="#fff" />
         </TouchableOpacity>
@@ -231,21 +242,21 @@ export default function HistoricoScreen() {
 
   const renderVendasPorData = (data: string, vendas: (VendaDatabase & { produtos: string[] })[]) => {
     const totalVendas = vendas.reduce((acc, venda) => acc + venda.total, 0).toFixed(2);
-  
+
     const hoje = new Date();
     const ontem = new Date(hoje);
     ontem.setDate(hoje.getDate() - 1);
-  
+
     const [dia, mes, ano] = data.split('/');
     const dataFormatada = `${ano}-${mes}-${dia}`;
-  
+
     const dataRenderizada =
       dataFormatada === hoje.toISOString().split("T")[0]
         ? "Hoje"
         : dataFormatada === ontem.toISOString().split("T")[0]
-        ? "Ontem"
-        : data;
-  
+          ? "Ontem"
+          : data;
+
     return (
       <View key={data}>
         <Text style={styles.dateHeader}>
@@ -258,7 +269,7 @@ export default function HistoricoScreen() {
         />
       </View>
     );
-  };    
+  };
 
   return (
     <View style={styles.container}>

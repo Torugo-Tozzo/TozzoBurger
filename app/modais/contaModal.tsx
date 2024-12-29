@@ -92,6 +92,9 @@ export default function ContaModalScreen() {
     itemText: {
       fontSize: 16,
     },
+    fleNome: {
+      flex: 1,
+    },
     totalText: {
       fontSize: 18,
       fontWeight: "bold",
@@ -161,7 +164,7 @@ export default function ContaModalScreen() {
         keyExtractor={(item) => String(item.id)}  // Garantir que o item tem id
         renderItem={({ item }) => (
           <View style={styles.cartItem}>
-            <Text style={styles.itemText}>{item.nome}</Text>
+            <Text style={[styles.itemText, styles.fleNome]}>{item.nome}</Text>
             <Text style={styles.itemText}>R$ {((item.quantidade ?? 0) * item.preco).toFixed(2)}</Text>
 
             <View style={styles.quantityControls}>

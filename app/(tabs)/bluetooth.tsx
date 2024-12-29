@@ -30,7 +30,7 @@ const BluetoothScreen = () => {
     try {
       const foundDevices = await listNearbyDevices(); // Obtém os dispositivos encontrados
       if (foundDevices.length === 0) {
-        Alert.alert('Nenhum dispositivo encontrado.');
+        Alert.alert('Nenhum dispositivo encontrado. \nSeu bluetooth está ligado?');
       } else {
         setDevices(foundDevices); // Atualiza a lista de dispositivos encontrados
       }
