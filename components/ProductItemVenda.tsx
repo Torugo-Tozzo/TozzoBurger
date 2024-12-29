@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Button, Image, Pressable, useColorScheme, Modal } from "react-native";
+import React, { useState, useRef } from "react";
+import { Animated, Button, Image, Pressable, useColorScheme, Modal, Easing } from "react-native";
 import { Text, View } from "@/components/Themed";
 import { ProductDatabase } from "@/database/useProductDatabase";
 import { FontAwesome } from "@expo/vector-icons";
@@ -23,11 +23,32 @@ type ProductItemVendaProps = {
 };
 
 export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart }: ProductItemVendaProps) {
-  const [modalVisible, setModalVisible] = useState(false); // Estado para controle do modal
+  const [modalVisible, setModalVisible] = useState(false);
   const colorScheme = useColorScheme();
 
+  // Controle de animações separadas
+  const buttonScaleAnim = useRef(new Animated.Value(1)).current;
+  const iconScaleAnim = useRef(new Animated.Value(1)).current;
+
+  const triggerAnimation = (anim: Animated.Value) => {
+    Animated.sequence([
+      Animated.timing(anim, {
+        toValue: 0.8,
+        duration: 100,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(anim, {
+        toValue: 1,
+        duration: 100,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
   const handleImagePress = () => {
-    setModalVisible(true); // Abre o modal ao pressionar na imagem
+    setModalVisible(true);
   };
 
   return (
@@ -52,27 +73,41 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart }: Produ
         />
       </Pressable>
       <View lightColor="#f9f9f9" darkColor="grey" style={{ flex: 1 }}>
-        <Text style={{ fontSize: 18, fontWeight: "bold"  }}>{data.nome}</Text>
+        <Text style={{ fontSize: 18, fontWeight: "bold" }}>{data.nome}</Text>
         <Text style={{ fontSize: 15 }}>Preço: R$ {data.preco.toFixed(2)}</Text>
       </View>
-      <Pressable onPress={() => onAdicionaltoCart(data, true)} style={{ flexDirection: "row" }}>
-        {({ pressed }) => (
+      <Animated.View style={{ transform: [{ scale: iconScaleAnim }] }}>
+        <Pressable
+          onPress={() => {
+            triggerAnimation(iconScaleAnim);
+            onAdicionaltoCart(data, true);
+          }}
+          style={{ flexDirection: "row" }}
+        >
           <FontAwesome
             name="flash"
             size={25}
             color={Colors[colorScheme ?? "light"].tint}
-            style={{ marginRight: 20, marginLeft: 10, opacity: pressed ? 0.5 : 1 }}
+            style={{ marginRight: 20, marginLeft: 10 }}
           />
-        )}
-      </Pressable>
-      <Button title="Adicionar" onPress={() => onAddToCart(data)} />
+        </Pressable>
+      </Animated.View>
+      <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
+        <Button
+          title="Adicionar"
+          onPress={() => {
+            triggerAnimation(buttonScaleAnim);
+            onAddToCart(data);
+          }}
+        />
+      </Animated.View>
 
       {/* Modal para mostrar os ingredientes */}
       <Modal
         visible={modalVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setModalVisible(false)} // Fechar o modal
+        onRequestClose={() => setModalVisible(false)}
       >
         <View
           style={{
@@ -93,7 +128,9 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart }: Produ
             <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 15 }}>
               Ingredientes do {data.nome}:
             </Text>
-            <Text style={{marginBottom: 20}}>{data.ingredientes ?? 'Os ingredientes não foram informados no cadastro deste produto'}</Text>
+            <Text style={{ marginBottom: 20 }}>
+              {data.ingredientes ?? "Os ingredientes não foram informados no cadastro deste produto"}
+            </Text>
             <Button title="Fechar" onPress={() => setModalVisible(false)} />
           </View>
         </View>
