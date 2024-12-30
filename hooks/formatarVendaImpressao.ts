@@ -21,10 +21,10 @@ export interface Produto {
         : produto.nome;
   
       const valorTotal = `R$ ${(produto.quantidade * produto.preco).toFixed(2)}`;
-      const numPontosLinha = 48 - (nomeProduto.length + valorTotal.length + 7); // 7 é para quantidade e espaços
+      const numPontosLinha = 48 - (nomeProduto.length + valorTotal.length + 8); // 7 é para quantidade e espaços
       const pontos = ".".repeat(numPontosLinha > 0 ? numPontosLinha : 0);
   
-      printContent += `\x1bE1( ${produto.quantidade}x ) ${nomeProduto}${pontos}${valorTotal}\x1bE0\n`; // Negrito no nome do produto e valor total
+      printContent += `\x1bE1( ${produto.quantidade} x ) ${nomeProduto.toUpperCase()}${pontos}${valorTotal}\x1bE0\n`; // Negrito no nome do produto e valor total
       printContent += produto.quantidade > 1
         ? `    \x1bE1Preço Unitário: R$ ${produto.preco.toFixed(2)}\x1bE0\n\n` // Negrito no preço unitário
         : '\n';
