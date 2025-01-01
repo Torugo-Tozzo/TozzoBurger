@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { Animated, Button, Image, Pressable, useColorScheme, Modal, Easing } from "react-native";
 import { Text, View } from "@/components/Themed";
 import { ProductDatabase } from "@/database/useProductDatabase";
@@ -22,11 +22,10 @@ type ProductItemVendaProps = {
   onAdicionaltoCart: (product: ProductDatabase, ehAdd: boolean) => void;
 };
 
-export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart }: ProductItemVendaProps) {
+const ProductItemVenda = React.memo(({ data, onAddToCart, onAdicionaltoCart }: ProductItemVendaProps) => {
   const [modalVisible, setModalVisible] = useState(false);
   const colorScheme = useColorScheme();
 
-  // Controle de animações separadas
   const buttonScaleAnim = useRef(new Animated.Value(1)).current;
   const iconScaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -47,9 +46,19 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart }: Produ
     ]).start();
   };
 
-  const handleImagePress = () => {
+  const handleImagePress = useCallback(() => {
     setModalVisible(true);
-  };
+  }, []);
+
+  const handleAddToCart = useCallback(() => {
+    triggerAnimation(buttonScaleAnim);
+    onAddToCart(data);
+  }, [buttonScaleAnim, data, onAddToCart]);
+
+  const handleAdicionalToCart = useCallback(() => {
+    triggerAnimation(iconScaleAnim);
+    onAdicionaltoCart(data, true);
+  }, [iconScaleAnim, data, onAdicionaltoCart]);
 
   return (
     <View
@@ -78,10 +87,7 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart }: Produ
       </View>
       <Animated.View style={{ transform: [{ scale: iconScaleAnim }] }}>
         <Pressable
-          onPress={() => {
-            triggerAnimation(iconScaleAnim);
-            onAdicionaltoCart(data, true);
-          }}
+          onPress={handleAdicionalToCart}
           style={{ flexDirection: "row" }}
         >
           <FontAwesome
@@ -93,16 +99,9 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart }: Produ
         </Pressable>
       </Animated.View>
       <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
-        <Button
-          title="Adicionar"
-          onPress={() => {
-            triggerAnimation(buttonScaleAnim);
-            onAddToCart(data);
-          }}
-        />
+        <Button title="Adicionar" onPress={handleAddToCart} />
       </Animated.View>
 
-      {/* Modal para mostrar os ingredientes */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -137,4 +136,6 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart }: Produ
       </Modal>
     </View>
   );
-}
+});
+
+export { ProductItemVenda };
