@@ -5,6 +5,7 @@ import { useColorScheme } from "react-native";
 import { View, Text } from "@/components/Themed";
 import Colors from '@/constants/Colors';
 import { useState } from "react";
+import { ProductDatabase } from "@/database/useProductDatabase";
 
 const productImages: Record<number, any> = {
   1: require("../assets/images/1-removebg-preview.png"),
@@ -17,12 +18,7 @@ const productImages: Record<number, any> = {
 };
 
 type Props = PressableProps & {
-  data: {
-    nome: string;
-    preco: number;
-    tipoProdutoId: number;
-    ingredientes?: string;
-  };
+  data: ProductDatabase;
   onDelete: () => void;
   onOpen: () => void;
 };

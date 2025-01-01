@@ -13,13 +13,14 @@ import { sendMessageToDevice } from '@/useBLE';
 export default function HistoricoScreen() {
   const [vendas, setVendas] = useState<Record<string, VendaDatabase[]>>({});
   const [searchDate, setSearchDate] = useState('');
+  const [loading, setLoading] = useState(true); // Estado para carregar dados
   const { listVendasRecentes, listVendasPorDia, removeVenda, getVendaById } = useVendasDatabase();
   const { showAdd } = useProductDatabase();
   const { getPrinter } = usePrinterDatabase();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const placeholderColor = colorScheme === "dark" ? "#ccc" : "#666";
-  const [title, setTitle] = useState('Histórico de Vendas (Últimos 5 dias)');
+  const [title, setTitle] = useState('Histórico de Vendas (Últimos 3 dias)');
   const [loadingPrint, setLoadingPrint] = useState<number | null>(null);
 
   const styles = StyleSheet.create({
@@ -101,6 +102,11 @@ export default function HistoricoScreen() {
       marginHorizontal: 5,
       width: 60,
     },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
   });
 
   useEffect(() => {
@@ -108,9 +114,11 @@ export default function HistoricoScreen() {
       try {
         const vendasData = await listVendasRecentes();
         setVendas(vendasData);
+        setLoading(false); // Definindo como false após carregar os dados
       } catch (error) {
         console.error(error);
         Alert.alert('Erro', 'Não foi possível carregar o histórico de vendas.');
+        setLoading(false); // Parar o carregamento em caso de erro
       }
     };
 
@@ -118,15 +126,18 @@ export default function HistoricoScreen() {
   }, []);
 
   const handleSearch = async () => {
+    setLoading(true); // Iniciar o carregamento enquanto busca
     if (searchDate.trim() === '') {
-      setTitle('Histórico de Vendas (Últimos 5 dias)');
+      setTitle('Histórico de Vendas (Últimos 3 dias)');
       setVendas(await listVendasRecentes());
+      setLoading(false); // Finalizar carregamento
       return;
     }
 
     const dateParts = searchDate.split('-');
     if (dateParts.length !== 3) {
       Alert.alert('Erro', 'Formato de data inválido. Use DD-MM-YYYY.');
+      setLoading(false); // Finalizar carregamento em caso de erro
       return;
     }
 
@@ -139,6 +150,8 @@ export default function HistoricoScreen() {
     } catch (error) {
       console.error(error);
       Alert.alert('Erro', 'Não foi possível buscar as vendas para a data especificada.');
+    } finally {
+      setLoading(false); // Finalizar carregamento após busca
     }
   };
 
@@ -211,9 +224,6 @@ export default function HistoricoScreen() {
       <Text style={styles.itemText}>Cliente: {item.cliente} | Horário: {new Date(item.horario).toLocaleTimeString()}</Text>
       <Text style={styles.itemTextTitle}>Total: R$ {item.total.toFixed(2)}</Text>
       <Text style={{ fontWeight: "bold", }}>Itens:{item.produtos.join(", ")}</Text>
-
-
-
       <View style={styles.buttonContainer} lightColor="whitesmoke" darkColor="grey">
         <TouchableOpacity
           onPress={() => router.push(`/modais/contaHistoricoModal?vendaId=${item.id}`)}
@@ -286,16 +296,22 @@ export default function HistoricoScreen() {
 
       <View style={styles.separator} />
 
-      <FlatList
-        data={Object.entries(vendas)}
-        renderItem={({ item }) => {
-          const [data, vendasDoDia] = item as [string, (VendaDatabase & { produtos: string[] })[]];
-          return renderVendasPorData(data, vendasDoDia);
-        }}
-        keyExtractor={(item) => item[0]}
-        showsVerticalScrollIndicator={true}
-        style={{ flex: 1 }}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007bff" />
+        </View>
+      ) : (
+        <FlatList
+          data={Object.entries(vendas)}
+          renderItem={({ item }) => {
+            const [data, vendasDoDia] = item as [string, (VendaDatabase & { produtos: string[] })[]];
+            return renderVendasPorData(data, vendasDoDia);
+          }}
+          keyExtractor={(item) => item[0]}
+          showsVerticalScrollIndicator={true}
+          style={{ flex: 1 }}
+        />
+      )}
     </View>
   );
 }

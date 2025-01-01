@@ -104,7 +104,7 @@ export function useVendasDatabase() {
     async function listVendasRecentes() {
         try {
             const seteDiasAtras = new Date();
-            seteDiasAtras.setDate(seteDiasAtras.getDate() - 5);
+            seteDiasAtras.setDate(seteDiasAtras.getDate() - 3);
             const seteDiasAtrasISO = seteDiasAtras.toISOString();
     
             const vendas = await database.getAllAsync<VendaDatabase>(

@@ -6,14 +6,22 @@ import { useVendasDatabase } from '@/database/useVendaDatabse';
 import { router } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useState } from 'react';
+import { formatarVendaParaImpressao, Produto } from '@/hooks/formatarVendaImpressao';
+import { useProductDatabase } from '@/database/useProductDatabase';
+import { usePrinterDatabase } from '@/database/usePrinterDatabase';
+import { sendMessageToDevice } from '@/useBLE';
 
 export default function ContaModalScreen() {
   const { cart, clearCart, updateCartItem } = useCart(); // Acessando o carrinho e a função de atualizar o item
   const { createVenda } = useVendasDatabase();
   const [cliente, setCliente] = useState('');
+  const { getVendaById } = useVendasDatabase();
+  const { getPrinter } = usePrinterDatabase();
+  const { showAdd } = useProductDatabase();
 
   const colorScheme = useColorScheme();
   const placeholderColor = colorScheme === "dark" ? "#ccc" : "#666";
+  const [loadingPrint, setLoadingPrint] = useState<number | null>(null);
 
   const total = cart.reduce((sum, item) => {
     const quantidade = item.quantidade ?? 0; // Se quantidade for null ou undefined, usamos 0
@@ -32,6 +40,39 @@ export default function ContaModalScreen() {
     ]);
   };
 
+  const handlePrint = async (vendaId: number) => {
+    setLoadingPrint(vendaId); // Ativar o estado de carregamento
+    let venda = await getVendaById(vendaId);
+    if (!venda) {
+      setLoadingPrint(null); // Desativar carregamento caso venda não exista
+      return;
+    }
+
+    const produtos: Produto[] = await Promise.all(
+      venda.produtos.map(async (produto) => {
+        let prodInfos = await showAdd(produto.produtoId);
+        return {
+          nome: prodInfos?.nome ?? "Produto desconhecido",
+          quantidade: produto.quantidade,
+          preco: prodInfos?.preco ?? 0,
+        };
+      })
+    );
+
+    let printContent = await formatarVendaParaImpressao(venda, produtos);
+
+    try {
+      await sendMessageToDevice(printContent, await getPrinter());
+      Alert.alert("Sucesso", "Conta enviada para impressão.");
+    } catch (error) {
+      Alert.alert("Erro", `${error}`);
+    } finally {
+      setLoadingPrint(null); // Desativar carregamento ao finalizar
+    }
+  };
+
+  const imprimeConta = async (vendaId: number): Promise<void> => await handlePrint(vendaId);
+
   const finalizarCompra = async () => {
     try {
       const produtos = cart.map(({ id, quantidade }) => ({
@@ -40,20 +81,23 @@ export default function ContaModalScreen() {
       }));
 
       const { vendaId } = await createVenda(produtos, cliente);
+      await clearCart(); 
+      router.back(); 
 
-      Alert.alert(
-        "Compra Finalizada",
-        `A compra foi concluída com sucesso!`
-      );
-      clearCart(); // Limpa o carrinho após finalizar a compra
-      router.push('/historico');
+      Alert.alert("Venda Realizada!", "Deseja imprimir a Conta?", [
+        { text: "Não", style: "cancel" },
+        {
+          text: "Sim",
+          onPress: () => imprimeConta(vendaId),
+        },
+      ]);
+
     } catch (error) {
       console.error(error);
       Alert.alert("Erro", "Não foi possível finalizar a compra.");
     }
   };
 
-  // Função para alterar a quantidade de um item no carrinho
   const alterarQuantidade = (itemId: number, operacao: 'incrementar' | 'decrementar') => {
     const item = cart.find((cartItem) => cartItem.id === itemId);
     if (!item) return;
