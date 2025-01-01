@@ -6,22 +6,17 @@ import { useVendasDatabase } from '@/database/useVendaDatabse';
 import { router } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useState } from 'react';
-import { formatarVendaParaImpressao, Produto } from '@/hooks/formatarVendaImpressao';
-import { useProductDatabase } from '@/database/useProductDatabase';
-import { usePrinterDatabase } from '@/database/usePrinterDatabase';
-import { sendMessageToDevice } from '@/useBLE';
+import { Ionicons } from '@expo/vector-icons';
+import { captureScreen } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 
 export default function ContaModalScreen() {
   const { cart, clearCart, updateCartItem } = useCart(); // Acessando o carrinho e a função de atualizar o item
   const { createVenda } = useVendasDatabase();
   const [cliente, setCliente] = useState('');
-  const { getVendaById } = useVendasDatabase();
-  const { getPrinter } = usePrinterDatabase();
-  const { showAdd } = useProductDatabase();
 
   const colorScheme = useColorScheme();
   const placeholderColor = colorScheme === "dark" ? "#ccc" : "#666";
-  const [loadingPrint, setLoadingPrint] = useState<number | null>(null);
 
   const total = cart.reduce((sum, item) => {
     const quantidade = item.quantidade ?? 0; // Se quantidade for null ou undefined, usamos 0
@@ -40,38 +35,20 @@ export default function ContaModalScreen() {
     ]);
   };
 
-  const handlePrint = async (vendaId: number) => {
-    setLoadingPrint(vendaId); // Ativar o estado de carregamento
-    let venda = await getVendaById(vendaId);
-    if (!venda) {
-      setLoadingPrint(null); // Desativar carregamento caso venda não exista
-      return;
-    }
+  const handleShare = async () => {
+      try {
+        const uri = await captureScreen({
+          format: 'png',
+          quality: 0.8,
+        });
+  
+        await Sharing.shareAsync(uri);
+      } catch (error) {
+        console.error("Erro ao capturar e compartilhar:", error);
+      } 
+    };
 
-    const produtos: Produto[] = await Promise.all(
-      venda.produtos.map(async (produto) => {
-        let prodInfos = await showAdd(produto.produtoId);
-        return {
-          nome: prodInfos?.nome ?? "Produto desconhecido",
-          quantidade: produto.quantidade,
-          preco: prodInfos?.preco ?? 0,
-        };
-      })
-    );
-
-    let printContent = await formatarVendaParaImpressao(venda, produtos);
-
-    try {
-      await sendMessageToDevice(printContent, await getPrinter());
-      Alert.alert("Sucesso", "Conta enviada para impressão.");
-    } catch (error) {
-      Alert.alert("Erro", `${error}`);
-    } finally {
-      setLoadingPrint(null); // Desativar carregamento ao finalizar
-    }
-  };
-
-  const imprimeConta = async (vendaId: number): Promise<void> => await handlePrint(vendaId);
+  const imprimeConta = async (vendaId: number): Promise<void> => await router.push(`/modais/contaHistoricoModal?vendaId=${vendaId}`);
 
   const finalizarCompra = async () => {
     try {
@@ -140,9 +117,10 @@ export default function ContaModalScreen() {
       flex: 1,
     },
     totalText: {
-      fontSize: 18,
+      fontSize: 25,
       fontWeight: "bold",
       marginVertical: 20,
+      textAlign: "center"
     },
     quantityControls: {
       flexDirection: "row",
@@ -232,6 +210,7 @@ export default function ContaModalScreen() {
         )}
       />
 
+      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
       <Text style={styles.totalText}>Total: R$ {total.toFixed(2)}</Text>
 
       <View style={styles.buttonContainer}>
@@ -240,14 +219,21 @@ export default function ContaModalScreen() {
           onPress={limparConta}
           disabled={isCartEmpty}  // Desabilitar botão se o carrinho estiver vazio
         >
-          <Text style={styles.buttonText}>Limpar Conta</Text>
+          <Text style={styles.buttonText}>Limpar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, isCartEmpty && styles.buttonDisabled, {flex: 0.25}]}  // Aplicar estilo para botão desabilitado
+          onPress={handleShare}
+          disabled={isCartEmpty}  // Desabilitar botão se o carrinho estiver vazio
+        >
+          <Ionicons name="share-social" size={24} color="white" />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, isCartEmpty && styles.buttonDisabled]}  // Aplicar estilo para botão desabilitado
           onPress={finalizarCompra}
           disabled={isCartEmpty}  // Desabilitar botão se o carrinho estiver vazio
         >
-          <Text style={styles.buttonText}>Finalizar Compra</Text>
+          <Text style={styles.buttonText}>Vender</Text>
         </TouchableOpacity>
       </View>
 

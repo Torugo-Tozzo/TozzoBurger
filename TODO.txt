@@ -1,1 +1,7 @@
+gerar o apk
+npx eas build -p android --profile preview  
+
+apk-debug
+npx expo run:android
+
 //fazer a lista dos lanches do cardapio, fazer uma query que vai popular direto

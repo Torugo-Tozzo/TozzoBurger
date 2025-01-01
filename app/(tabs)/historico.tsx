@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, FlatList, Alert, TouchableOpacity, TextInput, Button, ScrollView, useColorScheme, ActivityIndicator } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useVendasDatabase, VendaDatabase } from '@/database/useVendaDatabse';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { usePrinterDatabase } from '@/database/usePrinterDatabase';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { formatarVendaParaImpressao } from '@/hooks/formatarVendaImpressao';
 import { Produto } from '@/hooks/formatarVendaImpressao';
@@ -109,21 +109,23 @@ export default function HistoricoScreen() {
     },
   });
 
-  useEffect(() => {
-    const fetchVendas = async () => {
-      try {
-        const vendasData = await listVendasRecentes();
-        setVendas(vendasData);
-        setLoading(false); // Definindo como false após carregar os dados
-      } catch (error) {
-        console.error(error);
-        Alert.alert('Erro', 'Não foi possível carregar o histórico de vendas.');
-        setLoading(false); // Parar o carregamento em caso de erro
-      }
-    };
-
-    fetchVendas();
+  const fetchVendas = useCallback(async () => {
+    try {
+      const vendasData = await listVendasRecentes();
+      setVendas(vendasData);
+      setLoading(false); // Definindo como false após carregar os dados
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Erro', 'Não foi possível carregar o histórico de vendas.');
+      setLoading(false); // Parar o carregamento em caso de erro
+    }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchVendas();
+    }, [fetchVendas])
+  );
 
   const handleSearch = async () => {
     setLoading(true); // Iniciar o carregamento enquanto busca

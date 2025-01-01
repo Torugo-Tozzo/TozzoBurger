@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { StyleSheet, FlatList, Alert, ActivityIndicator, TouchableOpacity, Text as RNText } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -7,6 +7,9 @@ import { useProductDatabase } from '@/database/useProductDatabase';
 import { sendMessageToDevice } from '@/useBLE';
 import { usePrinterDatabase } from '@/database/usePrinterDatabase';
 import { formatarVendaParaImpressao } from '@/hooks/formatarVendaImpressao';
+import { Ionicons } from '@expo/vector-icons'; // Importando o ícone de share
+import { captureScreen } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 
 export default function ContaHistoricoModal() {
   const { vendaId } = useLocalSearchParams();
@@ -95,6 +98,19 @@ export default function ContaHistoricoModal() {
     Alert.alert('Sucesso', 'Conta enviada para impressão.');
   };
 
+  const handleShare = async () => {
+    try {
+      const uri = await captureScreen({
+        format: 'png',
+        quality: 0.8,
+      });
+
+      await Sharing.shareAsync(uri);
+    } catch (error) {
+      console.error("Erro ao capturar e compartilhar:", error);
+    } 
+  };
+
   const renderItem = ({ item }: { item: { nome: string; quantidade: number; preco: number } }) => (
     <View style={styles.item} darkColor="grey" lightColor="whitesmoke">
       <View style={styles.itemRow} darkColor="grey" lightColor="whitesmoke">
@@ -146,19 +162,28 @@ export default function ContaHistoricoModal() {
       <Text style={styles.title}>Total: R$ {venda.total.toFixed(2)}</Text>
       <View style={styles.separator} />
 
-      <TouchableOpacity
-        style={[
-          styles.button,
-          (!isPrinterConnected) && styles.buttonDisabled,
-        ]}
-        onPress={handlePrint}
-      >
-        {loadingPrint ? (
-          <ActivityIndicator size="small" color="#fff" />
-        ) : (
-          <RNText style={styles.buttonText}>Imprimir Conta</RNText>
-        )}
-      </TouchableOpacity>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[styles.shareButton, isPrinterConnected && styles.buttonDisabled]}
+          onPress={handleShare}
+        >
+          <Ionicons name="share-social" size={24} color="white" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.button,
+            (!isPrinterConnected) && styles.buttonDisabled,
+          ]}
+          onPress={handlePrint}
+        >
+          {loadingPrint ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Imprimir Conta</Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -206,10 +231,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'right',
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
   button: {
     backgroundColor: '#007AFF',
     padding: 12,
     borderRadius: 5,
+    flex: 1,
     alignItems: 'center',
   },
   buttonDisabled: {
@@ -219,5 +250,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  shareButton: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 5,
+    flex: 0.2, // Proporção de 20%
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
   },
 });
