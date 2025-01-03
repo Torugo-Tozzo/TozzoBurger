@@ -73,7 +73,7 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart }: Produ
         />
       </Pressable>
       <View lightColor="#f9f9f9" darkColor="grey" style={{ flex: 1 }}>
-        <Text style={{ fontSize: 18, fontWeight: "bold" }}>{data.nome}</Text>
+        <Text style={{ fontSize: 18, fontWeight: "bold" }}>{data.id} - {data.nome}</Text>
         <Text style={{ fontSize: 15 }}>Preço: R$ {data.preco.toFixed(2)}</Text>
       </View>
       <Animated.View style={{ transform: [{ scale: iconScaleAnim }] }}>

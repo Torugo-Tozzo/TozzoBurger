@@ -61,7 +61,7 @@ export function Product({ data, onDelete, onOpen, ...rest }: Props) {
             marginBottom: 4,
           }}
         >
-          {data.nome}
+          {data.id} - {data.nome}
         </Text>
         <Text style={{ fontSize: 14 }}>
           Preço: R$ {data.preco.toFixed(2)}

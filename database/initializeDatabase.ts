@@ -25,7 +25,8 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       total REAL NOT NULL,
       horario TEXT NOT NULL,
-      cliente TEXT NULL
+      cliente TEXT NULL,
+      excluida BOOLEAN NULL
     );
   `)
 

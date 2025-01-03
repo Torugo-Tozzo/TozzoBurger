@@ -164,7 +164,7 @@ export default function ContaHistoricoModal() {
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={[styles.shareButton, isPrinterConnected && styles.buttonDisabled]}
+          style={styles.shareButton}
           onPress={handleShare}
         >
           <Ionicons name="share-social" size={24} color="white" />

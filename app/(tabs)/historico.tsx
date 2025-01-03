@@ -42,6 +42,12 @@ export default function HistoricoScreen() {
       paddingHorizontal: 10,
       color: colorScheme === "dark" ? "#fff" : "#000"
     },
+    disabledColor: {
+      color: colorScheme === "dark" ? "black" : "grey",
+    },
+    disabledBackground: {
+      backgroundColor: colorScheme === "dark" ? "#2F4F5F" : "grey",
+    },
     separator: {
       marginVertical: 10,
       height: 1,
@@ -193,10 +199,7 @@ export default function HistoricoScreen() {
       'Confirmar Exclusão',
       'Tem certeza de que deseja excluir esta venda?',
       [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
+        { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Excluir',
           onPress: async () => {
@@ -205,7 +208,9 @@ export default function HistoricoScreen() {
               setVendas((prevVendas) => {
                 const updatedVendas = { ...prevVendas };
                 Object.entries(updatedVendas).forEach(([data, vendasPorData]) => {
-                  updatedVendas[data] = vendasPorData.filter((venda) => venda.id !== vendaId);
+                  updatedVendas[data] = vendasPorData.map((venda) =>
+                    venda.id === vendaId ? { ...venda, excluida: true } : venda
+                  );
                 });
                 return updatedVendas;
               });
@@ -222,21 +227,50 @@ export default function HistoricoScreen() {
 
   const renderVendaItem = ({ item }: { item: VendaDatabase & { produtos: string[] } }) => (
     <View style={styles.item} lightColor="whitesmoke" darkColor="grey">
-      <Text style={styles.itemTextTitle}>Venda #{item.id}</Text>
-      <Text style={styles.itemText}>Cliente: {item.cliente} | Horário: {new Date(item.horario).toLocaleTimeString()}</Text>
-      <Text style={styles.itemTextTitle}>Total: R$ {item.total.toFixed(2)}</Text>
-      <Text style={{ fontWeight: "bold", }}>Itens:{item.produtos.join(", ")}</Text>
+      <Text
+        style={[
+          styles.itemTextTitle,
+          item.excluida == true && { textDecorationLine: 'line-through', color: styles.disabledColor.color },
+        ]}
+      >
+        Venda #{item.id}
+      </Text>
+      <Text
+        style={[
+          styles.itemText,
+          item.excluida == true && { textDecorationLine: 'line-through', color: styles.disabledColor.color },
+        ]}
+      >
+        Cliente: {item.cliente} | Horário: {new Date(item.horario).toLocaleTimeString()}
+      </Text>
+      <Text
+        style={[
+          styles.itemTextTitle,
+          item.excluida == true && { textDecorationLine: 'line-through', color: styles.disabledColor.color },
+        ]}
+      >
+        Total: R$ {item.total.toFixed(2)}
+      </Text>
+      <Text
+        style={[
+          { fontWeight: 'bold' },
+          item.excluida == true && { textDecorationLine: 'line-through', color: styles.disabledColor.color },
+        ]}
+      >
+        Itens: {item.produtos.join(', ')}
+      </Text>
       <View style={styles.buttonContainer} lightColor="whitesmoke" darkColor="grey">
         <TouchableOpacity
           onPress={() => router.push(`/modais/contaHistoricoModal?vendaId=${item.id}`)}
-          style={styles.button}
+          style={[styles.button, item.excluida == true && { backgroundColor: styles.disabledBackground.backgroundColor }]}
+          disabled={item.excluida == true}
         >
           <FontAwesome name="eye" size={20} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => handlePrint(item.id)}
-          style={styles.Greenbutton}
-          disabled={loadingPrint === item.id}
+          style={[styles.Greenbutton, item.excluida == true && { backgroundColor: styles.disabledBackground.backgroundColor }]}
+          disabled={loadingPrint === item.id || item.excluida == true}
         >
           {loadingPrint === item.id ? (
             <ActivityIndicator size="small" color="#fff" />
@@ -245,7 +279,11 @@ export default function HistoricoScreen() {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => handleExcluir(item.id)} style={styles.Redbutton}>
+        <TouchableOpacity
+          onPress={() => handleExcluir(item.id)}
+          style={[styles.Redbutton, item.excluida == true && { backgroundColor: styles.disabledBackground.backgroundColor }]}
+          disabled={item.excluida == true}
+        >
           <FontAwesome name="trash" size={20} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -253,7 +291,10 @@ export default function HistoricoScreen() {
   );
 
   const renderVendasPorData = (data: string, vendas: (VendaDatabase & { produtos: string[] })[]) => {
-    const totalVendas = vendas.reduce((acc, venda) => acc + venda.total, 0).toFixed(2);
+    const totalVendas = vendas
+      .filter((venda) => venda.excluida != true) // Exclui vendas marcadas como excluídas
+      .reduce((acc, venda) => acc + venda.total, 0)
+      .toFixed(2);
 
     const hoje = new Date();
     const ontem = new Date(hoje);

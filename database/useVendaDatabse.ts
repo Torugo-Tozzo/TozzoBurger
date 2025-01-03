@@ -5,6 +5,7 @@ export type VendaDatabase = {
     total: number;
     horario: string;
     cliente?: string;
+    excluida: boolean;
 };
 
 export type VendaProduto = {
@@ -75,13 +76,12 @@ export function useVendasDatabase() {
     async function removeVenda(vendaId: number) {
         try {
             await database.execAsync(
-                `DELETE FROM RL_VENDA_PRODUTO WHERE vendaId = ${vendaId}`
+                `UPDATE TB_VENDAS SET excluida = TRUE WHERE id = ${vendaId}`
             );
-            await database.execAsync(`DELETE FROM TB_VENDAS WHERE id = ${vendaId}`);
         } catch (error) {
             throw error;
         }
-    }
+    }    
 
     async function calculateTotal(
         produtos: { produtoId: number; quantidade: number }[]
