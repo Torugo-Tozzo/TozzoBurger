@@ -282,7 +282,6 @@ const styles = StyleSheet.create({
   calendarContainer: {
     width: '90%',
     padding: 20,
-    backgroundColor: 'white',
     borderRadius: 10,
     shadowColor: "#000",
     shadowOffset: {
