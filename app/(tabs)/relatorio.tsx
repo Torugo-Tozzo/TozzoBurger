@@ -88,7 +88,7 @@ export default function Relatorio() {
               <Calendar
                 current={formatCalendarDate(dataInicial)}
                 onDayPress={(day: {timestamp: number; dateString: string; day: number; month: number; year: number}) => {
-                  const selectedDate = new Date(day.timestamp);
+                  const selectedDate = new Date(day.year, day.month - 1, day.day, 12, 0, 0);
                   setDataInicial(selectedDate);
                   setShowCalendarInicial(false);
                 }}
@@ -154,7 +154,7 @@ export default function Relatorio() {
               <Calendar
                 current={formatCalendarDate(dataFinal)}
                 onDayPress={(day: {timestamp: number; dateString: string; day: number; month: number; year: number}) => {
-                  const selectedDate = new Date(day.timestamp);
+                  const selectedDate = new Date(day.year, day.month - 1, day.day, 12, 0, 0);
                   setDataFinal(selectedDate);
                   setShowCalendarFinal(false);
                 }}
