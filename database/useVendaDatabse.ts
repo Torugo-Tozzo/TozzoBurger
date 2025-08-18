@@ -210,7 +210,7 @@ export function useVendasDatabase() {
             // Monta a query base usando comparações diretas em vez de BETWEEN
             let query = `
               SELECT 
-                P.id, P.nome, SUM(VP.quantidade) as totalVendido
+                P.id, P.nome, P.preco, SUM(VP.quantidade) as totalVendido
               FROM 
                 RL_VENDA_PRODUTO VP
               JOIN TB_VENDAS V ON VP.vendaId = V.id
@@ -233,6 +233,7 @@ export function useVendasDatabase() {
               id: number;
               nome: string;
               totalVendido: number;
+              preco: number;
             }>(query, params);
             
             return resultado;

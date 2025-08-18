@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 type RelatorioProduto = {
   id: number;
   nome: string;
+  preco: number;
   totalVendido: number;
 };
 
@@ -193,6 +194,7 @@ export default function RelatorioModal() {
     <View style={styles.listHeaderContainer}>
       <Text style={styles.listHeaderText}>Produto</Text>
       <Text style={styles.listHeaderText}>Nº Vendas</Text>
+      <Text style={styles.listHeaderText}>Total</Text>
     </View>
   );
   
@@ -222,12 +224,13 @@ export default function RelatorioModal() {
       textoRelatorio += "PRODUTOS VENDIDOS:\n";
       
       relatorioData.forEach((item, index) => {
-        textoRelatorio += `${index + 1}. ${item.nome}: ${item.totalVendido} unidades\n`;
+        textoRelatorio += `${index + 1}. ${item.nome}; ${item.totalVendido} unidades: Total: R$ ${(item.preco * item.totalVendido).toFixed(2)}\n`;
       });
       
       const totalGeral = relatorioData.reduce((total, item) => total + item.totalVendido, 0);
-      textoRelatorio += `\nTotal de itens vendidos: ${totalGeral} unidades`;
-      
+      const totalPreco = relatorioData.reduce((total, item) => total + (item.preco * item.totalVendido), 0);
+      textoRelatorio += `\nitens vendidos: ${totalGeral} unidades | Total: R$ ${totalPreco.toFixed(2)}`;
+
       await Share.share({
         message: textoRelatorio,
         title: 'Relatório de Vendas'
@@ -391,8 +394,9 @@ export default function RelatorioModal() {
             <ListHeader />
             {relatorioData.map(item => (
               <View key={item.id} style={styles.itemContainer}>
-                <Text style={styles.itemNome}>{item.nome}</Text>
-                <Text style={styles.itemQuantidade}>{item.totalVendido} un.</Text>
+                <Text style={styles.itemTabela}>{item.nome}</Text>
+                <Text style={styles.itemTabela}>{item.totalVendido} un.</Text>
+                <Text style={styles.itemTabela}>R$ {(item.preco * item.totalVendido).toFixed(2)}</Text>
               </View>
             ))}
             
@@ -494,6 +498,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
     color: 'white',
+    textAlign: 'center',
   },
   itemContainer: {
     flexDirection: 'row',
@@ -504,15 +509,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  itemNome: {
-    fontSize: 16,
-    flex: 3,
-  },
-  itemQuantidade: {
+  itemTabela: {
     fontSize: 16,
     fontWeight: 'bold',
-    flex: 1,
-    textAlign: 'right',
+    textAlign: 'center',
   },
   loadingContainer: {
     justifyContent: 'center',
