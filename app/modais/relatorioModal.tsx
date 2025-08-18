@@ -400,6 +400,12 @@ export default function RelatorioModal() {
               </View>
             ))}
             
+              <View style={styles.itemContainer}>
+                <Text style={styles.itemTabela}>Total Geral</Text>
+                <Text style={styles.itemTabela}>{relatorioData.reduce((total, item) => total + item.totalVendido, 0)} un.</Text>
+                <Text style={styles.itemTabela}>R$ {relatorioData.reduce((total, item) => total + (item.preco * item.totalVendido), 0).toFixed(2)}</Text>
+              </View>
+            
             <TouchableOpacity 
               style={styles.shareButton}
               onPress={() => compartilharRelatorio(relatorioData, dataInicial, dataFinal)}
@@ -508,6 +514,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+  },
+  finalListContainer: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   itemTabela: {
     fontSize: 16,
