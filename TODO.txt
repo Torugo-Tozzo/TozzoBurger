@@ -1,3 +1,5 @@
-// tratamento de erro na impressão bluetooth
+gerar o apk
+npx eas build -p android --profile preview  
 
-// elaborar como vai ser a adição de adicional nos lanches
+apk-debug
+npx expo run:android

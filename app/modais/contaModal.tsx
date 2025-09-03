@@ -6,6 +6,9 @@ import { useVendasDatabase } from '@/database/useVendaDatabse';
 import { router } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { captureScreen } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 
 export default function ContaModalScreen() {
   const { cart, clearCart, updateCartItem } = useCart(); // Acessando o carrinho e a função de atualizar o item
@@ -32,6 +35,21 @@ export default function ContaModalScreen() {
     ]);
   };
 
+  const handleShare = async () => {
+      try {
+        const uri = await captureScreen({
+          format: 'png',
+          quality: 0.8,
+        });
+  
+        await Sharing.shareAsync(uri);
+      } catch (error) {
+        console.error("Erro ao capturar e compartilhar:", error);
+      } 
+    };
+
+  const imprimeConta = async (vendaId: number): Promise<void> => await router.push(`/modais/contaHistoricoModal?vendaId=${vendaId}`);
+
   const finalizarCompra = async () => {
     try {
       const produtos = cart.map(({ id, quantidade }) => ({
@@ -40,20 +58,23 @@ export default function ContaModalScreen() {
       }));
 
       const { vendaId } = await createVenda(produtos, cliente);
+      await clearCart(); 
+      router.back(); 
 
-      Alert.alert(
-        "Compra Finalizada",
-        `A compra foi concluída com sucesso!`
-      );
-      clearCart(); // Limpa o carrinho após finalizar a compra
-      router.push('/historico');
+      Alert.alert("Venda Realizada!", "Deseja imprimir a Conta?", [
+        { text: "Não", style: "cancel" },
+        {
+          text: "Sim",
+          onPress: () => imprimeConta(vendaId),
+        },
+      ]);
+
     } catch (error) {
       console.error(error);
       Alert.alert("Erro", "Não foi possível finalizar a compra.");
     }
   };
 
-  // Função para alterar a quantidade de um item no carrinho
   const alterarQuantidade = (itemId: number, operacao: 'incrementar' | 'decrementar') => {
     const item = cart.find((cartItem) => cartItem.id === itemId);
     if (!item) return;
@@ -92,10 +113,14 @@ export default function ContaModalScreen() {
     itemText: {
       fontSize: 16,
     },
+    fleNome: {
+      flex: 1,
+    },
     totalText: {
-      fontSize: 18,
+      fontSize: 25,
       fontWeight: "bold",
       marginVertical: 20,
+      textAlign: "center"
     },
     quantityControls: {
       flexDirection: "row",
@@ -161,7 +186,7 @@ export default function ContaModalScreen() {
         keyExtractor={(item) => String(item.id)}  // Garantir que o item tem id
         renderItem={({ item }) => (
           <View style={styles.cartItem}>
-            <Text style={styles.itemText}>{item.nome}</Text>
+            <Text style={[styles.itemText, styles.fleNome]}>{item.nome}</Text>
             <Text style={styles.itemText}>R$ {((item.quantidade ?? 0) * item.preco).toFixed(2)}</Text>
 
             <View style={styles.quantityControls}>
@@ -185,6 +210,7 @@ export default function ContaModalScreen() {
         )}
       />
 
+      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
       <Text style={styles.totalText}>Total: R$ {total.toFixed(2)}</Text>
 
       <View style={styles.buttonContainer}>
@@ -193,14 +219,21 @@ export default function ContaModalScreen() {
           onPress={limparConta}
           disabled={isCartEmpty}  // Desabilitar botão se o carrinho estiver vazio
         >
-          <Text style={styles.buttonText}>Limpar Conta</Text>
+          <Text style={styles.buttonText}>Limpar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, isCartEmpty && styles.buttonDisabled, {flex: 0.25}]}  // Aplicar estilo para botão desabilitado
+          onPress={handleShare}
+          disabled={isCartEmpty}  // Desabilitar botão se o carrinho estiver vazio
+        >
+          <Ionicons name="share-social" size={24} color="white" />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, isCartEmpty && styles.buttonDisabled]}  // Aplicar estilo para botão desabilitado
           onPress={finalizarCompra}
           disabled={isCartEmpty}  // Desabilitar botão se o carrinho estiver vazio
         >
-          <Text style={styles.buttonText}>Finalizar Compra</Text>
+          <Text style={styles.buttonText}>Vender</Text>
         </TouchableOpacity>
       </View>
 

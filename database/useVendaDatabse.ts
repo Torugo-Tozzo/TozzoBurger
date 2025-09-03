@@ -5,6 +5,7 @@ export type VendaDatabase = {
     total: number;
     horario: string;
     cliente?: string;
+    excluida: boolean;
 };
 
 export type VendaProduto = {
@@ -75,13 +76,12 @@ export function useVendasDatabase() {
     async function removeVenda(vendaId: number) {
         try {
             await database.execAsync(
-                `DELETE FROM RL_VENDA_PRODUTO WHERE vendaId = ${vendaId}`
+                `UPDATE TB_VENDAS SET excluida = TRUE WHERE id = ${vendaId}`
             );
-            await database.execAsync(`DELETE FROM TB_VENDAS WHERE id = ${vendaId}`);
         } catch (error) {
             throw error;
         }
-    }
+    }    
 
     async function calculateTotal(
         produtos: { produtoId: number; quantidade: number }[]
@@ -104,7 +104,7 @@ export function useVendasDatabase() {
     async function listVendasRecentes() {
         try {
             const seteDiasAtras = new Date();
-            seteDiasAtras.setDate(seteDiasAtras.getDate() - 5);
+            seteDiasAtras.setDate(seteDiasAtras.getDate() - 3);
             const seteDiasAtrasISO = seteDiasAtras.toISOString();
     
             const vendas = await database.getAllAsync<VendaDatabase>(
@@ -192,5 +192,63 @@ export function useVendasDatabase() {
         }
     }    
 
-    return { createVenda, removeVenda, listVendasRecentes, getVendaById, listVendasPorDia };
+    async function getRelatorioPorPeriodo(
+        dataInicial: string,
+        dataFinal: string,
+        tipoProdutoId?: string
+    ) {
+        try {
+            const dataInicialObj = new Date(dataInicial);
+            dataInicialObj.setHours(0, 0, 0, 0);
+            const inicioPeriodo = dataInicialObj.toISOString();
+            
+            // Data final termina à meia-noite do dia seguinte
+            const dataFinalObj = new Date(dataFinal);
+            dataFinalObj.setHours(23, 59, 59, 999);
+            const fimPeriodo = dataFinalObj.toISOString();
+            
+            // Monta a query base usando comparações diretas em vez de BETWEEN
+            let query = `
+              SELECT 
+                P.id, P.nome, P.preco, SUM(VP.quantidade) as totalVendido
+              FROM 
+                RL_VENDA_PRODUTO VP
+              JOIN TB_VENDAS V ON VP.vendaId = V.id
+              JOIN TB_PRODUTOS P ON VP.produtoId = P.id
+              WHERE 
+                V.horario >= ? AND V.horario <= ?
+                AND V.excluida IS NOT TRUE
+            `;
+            
+            const params: any[] = [inicioPeriodo, fimPeriodo];
+            
+            if (tipoProdutoId && tipoProdutoId !== '' && tipoProdutoId !== '100') {
+              query += ` AND P.tipoProdutoId = ?`;
+              params.push(Number(tipoProdutoId));
+            }
+            
+            query += ` GROUP BY P.id ORDER BY totalVendido DESC`;
+            
+            const resultado = await database.getAllAsync<{
+              id: number;
+              nome: string;
+              totalVendido: number;
+              preco: number;
+            }>(query, params);
+            
+            return resultado;
+        } catch (error) {
+            console.error('ERRO DETALHADO:', error);
+            throw error;
+        }
+    }      
+
+    return { 
+        createVenda, 
+        removeVenda, 
+        listVendasRecentes, 
+        getVendaById, 
+        listVendasPorDia,
+        getRelatorioPorPeriodo 
+    };
 }

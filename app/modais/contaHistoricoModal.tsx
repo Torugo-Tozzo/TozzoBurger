@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, FlatList, Alert, Button, ActivityIndicator } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { StyleSheet, FlatList, Alert, ActivityIndicator, TouchableOpacity, Text as RNText } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useVendasDatabase, VendaDatabase } from '@/database/useVendaDatabse';
@@ -7,11 +7,14 @@ import { useProductDatabase } from '@/database/useProductDatabase';
 import { sendMessageToDevice } from '@/useBLE';
 import { usePrinterDatabase } from '@/database/usePrinterDatabase';
 import { formatarVendaParaImpressao } from '@/hooks/formatarVendaImpressao';
+import { Ionicons } from '@expo/vector-icons'; // Importando o ícone de share
+import { captureScreen } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 
 export default function ContaHistoricoModal() {
   const { vendaId } = useLocalSearchParams();
   const { getVendaById } = useVendasDatabase();
-  const { show: getProductById } = useProductDatabase();
+  const { showAdd: getProductById } = useProductDatabase();
   const { getPrinter } = usePrinterDatabase();
   const router = useRouter();
 
@@ -19,6 +22,7 @@ export default function ContaHistoricoModal() {
   const [produtos, setProdutos] = useState<{ nome: string; quantidade: number; preco: number }[]>([]);
   const [isPrinterConnected, setIsPrinterConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingPrint, setLoadingPrint] = useState<number | null>(null);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -79,28 +83,41 @@ export default function ContaHistoricoModal() {
   const handlePrint = async () => {
     if (!venda) return;
 
-    // Início da string de impressão
+    setLoadingPrint(venda?.id);
+
     let printContent = await formatarVendaParaImpressao(venda, produtos);
 
     try {
       await sendMessageToDevice(printContent, await getPrinter());
     } catch (error) {
-      Alert.alert("Erro", `${error}`);
+      Alert.alert('Erro', `${error}`);
       return;
+    } finally {
+      setLoadingPrint(null); // Desativar carregamento ao finalizar
     }
-    Alert.alert("Sucesso", "Conta enviada para impressão.");
+    Alert.alert('Sucesso', 'Conta enviada para impressão.');
   };
 
+  const handleShare = async () => {
+    try {
+      const uri = await captureScreen({
+        format: 'png',
+        quality: 0.8,
+      });
+
+      await Sharing.shareAsync(uri);
+    } catch (error) {
+      console.error("Erro ao capturar e compartilhar:", error);
+    } 
+  };
 
   const renderItem = ({ item }: { item: { nome: string; quantidade: number; preco: number } }) => (
-    <View style={styles.item} darkColor='grey' lightColor='whitesmoke'>
-      <View style={styles.itemRow} darkColor='grey' lightColor='whitesmoke'>
+    <View style={styles.item} darkColor="grey" lightColor="whitesmoke">
+      <View style={styles.itemRow} darkColor="grey" lightColor="whitesmoke">
         <Text style={styles.itemTextLeft}>
           ({item.quantidade}x) {item.nome}
         </Text>
-        <Text style={styles.itemTextRight}>
-          R$ {item.preco.toFixed(2)}
-        </Text>
+        <Text style={styles.itemTextRight}>R$ {item.preco.toFixed(2)}</Text>
       </View>
     </View>
   );
@@ -133,9 +150,7 @@ export default function ContaHistoricoModal() {
       <Text style={styles.detailText}>
         Horário: {new Date(venda.horario).toLocaleTimeString()}
       </Text>
-      <Text style={styles.detailText}>
-        Cliente: {venda.cliente}
-      </Text>
+      <Text style={styles.detailText}>Cliente: {venda.cliente}</Text>
       <View style={styles.separator} />
       <Text style={styles.subtitle}>Produtos</Text>
 
@@ -146,12 +161,29 @@ export default function ContaHistoricoModal() {
       />
       <Text style={styles.title}>Total: R$ {venda.total.toFixed(2)}</Text>
       <View style={styles.separator} />
-      <Button
-        title="Imprimir Conta"
-        onPress={handlePrint}
-        color="#007AFF"
-        disabled={!isPrinterConnected} // Desabilita o botão caso não haja impressora registrada
-      />
+
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={styles.shareButton}
+          onPress={handleShare}
+        >
+          <Ionicons name="share-social" size={24} color="white" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.button,
+            (!isPrinterConnected) && styles.buttonDisabled,
+          ]}
+          onPress={handlePrint}
+        >
+          {loadingPrint ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Imprimir Conta</Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -185,7 +217,6 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     padding: 10,
     borderRadius: 5,
-    //backgroundColor: '#f9f9f9', // Para o tema claro
   },
   itemRow: {
     flexDirection: 'row',
@@ -194,10 +225,39 @@ const styles = StyleSheet.create({
   },
   itemTextLeft: {
     fontSize: 16,
-    flex: 1, // Garante que o texto à esquerda tenha espaço suficiente
+    flex: 1,
   },
   itemTextRight: {
     fontSize: 16,
-    textAlign: 'right', // Garante alinhamento correto
-  }
+    textAlign: 'right',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 5,
+    flex: 1,
+    alignItems: 'center',
+  },
+  buttonDisabled: {
+    backgroundColor: '#a1a1a1',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  shareButton: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 5,
+    flex: 0.2, // Proporção de 20%
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
 });

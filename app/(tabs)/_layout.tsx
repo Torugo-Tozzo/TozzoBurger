@@ -89,6 +89,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name='relatorio'
+        options={{
+          title: 'Relatório',
+          tabBarIcon: ({ color }) => <TabBarIcon name="area-chart" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="bluetooth"
         options={{
           title: 'Bluetooth',

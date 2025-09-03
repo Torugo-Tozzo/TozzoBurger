@@ -19,6 +19,7 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
 
   const [nome, setNome] = useState('');
   const [preco, setPreco] = useState('');
+  const [ingredientes, setIngredientes] = useState('');
   const [tipoProdutoId, setTipoProdutoId] = useState<number | undefined>();
   const [tiposProdutos, setTiposProdutos] = useState<{ id: number; descricao: string }[]>([]);
   const router = useRouter();
@@ -41,7 +42,7 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
 
   useEffect(() => {
     if (productId != null) {
-      let prodId = Number(productId); 
+      let prodId = Number(productId);
       async function fetchProduct() {
         try {
           const product = await show(prodId);
@@ -49,6 +50,7 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
             setNome(product.nome);
             setPreco(product.preco.toString());
             setTipoProdutoId(product.tipoProdutoId);
+            setIngredientes(product.ingredientes?.toString() || '');
           }
         } catch (error) {
           console.error('Erro ao carregar o produto:', error);
@@ -62,7 +64,7 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
   async function handleSave() {
     try {
       if (!nome || !preco || !tipoProdutoId) {
-        Alert.alert('Erro', 'Por favor, preencha todos os campos.');
+        Alert.alert('Erro', 'Por favor, preencha os campos obrigatórios: \nnome, preço e tipo.');
         return;
       }
 
@@ -72,12 +74,14 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
           nome,
           preco: parseFloat(preco),
           tipoProdutoId,
+          ingredientes
         });
       } else {
         await create({
           nome,
           preco: parseFloat(preco),
           tipoProdutoId,
+          ingredientes
         });
       }
       router.back();
@@ -134,24 +138,33 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
         {productId ? 'Editar Produto' : 'Cadastrar Produto'}
       </Text>
       <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-      <Text style={{fontSize: 16, margin: 10, fontWeight: "bold"}}>Nome do Produto</Text>
+      <Text style={{ fontSize: 16, margin: 10, fontWeight: "bold" }}>Nome do Produto</Text>
       <TextInput
         style={styles.input}
         placeholder="Digite o Nome..."
         value={nome}
         onChangeText={setNome}
-        placeholderTextColor={placeholderColor} 
+        placeholderTextColor={placeholderColor}
       />
-      <Text style={{fontSize: 16, margin: 10, fontWeight: "bold"}}>Preço do Produto</Text>
+      <Text style={{ fontSize: 16, margin: 10, fontWeight: "bold" }}>Preço do Produto</Text>
       <TextInput
         style={styles.input}
         placeholder="Digite o Preço.."
         value={preco}
         keyboardType="numeric"
         onChangeText={setPreco}
-        placeholderTextColor={placeholderColor} 
+        placeholderTextColor={placeholderColor}
       />
-      <Text style={{fontSize: 16, margin: 10, fontWeight: "bold"}}>Tipo do Produto</Text>
+      <Text style={{ fontSize: 16, margin: 10, fontWeight: "bold" }}>Ingredientes do Produto </Text>
+      <TextInput
+        style={[styles.input, { height: 100, textAlignVertical: 'top' }]} // Ajuste a altura para 3-4 linhas
+        placeholder="Digite os Ingredientes.."
+        value={ingredientes}
+        onChangeText={setIngredientes}
+        placeholderTextColor={placeholderColor}
+        multiline={true} // Permite múltiplas linhas
+      />
+      <Text style={{ fontSize: 16, margin: 10, fontWeight: "bold" }}>Tipo do Produto</Text>
       <View style={styles.input}>
         <Picker
           selectedValue={tipoProdutoId}

@@ -6,6 +6,8 @@ export type ProductDatabase = {
   preco: number
   tipoProdutoId: number
   quantidade?: number | null
+  origemProdutoId?: number | null
+  ingredientes?: string | null
 }
 
 export function useProductDatabase() {
@@ -13,14 +15,16 @@ export function useProductDatabase() {
 
   async function create(data: Omit<ProductDatabase, "id">) {
     const statement = await database.prepareAsync(
-      "INSERT INTO TB_PRODUTOS (nome, preco, tipoProdutoId) VALUES ($nome, $preco, $tipoProdutoId)"
+      "INSERT INTO TB_PRODUTOS (nome, preco, tipoProdutoId, origemProdutoId, ingredientes) VALUES ($nome, $preco, $tipoProdutoId, $origemProdutoId, $ingredientes)"
     )
 
     try {
       const result = await statement.executeAsync({
         $nome: data.nome,
         $preco: data.preco,
-        $tipoProdutoId: data.tipoProdutoId
+        $tipoProdutoId: data.tipoProdutoId,
+        $origemProdutoId: data.origemProdutoId ?? null,
+        $ingredientes: data.ingredientes ?? null
       })
 
       const insertedRowId = result.lastInsertRowId.toLocaleString()
@@ -35,7 +39,7 @@ export function useProductDatabase() {
 
   async function searchByName(name: string) {
     try {
-      const query = "SELECT * FROM TB_PRODUTOS WHERE nome LIKE ?"
+      const query = "SELECT * FROM TB_PRODUTOS WHERE origemProdutoId IS NULL AND nome LIKE ?"
 
       const response = await database.getAllAsync<ProductDatabase>(
         query,
@@ -50,7 +54,7 @@ export function useProductDatabase() {
 
   async function update(data: ProductDatabase) {
     const statement = await database.prepareAsync(
-      "UPDATE TB_PRODUTOS SET nome = $nome, preco = $preco, tipoProdutoId = $tipoProdutoId WHERE id = $id"
+      "UPDATE TB_PRODUTOS SET nome = $nome, preco = $preco, tipoProdutoId = $tipoProdutoId, ingredientes = $ingredientes WHERE id = $id"
     )
 
     try {
@@ -58,7 +62,8 @@ export function useProductDatabase() {
         $id: data.id,
         $nome: data.nome,
         $preco: data.preco,
-        $tipoProdutoId: data.tipoProdutoId
+        $tipoProdutoId: data.tipoProdutoId,
+        $ingredientes: data.ingredientes ?? null
       })
     } catch (error) {
       throw error
@@ -76,6 +81,20 @@ export function useProductDatabase() {
   }
 
   async function show(id: number) {
+    try {
+      const query = "SELECT * FROM TB_PRODUTOS WHERE origemProdutoId IS NULL AND id = ?"
+
+      const response = await database.getFirstAsync<ProductDatabase>(query, [
+        id,
+      ])
+
+      return response
+    } catch (error) {
+      throw error
+    }
+  }
+
+  async function showAdd(id: number) {
     try {
       const query = "SELECT * FROM TB_PRODUTOS WHERE id = ?"
 
@@ -105,7 +124,7 @@ export function useProductDatabase() {
 
   async function filterByTipo(tipoProdutoId: number): Promise<ProductDatabase[]> {
     try {
-      const query = "SELECT * FROM TB_PRODUTOS WHERE tipoProdutoId = ?"
+      const query = "SELECT * FROM TB_PRODUTOS WHERE origemProdutoId IS NULL AND tipoProdutoId = ?"
   
       const response = await database.getAllAsync<ProductDatabase>(
         query,
@@ -118,5 +137,21 @@ export function useProductDatabase() {
     }
   }
 
-  return { create, searchByName, update, remove, show, getTipoProdutos, filterByTipo }
+  async function searchOrigemProdutoId(produtoId: number): Promise<ProductDatabase[]> {
+    try {
+      const query = "SELECT * FROM TB_PRODUTOS WHERE origemProdutoId = ?"
+
+      const response = await database.getAllAsync<ProductDatabase>(
+        query,
+        [produtoId]
+      )
+
+      return response
+    } catch (error) {
+      console.error("Erro ao buscar produtos de origem:", error)
+      throw error
+    }
+  }
+
+  return { create, searchByName, update, remove, show, getTipoProdutos, filterByTipo, searchOrigemProdutoId, showAdd }
 }
