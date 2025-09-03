@@ -39,6 +39,7 @@ cd tozzo-burger
 2. **Instalar as dependências**:
 
 ```bash
+(delete a pasta android)
 npm install
 ```
 
