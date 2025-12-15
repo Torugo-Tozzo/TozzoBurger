@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 import { SQLiteProvider } from 'expo-sqlite';  // Importar o SQLiteProvider
 import { initializeDatabase } from '@/database/initializeDatabase';  // Importe sua função de inicialização
 import { CartProvider } from '@/context/CartContext';
+import { AuthProvider } from '@/context/AuthContext';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { StatusBar } from 'expo-status-bar';
@@ -48,9 +49,11 @@ export default function RootLayout() {
 
   return (
     <SQLiteProvider databaseName="database.db" onInit={initializeDatabase}>
-      <CartProvider>
-        <RootLayoutNav />
-      </CartProvider>
+      <AuthProvider>
+        <CartProvider>
+          <RootLayoutNav />
+        </CartProvider>
+      </AuthProvider>
     </SQLiteProvider>
   );
 }

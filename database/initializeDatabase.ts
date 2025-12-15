@@ -1,7 +1,42 @@
 import { type SQLiteDatabase } from "expo-sqlite"
 
-export async function initializeDatabase(database: SQLiteDatabase) {
+export const STATUS_PEDIDO = {
+  ABERTO: 'ABERTO',
+  FECHADO: 'FECHADO',
+} as const;
 
+export async function initializeDatabase(database: SQLiteDatabase) {
+  const SCHEMA_VERSION = 1000; //when update the DB schema, increment this value
+
+  // Read current DB schema version from TB_SCHEMA (if exists)
+  let dbVersion = 0;
+  try {
+    const row = await database.getFirstAsync<{ version: number }>(`SELECT version FROM TB_SCHEMA LIMIT 1`);
+    if (row && typeof row.version !== 'undefined') dbVersion = Number(row.version) || 0;
+  } catch (err) {
+    // TB_SCHEMA does not exist or query failed — treat as version 0
+    dbVersion = 0;
+  }
+
+  // Only run initialization/migrations if code schema version is newer than DB
+  if (dbVersion >= SCHEMA_VERSION) {
+    return;
+  }
+
+  // Helper: ensure a column exists using PRAGMA table_info
+  async function ensureColumnExists(table: string, column: string, definition: string) {
+    try {
+      const info = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(${table});`);
+      const exists = info.some((c) => c.name === column);
+      if (!exists) {
+        await database.execAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
+      }
+    } catch (err) {
+      console.warn(`Could not ensure column ${column} on ${table}:`, err);
+    }
+  }
+
+  // Create/ensure base tables
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS TB_PRODUTOS (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -11,14 +46,14 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       origemProdutoId INTEGER NULL,
       ingredientes TEXT NULL
     );
-  `)
+  `);
 
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS TB_TP_PRODUTO (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       descricao TEXT NOT NULL
     );
-  `)
+  `);
 
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS TB_VENDAS (
@@ -28,7 +63,29 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       cliente TEXT NULL,
       excluida BOOLEAN NULL
     );
-  `)
+  `);
+
+  // Create pedidos tables (new in this app update)
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS TB_PEDIDOS (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      total REAL NOT NULL,
+      horario TEXT NOT NULL,
+      cliente TEXT NULL,
+      status TEXT NOT NULL
+    );
+  `);
+
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS RL_PEDIDO_PRODUTO (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pedidoId INTEGER NOT NULL,
+      produtoId INTEGER NOT NULL,
+      quantidade INTEGER NOT NULL DEFAULT 1,
+      FOREIGN KEY (pedidoId) REFERENCES TB_PEDIDOS (id),
+      FOREIGN KEY (produtoId) REFERENCES TB_PRODUTOS (id)
+    );
+  `);
 
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS RL_VENDA_PRODUTO (
@@ -39,7 +96,7 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       FOREIGN KEY (vendaId) REFERENCES TB_VENDAS (id),
       FOREIGN KEY (produtoId) REFERENCES TB_PRODUTOS (id)
     );
-  `)
+  `);
 
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS TB_IMPRESSORAS (
@@ -51,6 +108,25 @@ export async function initializeDatabase(database: SQLiteDatabase) {
 
   await seedTipoProduto(database);
   await seedProdutosPadrao(database);
+
+  // Ensure new columns exist
+  await ensureColumnExists('TB_PRODUTOS', 'foiSincronizado', 'BOOLEAN NOT NULL DEFAULT 0');
+  await ensureColumnExists('TB_VENDAS', 'foiSincronizado', 'BOOLEAN NOT NULL DEFAULT 0');
+  await ensureColumnExists('TB_VENDAS', 'pedidoId', 'INTEGER NULL');
+
+  // Create TB_SCHEMA if missing and store current schema version
+  try {
+    await database.execAsync(`CREATE TABLE IF NOT EXISTS TB_SCHEMA (version INTEGER NOT NULL);`);
+
+    const existing = await database.getFirstAsync<{ version: number }>(`SELECT version FROM TB_SCHEMA LIMIT 1`).catch(() => null);
+    if (existing && typeof existing.version !== 'undefined') {
+      await database.execAsync(`UPDATE TB_SCHEMA SET version = ${SCHEMA_VERSION};`);
+    } else {
+      await database.execAsync(`INSERT INTO TB_SCHEMA (version) VALUES (${SCHEMA_VERSION});`);
+    }
+  } catch (err) {
+    console.warn('Failed to write TB_SCHEMA version:', err);
+  }
 }
 
 async function seedTipoProduto(database: SQLiteDatabase) {
