@@ -3,3 +3,5 @@ npx eas build -p android --profile preview
 
 apk-debug
 npx expo run:android
+
+- REFATORAR AS IMAGENS AGORA USAR O ESCRITO DO TIPO COM A CORZINHA.

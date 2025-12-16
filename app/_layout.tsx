@@ -9,6 +9,8 @@ import { SQLiteProvider } from 'expo-sqlite';  // Importar o SQLiteProvider
 import { initializeDatabase } from '@/database/initializeDatabase';  // Importe sua função de inicialização
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'expo-router';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { StatusBar } from 'expo-status-bar';
@@ -60,6 +62,22 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  // Redirect to login or main tabs depending on auth
+  // Use replace so user can't go back to the wrong screen
+  useEffect(() => {
+    if (loading) return;
+    const pathname = (router as any).pathname as string | undefined;
+    if (!user && pathname !== '/login') {
+      (router as any).replace('/login');
+    } else if (user && pathname === '/login') {
+      (router as any).replace('/(tabs)');
+    }
+  }, [loading, user, router]);
+
+  // While auth is rehydrating, don't render navigation (prevents flicker)
+  if (loading) return null;
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

@@ -11,7 +11,12 @@ export async function initializeDatabase(database: SQLiteDatabase) {
   // Read current DB schema version from TB_SCHEMA (if exists)
   let dbVersion = 0;
   try {
-    const row = await database.getFirstAsync<{ version: number }>(`SELECT version FROM TB_SCHEMA LIMIT 1`);
+    const row = await database.getFirstAsync<{
+      version?: number;
+      estabelecimentoId?: number | null;
+      usuarioId?: number | null;
+      sincronizacaoAutomatica?: number | boolean | null;
+    }>(`SELECT version, estabelecimentoId, usuarioId, sincronizacaoAutomatica FROM TB_SCHEMA LIMIT 1`);
     if (row && typeof row.version !== 'undefined') dbVersion = Number(row.version) || 0;
   } catch (err) {
     // TB_SCHEMA does not exist or query failed — treat as version 0
@@ -51,7 +56,8 @@ export async function initializeDatabase(database: SQLiteDatabase) {
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS TB_TP_PRODUTO (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      descricao TEXT NOT NULL
+      descricao TEXT NOT NULL,
+      cor TEXT NOT NULL DEFAULT '#9E9E9E'
     );
   `);
 
@@ -106,6 +112,16 @@ export async function initializeDatabase(database: SQLiteDatabase) {
     );
   `);
 
+  // Create users table
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS TB_USUARIO (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL,
+      estabelecimentoId INTEGER NULL,
+      nomeEstabelecimento TEXT NULL
+    );
+  `);
+
   await seedTipoProduto(database);
   await seedProdutosPadrao(database);
 
@@ -113,16 +129,34 @@ export async function initializeDatabase(database: SQLiteDatabase) {
   await ensureColumnExists('TB_PRODUTOS', 'foiSincronizado', 'BOOLEAN NOT NULL DEFAULT 0');
   await ensureColumnExists('TB_VENDAS', 'foiSincronizado', 'BOOLEAN NOT NULL DEFAULT 0');
   await ensureColumnExists('TB_VENDAS', 'pedidoId', 'INTEGER NULL');
+  await ensureColumnExists('TB_TP_PRODUTO', 'cor', 'TEXT NOT NULL DEFAULT \'#9E9E9E\'');
 
   // Create TB_SCHEMA if missing and store current schema version
   try {
-    await database.execAsync(`CREATE TABLE IF NOT EXISTS TB_SCHEMA (version INTEGER NOT NULL);`);
+    // Ensure TB_SCHEMA exists with additional columns to store establishment and user ids and sync flag
+    await database.execAsync(`CREATE TABLE IF NOT EXISTS TB_SCHEMA (
+      version INTEGER NOT NULL,
+      estabelecimentoId INTEGER NULL,
+      usuarioId INTEGER NULL,
+      sincronizacaoAutomatica BOOLEAN NOT NULL DEFAULT 0
+    );`);
 
-    const existing = await database.getFirstAsync<{ version: number }>(`SELECT version FROM TB_SCHEMA LIMIT 1`).catch(() => null);
+    // Ensure columns exist for older DBs
+    await ensureColumnExists('TB_SCHEMA', 'estabelecimentoId', 'INTEGER NULL');
+    await ensureColumnExists('TB_SCHEMA', 'usuarioId', 'INTEGER NULL');
+    await ensureColumnExists('TB_SCHEMA', 'sincronizacaoAutomatica', 'BOOLEAN NOT NULL DEFAULT 0');
+
+    const existing = await database.getFirstAsync<{
+      version?: number;
+      estabelecimentoId?: number | null;
+      usuarioId?: number | null;
+      sincronizacaoAutomatica?: number | boolean | null;
+    }>(`SELECT version, estabelecimentoId, usuarioId, sincronizacaoAutomatica FROM TB_SCHEMA LIMIT 1`).catch(() => null);
+
     if (existing && typeof existing.version !== 'undefined') {
       await database.execAsync(`UPDATE TB_SCHEMA SET version = ${SCHEMA_VERSION};`);
     } else {
-      await database.execAsync(`INSERT INTO TB_SCHEMA (version) VALUES (${SCHEMA_VERSION});`);
+      await database.execAsync(`INSERT INTO TB_SCHEMA (version, estabelecimentoId, usuarioId, sincronizacaoAutomatica) VALUES (${SCHEMA_VERSION}, NULL, NULL, 0);`);
     }
   } catch (err) {
     console.warn('Failed to write TB_SCHEMA version:', err);
@@ -131,20 +165,35 @@ export async function initializeDatabase(database: SQLiteDatabase) {
 
 async function seedTipoProduto(database: SQLiteDatabase) {
   const tipos = [
-    { id: 1, descricao: "Industrial" },
-    { id: 2, descricao: "Artesanal" },
-    { id: 3, descricao: "Frango" },
-    { id: 4, descricao: "HotDog" },
-    { id: 5, descricao: "Bebida" },
-    { id: 6, descricao: "Batata Frita" },
-    { id: 7, descricao: "Adicional" },
-    { id: 8, descricao: "Outro" }
+    { id: 1, descricao: "Hambúrguer", cor: "#2f84d3ff" },
+    { id: 2, descricao: "Hambúrguer Artesanal", cor: "#4ba04bff" },
+    { id: 3, descricao: "Frango", cor: "#FFA000" },
+    { id: 4, descricao: "HotDog", cor: "#FF7043" },
+    { id: 5, descricao: "Bebida", cor: "#d21919ff" },
+    { id: 6, descricao: "Batata Frita", cor: "#FBC02D" },
+    { id: 7, descricao: "Adicional", cor: "#7B1FA2" },
+    { id: 8, descricao: "Outro", cor: "#9E9E9E" },
+    { id: 9, descricao: "Pizza", cor: "#E64A19" },
+    { id: 10, descricao: "Sushi", cor: "#00695C" },
+    { id: 11, descricao: "Prato Feito", cor: "#00897B" },
+    { id: 12, descricao: "Salgado", cor: "#8D6E63" },
+    { id: 13, descricao: "Doce", cor: "#F06292" },
+    { id: 14, descricao: "Café", cor: "#5D4037" },
+    { id: 15, descricao: "Porção", cor: "#FF8A65" },
+    { id: 16, descricao: "Pastel", cor: "#FFB74D" },
+    { id: 17, descricao: "Culinária Asiática", cor: "#AFB42B" },
+    { id: 18, descricao: "Vegetariano", cor: "#388E3C" },
+    { id: 19, descricao: "Combo", cor: "#1976D2" },
+    { id: 20, descricao: "Sopa", cor: "#4FC3F7" },
+    { id: 21, descricao: "Salada", cor: "#66BB6A" },
+    { id: 22, descricao: "Sorvete", cor: "#BA68C8" },
+    { id: 23, descricao: "Açaí", cor: "#5E35B1" }
   ];
 
   for (const tipo of tipos) {
     await database.execAsync(`
-      INSERT OR IGNORE INTO TB_TP_PRODUTO (id, descricao)
-      VALUES (${tipo.id}, '${tipo.descricao}');
+      INSERT OR IGNORE INTO TB_TP_PRODUTO (id, descricao, cor)
+      VALUES (${tipo.id}, '${tipo.descricao}', '${tipo.cor}');
     `);
   }
 }

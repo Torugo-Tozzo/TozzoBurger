@@ -11,6 +11,7 @@ type User = {
 type AuthContextData = {
   user: User | null;
   token: string | null;
+  loading: boolean;
   login: (email: string, senha: string) => Promise<boolean>;
   logout: () => void;
 };
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextData | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const TOKEN_KEY = 'tozzo_token_v1';
 
   // Rehydrate token on mount and validate it
@@ -45,6 +47,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } catch (err) {
         console.warn('Failed to load token from SecureStore', err);
+      } finally {
+        if (mounted) setLoading(false);
       }
     };
 
@@ -55,6 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, senha: string) => {
+    setLoading(true);
     try {
       const body = await api.login(email, senha);
       // Expect the API to return an object that includes a token string.
@@ -81,6 +86,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       console.warn('Login failed', err);
       return false;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -91,7 +98,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

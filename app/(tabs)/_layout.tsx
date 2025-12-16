@@ -61,6 +61,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name='relatorio'
+        options={{
+          title: 'Relatório',
+          tabBarIcon: ({ color }) => <TabBarIcon name="area-chart" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="historico"
+        options={{
+          title: 'Histórico',
+          tabBarIcon: ({ color }) => <TabBarIcon name="clock-o" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="produtos"
         options={{
           title: 'Produtos',
@@ -82,24 +96,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="historico"
+        name="configs"
         options={{
-          title: 'Histórico',
-          tabBarIcon: ({ color }) => <TabBarIcon name="clock-o" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name='relatorio'
-        options={{
-          title: 'Relatório',
-          tabBarIcon: ({ color }) => <TabBarIcon name="area-chart" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="bluetooth"
-        options={{
-          title: 'Bluetooth',
-          tabBarIcon: ({ color }) => <TabBarIcon name="bluetooth" color={color} />,
+          title: 'Configurações',
+          tabBarIcon: ({ color }) => <TabBarIcon name="cog" color={color} />,
         }}
       />
     </Tabs>

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Button, FlatList, Alert, ActivityIndicator, TextInput, StyleSheet } from 'react-native';
 import { Text, View } from '@/components/Themed';
+import { useColorScheme } from '@/components/useColorScheme';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { usePrinterDatabase } from '@/database/usePrinterDatabase'; // Importando o hook de banco de dados
 import { listNearbyDevices, connectToDevice, disconnectFromDevice } from '@/useBLE'; // Importando os métodos de BLE
 import { useAuth } from '@/context/AuthContext';
@@ -12,6 +14,8 @@ const BluetoothScreen = () => {
   const [isScanning, setIsScanning] = useState(false); // Estado para controlar se está escaneando
 
   const { user, login, logout, token } = useAuth();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
@@ -98,58 +102,74 @@ const BluetoothScreen = () => {
   };
 
   return (
-    <View style={{ flex: 1, padding: 20 }}>
-      {/* Authentication area */}
-      <View style={{ marginBottom: 20 }}>
-        {user ? (
-          <View>
-            <Text style={styles.username}>Olá, {user.nome ?? user.email}</Text>
-            <Button title="Sair" onPress={() => logout()} />
-          </View>
-        ) : (
-          <View>
-            <Text style={{ marginBottom: 8 }}>Conecte-se à API para sincronizar</Text>
-            <TextInput
-              placeholder="E-mail"
-              value={email}
-              onChangeText={setEmail}
-              style={styles.input}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-            <TextInput
-              placeholder="Senha"
-              value={senha}
-              onChangeText={setSenha}
-              style={styles.input}
-              secureTextEntry
-            />
-            <Button title={loginLoading ? 'Entrando...' : 'Entrar'} onPress={handleLogin} disabled={loginLoading} />
-          </View>
-        )}
+    <View style={[{ flex: 1, padding: 20 }, { backgroundColor: isDark ? '#000' : '#fff' }]}>
+     
+
+      {/* Sections: User / Printer */}
+      <View style={[styles.section, { backgroundColor: isDark ? '#111' : '#fff', borderColor: isDark ? '#222' : '#e6e6e6' }]}>
+        <View style={[styles.sectionHeader, { backgroundColor: isDark ? '#0d0d0d' : '#fafafa' }] }>
+          <Text style={[styles.sectionTitle, { color: isDark ? '#fff' : '#000' }]}>Usuário</Text>
+        </View>
+        <View style={styles.sectionContent}>
+          {user ? (
+            <View style={{ alignItems: 'center' }}>
+              <FontAwesome name="user-circle" size={56} color={isDark ? '#ddd' : '#666'} style={styles.userIcon} />
+              <Text style={[styles.username, { color: isDark ? '#fff' : '#000' }]}>{user.nome ?? user.email}</Text>
+              <View style={{ marginTop: 8 }}>
+                <Button title="Sair" onPress={() => logout()} />
+              </View>
+            </View>
+          ) : (
+            <View>
+              <Text style={{ marginBottom: 8, color: isDark ? '#fff' : '#000' }}>Conecte-se à API para sincronizar</Text>
+              <TextInput
+                placeholder="E-mail"
+                value={email}
+                onChangeText={setEmail}
+                style={[styles.input, { backgroundColor: isDark ? '#111' : '#fff', borderColor: isDark ? '#333' : '#ccc', color: isDark ? '#fff' : '#000' }]}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              <TextInput
+                placeholder="Senha"
+                value={senha}
+                onChangeText={setSenha}
+                style={[styles.input, { backgroundColor: isDark ? '#111' : '#fff', borderColor: isDark ? '#333' : '#ccc', color: isDark ? '#fff' : '#000' }]}
+                secureTextEntry
+              />
+              <Button title={loginLoading ? 'Entrando...' : 'Entrar'} onPress={handleLogin} disabled={loginLoading} />
+            </View>
+          )}
+        </View>
       </View>
 
-      {/* Printer area */}
-      {connectedPrinter ? (
-        <View>
-          <Text style={{ fontSize: 18, marginBottom: 10 }}>Impressora conectada: {connectedPrinter}</Text>
-          <Button title="Remover Impressora" onPress={handleRemovePrinter} />
+      <View style={[styles.section, { backgroundColor: isDark ? '#111' : '#fff', borderColor: isDark ? '#222' : '#e6e6e6' }]}>
+        <View style={[styles.sectionHeader, { backgroundColor: isDark ? '#0d0d0d' : '#fafafa' }] }>
+          <Text style={[styles.sectionTitle, { color: isDark ? '#fff' : '#000' }]}>Impressora</Text>
         </View>
-      ) : (
-        <View>
-          <Button title="Adicionar Impressora" onPress={handleScanDevices} />
+        <View style={styles.sectionContent}>
+          {connectedPrinter ? (
+            <View>
+              <Text style={{ fontSize: 18, marginBottom: 10, color: isDark ? '#fff' : '#000' }}>Impressora conectada: {connectedPrinter}</Text>
+              <Button title="Remover Impressora" onPress={handleRemovePrinter} />
+            </View>
+          ) : (
+            <View>
+              <Button title="Adicionar Impressora" onPress={handleScanDevices} />
+            </View>
+          )}
         </View>
-      )}
+      </View>
 
       {isScanning ? (
-        <ActivityIndicator size="large" color="#0000ff" />
+        <ActivityIndicator size="large" color={isDark ? '#fff' : '#0000ff'} />
       ) : (
         <FlatList
           data={devices}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <View style={{ marginVertical: 10 }}>
-              <Text style={{ textAlign: 'center', margin: 10 }}>{item.name || 'Dispositivo desconhecido'}</Text>
+              <Text style={{ textAlign: 'center', margin: 10, color: isDark ? '#fff' : '#000' }}>{item.name || 'Dispositivo desconhecido'}</Text>
               <Button title="Registrar Impressora" onPress={() => handleConnect(item)} />
             </View>
           )}
@@ -169,6 +189,38 @@ const styles = StyleSheet.create({
   },
   username: {
     fontSize: 18,
+    marginBottom: 8,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+  section: {
+    marginBottom: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e6e6e6',
+  },
+  sectionHeader: {
+    padding: 12,
+    backgroundColor: '#fafafa',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  sectionContent: {
+    padding: 12,
+  },
+  userIcon: {
     marginBottom: 8,
   },
 });
