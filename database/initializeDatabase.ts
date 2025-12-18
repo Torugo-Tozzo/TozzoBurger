@@ -7,9 +7,8 @@ export const STATUS_PEDIDO = {
 
 export async function initializeDatabase(database: SQLiteDatabase) {
   const SCHEMA_VERSION = 1000; //when update the DB schema, increment this value
-
-  // Read current DB schema version from TB_SCHEMA (if exists)
   let dbVersion = 0;
+
   try {
     const row = await database.getFirstAsync<{
       version?: number;
@@ -19,7 +18,6 @@ export async function initializeDatabase(database: SQLiteDatabase) {
     }>(`SELECT version, estabelecimentoId, usuarioId, sincronizacaoAutomatica FROM TB_SCHEMA LIMIT 1`);
     if (row && typeof row.version !== 'undefined') dbVersion = Number(row.version) || 0;
   } catch (err) {
-    // TB_SCHEMA does not exist or query failed — treat as version 0
     dbVersion = 0;
   }
 
@@ -28,7 +26,6 @@ export async function initializeDatabase(database: SQLiteDatabase) {
     return;
   }
 
-  // Helper: ensure a column exists using PRAGMA table_info
   async function ensureColumnExists(table: string, column: string, definition: string) {
     try {
       const info = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(${table});`);
@@ -41,7 +38,6 @@ export async function initializeDatabase(database: SQLiteDatabase) {
     }
   }
 
-  // Create/ensure base tables
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS TB_PRODUTOS (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,7 +67,6 @@ export async function initializeDatabase(database: SQLiteDatabase) {
     );
   `);
 
-  // Create pedidos tables (new in this app update)
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS TB_PEDIDOS (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -112,33 +107,24 @@ export async function initializeDatabase(database: SQLiteDatabase) {
     );
   `);
 
-  // Create users table
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS TB_USUARIO (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nome TEXT NOT NULL,
       email TEXT UNIQUE,
-      estabelecimentoId INTEGER NULL,
+      estabelecimentoId INTEGER NOT NULL,
       nomeEstabelecimento TEXT NULL
     );
   `);
 
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS TB_ESTABELECIMENTO (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nomeFantasia TEXT NOT NULL
+    );
+  `);
+
   await seedTipoProduto(database);
-
-  // Seed produtos padrão only for a specific user login (email stored in TB_USUARIO)
-  try {
-    const allowedLogin = 'vitim@123.com';
-    const usuario = await database.getFirstAsync<{ email?: string }>(
-      `SELECT email FROM TB_USUARIO WHERE email = ? LIMIT 1`,
-      [allowedLogin]
-    ).catch(() => null);
-
-    if (usuario && usuario.email === allowedLogin) {
-      await seedProdutosPadrao(database);
-    }
-  } catch (err) {
-    console.warn('Failed to check user for seeding produtos padrao:', err);
-  }
 
   // Ensure new columns exist
   await ensureColumnExists('TB_PRODUTOS', 'foiSincronizado', 'BOOLEAN NOT NULL DEFAULT 0');
@@ -146,20 +132,13 @@ export async function initializeDatabase(database: SQLiteDatabase) {
   await ensureColumnExists('TB_VENDAS', 'pedidoId', 'INTEGER NULL');
   await ensureColumnExists('TB_TP_PRODUTO', 'cor', 'TEXT NOT NULL DEFAULT \'#9E9E9E\'');
 
-  // Create TB_SCHEMA if missing and store current schema version
   try {
-    // Ensure TB_SCHEMA exists with additional columns to store establishment and user ids and sync flag
     await database.execAsync(`CREATE TABLE IF NOT EXISTS TB_SCHEMA (
       version INTEGER NOT NULL,
       estabelecimentoId INTEGER NULL,
       usuarioId INTEGER NULL,
       sincronizacaoAutomatica BOOLEAN NOT NULL DEFAULT 0
     );`);
-
-    // Ensure columns exist for older DBs
-    await ensureColumnExists('TB_SCHEMA', 'estabelecimentoId', 'INTEGER NULL');
-    await ensureColumnExists('TB_SCHEMA', 'usuarioId', 'INTEGER NULL');
-    await ensureColumnExists('TB_SCHEMA', 'sincronizacaoAutomatica', 'BOOLEAN NOT NULL DEFAULT 0');
 
     const existing = await database.getFirstAsync<{
       version?: number;
@@ -213,8 +192,10 @@ async function seedTipoProduto(database: SQLiteDatabase) {
   }
 }
 
-//MUDAR PARA SOMENTE O USUARIO DO MEU PAI
-async function seedProdutosPadrao(database: SQLiteDatabase) {
+// Export seedTipoProduto so it can be used when reseeding after destructive swap
+export { seedTipoProduto };
+
+export async function seedProdutosPadrao(database: SQLiteDatabase) {
   const produtos = [
     { id: 1, nome: "X-Tudo", tipoProdutoId: 1, preco: 24, origemProdutoId: null, ingredientes: "Hamburger, presunto, mussarela, bacon, ovo, alface, tomate, salsicha, molho especial e batata palha." },
     { id: 2, nome: "Top Burguer", tipoProdutoId: 1, preco: 26, origemProdutoId: null, ingredientes: "2x hambúrgueres, presunto, mussarela, bacon, ovo, alface, tomate, salsicha, molho especial e batata palha." },
