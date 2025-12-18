@@ -86,9 +86,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.torugotozzo.TozzoBurger'
+    namespace 'com.torugotozzo.TozzoUk'
     defaultConfig {
-        applicationId 'com.torugotozzo.TozzoBurger'
+        applicationId 'com.torugotozzo.TozzoUk'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

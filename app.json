@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "TozzoBurger",
-    "slug": "TozzoBurger",
+    "name": "TozzoUk",
+    "slug": "TozzoUk",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon-geral.png",
@@ -26,7 +26,7 @@
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_CONNECT"
       ],
-      "package": "com.torugotozzo.TozzoBurger"
+      "package": "com.torugotozzo.TozzoUk"
     },
     "web": {
       "bundler": "metro",
