@@ -1,29 +1,20 @@
-import { Pressable, PressableProps, TouchableOpacity, Image, StyleSheet, Modal, Button } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import { Pressable, PressableProps, TouchableOpacity, StyleSheet, Modal, Button, useColorScheme } from "react-native";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { useColorScheme } from "react-native";
 import { View, Text } from "@/components/Themed";
 import Colors from '@/constants/Colors';
 import { useState } from "react";
 import { ProductDatabase } from "@/database/useProductDatabase";
+import { DarkTheme } from "@react-navigation/native";
 
-const productImages: Record<number, any> = {
-  1: require("../assets/images/1-removebg-preview.png"),
-  2: require("../assets/images/2-removebg-preview.png"),
-  3: require("../assets/images/3-removebg-preview.png"),
-  4: require("../assets/images/4-removebg-preview.png"),
-  5: require("../assets/images/5-removebg-preview.png"),
-  6: require("../assets/images/6-removebg-preview.png"),
-  7: require("../assets/images/7-removebg-preview.png"),
-};
 
 type Props = PressableProps & {
   data: ProductDatabase;
+  tipoNome?: string;
   onDelete: () => void;
   onOpen: () => void;
 };
 
-export function Product({ data, onDelete, onOpen, ...rest }: Props) {
+export function Product({ data, onDelete, onOpen, tipoNome, ...rest }: Props) {
   const colorScheme = useColorScheme();
   const [modalVisible, setModalVisible] = useState(false);
   const isDarkMode = colorScheme === "dark";
@@ -34,8 +25,20 @@ export function Product({ data, onDelete, onOpen, ...rest }: Props) {
   };
 
   const handleImagePress = () => {
-    setModalVisible(true); // Abre o modal ao pressionar na imagem
+    setModalVisible(true); // Abre o modal ao pressionar no tipo
   };
+
+  const tipoColors: Record<number, string> = {
+    1: "#ef4444",
+    2: "#f59e0b",
+    3: "#10b981",
+    4: "#3b82f6",
+    5: "#8b5cf6",
+    6: "#ec4899",
+    7: "#14b8a6",
+  };
+
+  const tipoLabel = tipoNome ?? (data as any).tipoNome ?? `Tipo ${data.tipoProdutoId}`;
 
   return (
     <Pressable
@@ -45,15 +48,7 @@ export function Product({ data, onDelete, onOpen, ...rest }: Props) {
       ]}
       {...rest}
     >
-      <Pressable onPress={handleImagePress}>
-        <Image
-          source={productImages[data.tipoProdutoId]}
-          style={{ width: 50, height: 50, marginRight: 16 }}
-          resizeMode="contain"
-        />
-      </Pressable>
-
-      <View style={{ flex: 1 }} lightColor="#f9f9f9" darkColor="grey">
+      <View style={styles.leftInfo} lightColor="#f9f9f9" darkColor="grey">
         <Text
           style={{
             fontSize: 16,
@@ -67,6 +62,16 @@ export function Product({ data, onDelete, onOpen, ...rest }: Props) {
           Preço: R$ {data.preco.toFixed(2)}
         </Text>
       </View>
+
+      <Pressable
+        onPress={handleImagePress}
+        style={[
+          styles.centerBadgeContainer,
+          { backgroundColor: tipoColors[data.tipoProdutoId] ?? '#888', borderColor: '#fff', borderWidth: 1 },
+        ]}
+      >
+        <Text style={[styles.typeBadgeText, { color: '#fff' }]}>{tipoLabel}</Text>
+      </Pressable>
 
       <View style={styles.buttonContainer} lightColor="#f9f9f9" darkColor="grey">
         <TouchableOpacity onPress={onOpen}>
@@ -93,7 +98,7 @@ export function Product({ data, onDelete, onOpen, ...rest }: Props) {
           >
             <View
               style={{
-                backgroundColor: useColorScheme() === "dark" ? "#333" : "#fff",
+                backgroundColor: colorScheme === "dark" ? "#333" : "#fff",
                 padding: 20,
                 borderRadius: 10,
                 width: "80%",
@@ -128,4 +133,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+  leftInfo: {
+    flex: 1,
+  },
+  centerBadgeContainer: {
+    minWidth: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  typeBadgeText: {
+    fontWeight: '700',
+    fontSize: 12,
+    textAlign: 'center'
+  }
 });

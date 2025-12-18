@@ -70,9 +70,11 @@ export default function VendaScreen() {
       <FlatList
         data={products}
         keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => (
-          <ProductItemVenda data={item} onAddToCart={handleAddToConta} onAdicionaltoCart={handleAdicional} />
-        )}
+        renderItem={({ item }) => {
+          const tipo = tiposProduto?.find((t: any) => Number(t.id) === Number(item.tipoProdutoId))?.descricao;
+
+          return <ProductItemVenda data={item} tipoNome={tipo} onAddToCart={handleAddToConta} onAdicionaltoCart={handleAdicional} />
+        }}
         contentContainerStyle={{ gap: 16 }}
       />
 

@@ -1,28 +1,18 @@
 import React, { useState, useRef } from "react";
-import { Animated, Button, Image, Pressable, useColorScheme, Modal, Easing } from "react-native";
+import { Animated, Pressable, useColorScheme, Modal, Easing, Button } from "react-native";
 import { Text, View } from "@/components/Themed";
 import { ProductDatabase } from "@/database/useProductDatabase";
 import { FontAwesome } from "@expo/vector-icons";
 import Colors from "@/constants/Colors";
+import { DarkTheme } from "@react-navigation/native";
 
-const productImages: Record<number, any> = {
-  1: require("../assets/images/1-removebg-preview.png"),
-  2: require("../assets/images/2-removebg-preview.png"),
-  3: require("../assets/images/3-removebg-preview.png"),
-  4: require("../assets/images/4-removebg-preview.png"),
-  5: require("../assets/images/5-removebg-preview.png"),
-  6: require("../assets/images/6-removebg-preview.png"),
-  7: require("../assets/images/7-removebg-preview.png"),
-  8: require("../assets/images/8-removebg-preview.png"),
-};
-
-type ProductItemVendaProps = {
+type Props = {
   data: ProductDatabase;
+  tipoNome?: string;
   onAddToCart: (product: ProductDatabase) => void;
   onAdicionaltoCart: (product: ProductDatabase, ehAdd: boolean) => void;
 };
-
-export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart }: ProductItemVendaProps) {
+export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart, tipoNome }: Props) {
   const [modalVisible, setModalVisible] = useState(false);
   const colorScheme = useColorScheme();
 
@@ -51,6 +41,19 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart }: Produ
     setModalVisible(true);
   };
 
+  const tipoColors: Record<number, string> = {
+    1: "#ef4444",
+    2: "#f59e0b",
+    3: "#10b981",
+    4: "#3b82f6",
+    5: "#8b5cf6",
+    6: "#ec4899",
+    7: "#14b8a6",
+    8: "#06b6d4",
+  };
+
+  const tipoLabel = tipoNome ?? (data as any).tipoNome ?? `Tipo ${data.tipoProdutoId}`;
+
   return (
     <View
       lightColor="#f9f9f9"
@@ -65,17 +68,27 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart }: Produ
         alignItems: "center",
       }}
     >
-      <Pressable onPress={handleImagePress}>
-        <Image
-          source={productImages[data.tipoProdutoId]}
-          style={{ width: 50, height: 50, marginRight: 16 }}
-          resizeMode="contain"
-        />
-      </Pressable>
-      <View lightColor="#f9f9f9" darkColor="grey" style={{ flex: 1 }}>
-        <Text style={{ fontSize: 18, fontWeight: "bold" }}>{data.id} - {data.nome}</Text>
-        <Text style={{ fontSize: 15 }}>Preço: R$ {data.preco.toFixed(2)}</Text>
+      <View style={{ flex: 1 }} lightColor="#f9f9f9" darkColor="grey">
+        <Text style={{ fontSize: 16, fontWeight: "bold" }}>{data.id} - {data.nome}</Text>
+        <Text style={{ fontSize: 14 }}>Preço: R$ {data.preco.toFixed(2)}</Text>
       </View>
+
+      <Pressable
+        onPress={handleImagePress}
+        style={{
+          minWidth: 120,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: 12,
+          paddingVertical: 4,
+          borderRadius: 999,
+          backgroundColor: tipoColors[data.tipoProdutoId] ?? '#888',
+          borderColor: '#fff',
+          borderWidth: 1,
+        }}
+      >
+        <Text style={{ color: '#fff', fontWeight: '700' }}>{tipoLabel}</Text>
+      </Pressable>
       <Animated.View style={{ transform: [{ scale: iconScaleAnim }] }}>
         <Pressable
           onPress={() => {
@@ -93,13 +106,15 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart }: Produ
         </Pressable>
       </Animated.View>
       <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
-        <Button
-          title="Adicionar"
+        <Pressable
           onPress={() => {
             triggerAnimation(buttonScaleAnim);
             onAddToCart(data);
           }}
-        />
+          style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: Colors["light"].tint, alignItems: 'center', justifyContent: 'center', marginLeft: 8 }}
+        >
+          <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700' }}>+</Text>
+        </Pressable>
       </Animated.View>
 
       {/* Modal para mostrar os ingredientes */}

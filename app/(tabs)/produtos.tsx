@@ -32,29 +32,34 @@ export default function ProdutosScreen() {
       <FlatList
         data={products}
         keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => (
-          <Product
-            data={item}
-            onDelete={() => {
-              Alert.alert(
-                'Confirmar Remoção',
-                'Tem certeza que deseja remover este produto?',
-                [
-                  { text: 'Cancelar', style: 'cancel' },
-                  {
-                    text: 'Remover',
-                    onPress: () => {
-                      remove(item.id);
-                      filterByTipo(Number(tipoProdutoId));
+        renderItem={({ item }) => {
+          const tipo = tiposProduto?.find((t: any) => Number(t.id) === Number(item.tipoProdutoId))?.descricao;
+
+          return (
+            <Product
+              data={item}
+              tipoNome={tipo}
+              onDelete={() => {
+                Alert.alert(
+                  'Confirmar Remoção',
+                  'Tem certeza que deseja remover este produto?',
+                  [
+                    { text: 'Cancelar', style: 'cancel' },
+                    {
+                      text: 'Remover',
+                      onPress: () => {
+                        remove(item.id);
+                        filterByTipo(Number(tipoProdutoId));
+                      },
+                      style: 'destructive',
                     },
-                    style: 'destructive',
-                  },
-                ]
-              );
-            }}
-            onOpen={() => router.push(`/modais/produtoModal?productId=${item.id}`)}
-          />
-        )}
+                  ]
+                );
+              }}
+              onOpen={() => router.push(`/modais/produtoModal?productId=${item.id}`)}
+            />
+          )
+        }}
         contentContainerStyle={{ gap: 16 }}
       />
     </View>
