@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import * as api from '@/services/api';
 import * as SecureStore from 'expo-secure-store';
 import { useSQLiteContext } from 'expo-sqlite';
-import { seedProdutosPadrao, seedTipoProduto } from '@/database/initializeDatabase';
+import { seedTipoProduto } from '@/database/initializeDatabase';
+import { sincronizarComServidor } from '@/database/sincronizacao';
 
 type User = {
   id?: number | string;
@@ -10,8 +11,6 @@ type User = {
   email?: string;
   estabelecimentoId?: number | string | null;
 };
-
-const TARGET_ESTAB_ID = '2375ca87-9d04-468c-b5a1-3619105876bf';//*MUDAR EM PROD*//
 
 type AuthContextData = {
   user: User | null;
@@ -46,16 +45,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const schema = await database.getFirstAsync<{ usuarioId?: number | null }>(`SELECT usuarioId FROM TB_SCHEMA LIMIT 1`).catch(() => null);
                 const usuarioId = schema && typeof schema.usuarioId !== 'undefined' ? schema.usuarioId : null;
                 if (!usuarioId) {
-                  // Only seed if the logged user's estabelecimentoId matches the target
-                  if (String((me as any).estabelecimentoId) === TARGET_ESTAB_ID) {
-                    await seedProdutosPadrao(database);
-                    const uid = Number((me as any).id);
-                    if (!isNaN(uid)) {
-                      await database.execAsync(`UPDATE TB_SCHEMA SET usuarioId = ${uid};`);
-                    } else {
-                      await database.execAsync(`UPDATE TB_SCHEMA SET usuarioId = NULL;`);
-                    }
-                  }
+                      const uid = Number((me as any).id);
+                      if (!isNaN(uid)) {
+                        await database.execAsync(`UPDATE TB_SCHEMA SET usuarioId = ${uid};`);
+                      } else {
+                        await database.execAsync(`UPDATE TB_SCHEMA SET usuarioId = NULL;`);
+                      }
                 }
               } catch (err) {
                 console.warn('Failed to run seedProdutosPadrao after rehydrate', err);
@@ -121,12 +116,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await database.execAsync('DELETE FROM TB_USUARIO;');
             await database.execAsync(`INSERT INTO TB_USUARIO (nome, email, estabelecimentoId, nomeEstabelecimento) VALUES (${esc((me as any)?.nome)}, ${esc(meEmail)}, ${esc(meEstab)}, ${esc((me as any)?.nomeEstabelecimento)});`);
             await database.execAsync(`UPDATE TB_SCHEMA SET usuarioId = ${isNaN(Number(meId)) ? 'NULL' : Number(meId)}, estabelecimentoId = ${esc(meEstab)};`).catch(() => {});
-
-            // seed if target establishment
-            if (String(meEstab) === TARGET_ESTAB_ID) {
-              await seedTipoProduto(database).catch(() => {});
-              await seedProdutosPadrao(database).catch(() => {});
-            }
+            // seed default types for all users
+            await seedTipoProduto(database).catch(() => {});
           } else {
             if (String(prev.estabelecimentoId) !== String(meEstab)) {
               // destructive: clear product-related tables and replace user
@@ -153,11 +144,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 console.warn('Failed during destructive swap; rolled back', err);
               }
 
-              // reseed if target
-              if (String(meEstab) === TARGET_ESTAB_ID) {
+                // reseed default types for all users
                 await seedTipoProduto(database).catch(() => {});
-                await seedProdutosPadrao(database).catch(() => {});
-              }
             } else {
               // same estabelecimento: replace only user
               await database.execAsync('DELETE FROM TB_USUARIO;').catch(() => {});
@@ -167,6 +155,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         } catch (err) {
           console.warn('Failed to check/replace TB_USUARIO on login', err);
+        }
+        // After user and local DB have been updated, synchronize with server
+        try {
+          if (t) await sincronizarComServidor(database, t).catch((e) => console.warn('sync after login failed', e));
+        } catch (err) {
+          console.warn('Synchronization after login failed', err);
         }
         
       } catch (err) {

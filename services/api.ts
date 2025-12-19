@@ -1,4 +1,4 @@
-export const BASE_URL = 'https://edcee5b30db5.ngrok-free.app';
+export const BASE_URL = 'https://9a8fafc3a6ba.ngrok-free.app';
 
 async function handleJsonResponse(res: Response) {
   const txt = await res.text();
@@ -73,6 +73,28 @@ export async function sincronizar(token: string, payload: any) {
     return handleJsonResponse(res);
   } catch (err: any) {
     console.error('Network/sincronizar request failed', url, err?.message ?? err);
+    throw err;
+  }
+}
+
+export async function getChanges(token: string) {
+  const url = `${BASE_URL}/sincronizacao/changes`;
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    });
+
+    if (!res.ok) {
+      const errBody = await handleJsonResponse(res).catch(() => null);
+      const message = (errBody && (errBody.message || JSON.stringify(errBody))) || `HTTP ${res.status}`;
+      console.error('API getChanges error:', url, message);
+      throw new Error(message);
+    }
+
+    return handleJsonResponse(res);
+  } catch (err: any) {
+    console.error('Network/getChanges request failed', url, err?.message ?? err);
     throw err;
   }
 }
