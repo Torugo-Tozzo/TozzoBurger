@@ -5,3 +5,4 @@ apk-debug
 npx expo run:android
 
 - Criar logica para ficar consultando /sincronizacao/devices/{id}/last-mod
+- Não obrigar sincronização mas mostrar sempre se foi ou não sincronizado 
