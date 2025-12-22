@@ -56,13 +56,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 console.warn('Failed to run seedProdutosPadrao after rehydrate', err);
               }
             }
-          } catch (err) {
-            // token invalid or request failed -> clear
-            console.warn('Stored token invalid, clearing', err);
-            await SecureStore.deleteItemAsync(TOKEN_KEY);
-            if (mounted) {
-              setToken(null);
-              setUser(null);
+          } catch (err: any) {
+            // Only clear token on explicit auth errors (401/402/403).
+            // For network/server errors (offline) keep the stored token.
+            const status = err?.response?.status ?? err?.status ?? null;
+            if (status === 401 || status === 402 || status === 403) {
+              console.warn('Stored token invalid, clearing', err);
+              await SecureStore.deleteItemAsync(TOKEN_KEY);
+              if (mounted) {
+                setToken(null);
+                setUser(null);
+              }
+            } else {
+              console.warn('Network/server error validating token — keeping stored token', err);
+              try {
+                const prev = await database.getFirstAsync<{ 
+                  id?: number; 
+                  nome?: string; 
+                  email?: string; 
+                  estabelecimentoId?: number | string; nomeEstabelecimento?: string 
+                }>(`SELECT id, nome, email, estabelecimentoId, nomeEstabelecimento FROM TB_USUARIO LIMIT 1`).catch(() => null);
+                if (prev && mounted) {
+                  setUser({
+                    id: prev.id,
+                    nome: prev.nome,
+                    email: prev.email,
+                    estabelecimentoId: prev.estabelecimentoId,
+                  });
+                }
+              } catch (e) {
+                console.warn('Failed to load local TB_USUARIO after network error', e);
+              }
             }
           }
         }

@@ -126,12 +126,6 @@ export async function initializeDatabase(database: SQLiteDatabase) {
 
   await seedTipoProduto(database);
 
-  // Ensure new columns exist
-  await ensureColumnExists('TB_PRODUTOS', 'foiSincronizado', 'BOOLEAN NOT NULL DEFAULT 0');
-  await ensureColumnExists('TB_VENDAS', 'foiSincronizado', 'BOOLEAN NOT NULL DEFAULT 0');
-  await ensureColumnExists('TB_VENDAS', 'pedidoId', 'INTEGER NULL');
-  await ensureColumnExists('TB_TP_PRODUTO', 'cor', 'TEXT NOT NULL DEFAULT \'#9E9E9E\'');
-
   try {
     await database.execAsync(`CREATE TABLE IF NOT EXISTS TB_SCHEMA (
       version INTEGER NOT NULL,
