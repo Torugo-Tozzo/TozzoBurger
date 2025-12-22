@@ -4,5 +4,7 @@ npx eas build -p android --profile preview
 apk-debug
 npx expo run:android
 
-- Criar logica para ficar consultando /sincronizacao/devices/{id}/last-mod
+- Criar logica para ficar consultando /sincronizacao/devices/{id}/last-mod //se realmente n puder deletar a pasta android
 - Não obrigar sincronização mas mostrar sempre se foi ou não sincronizado 
+- Apagar pasta android se realmente não for necessaria.
+- Trocar expo-sqlite pelo expo-watermelonDB. (etapa anterior necessaria antes). //app.json
