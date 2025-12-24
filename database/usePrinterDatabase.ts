@@ -1,10 +1,5 @@
 import { useSQLiteContext } from "expo-sqlite";
-
-export type PrinterDatabase = {
-    id: number;
-    uuid: string;  // UUID da impressora
-    nome: string;  // Nome da impressora
-};
+import { PrinterDatabase } from "./types/Impressora";
 
 export function usePrinterDatabase() {
     const database = useSQLiteContext();

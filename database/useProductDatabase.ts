@@ -1,35 +1,28 @@
 import { useSQLiteContext } from "expo-sqlite"
-
-export type ProductDatabase = {
-  id: number
-  nome: string
-  preco: number
-  tipoProdutoId: number
-  quantidade?: number | null
-  origemProdutoId?: number | null
-  ingredientes?: string | null
-}
+import { ProductDatabase } from "./types/Produto"
+import { generateUUID } from "./utils/uuid"
 
 export function useProductDatabase() {
   const database = useSQLiteContext()
 
   async function create(data: Omit<ProductDatabase, "id">) {
     const statement = await database.prepareAsync(
-      "INSERT INTO TB_PRODUTOS (nome, preco, tipoProdutoId, origemProdutoId, ingredientes) VALUES ($nome, $preco, $tipoProdutoId, $origemProdutoId, $ingredientes)"
+      "INSERT INTO TB_PRODUTOS (id, nome, preco, tipoProdutoId, origemProdutoId, ingredientes, updated_at) VALUES ($id, $nome, $preco, $tipoProdutoId, $origemProdutoId, $ingredientes, $updated_at)"
     )
 
     try {
+      const id = generateUUID()
       const result = await statement.executeAsync({
+        $id: id,
         $nome: data.nome,
         $preco: data.preco,
         $tipoProdutoId: data.tipoProdutoId,
         $origemProdutoId: data.origemProdutoId ?? null,
-        $ingredientes: data.ingredientes ?? null
+        $ingredientes: data.ingredientes ?? null,
+        $updated_at: Date.now(),
       })
 
-      const insertedRowId = result.lastInsertRowId.toLocaleString()
-
-      return { insertedRowId }
+      return { id }
     } catch (error) {
       throw error
     } finally {
@@ -54,7 +47,7 @@ export function useProductDatabase() {
 
   async function update(data: ProductDatabase) {
     const statement = await database.prepareAsync(
-      "UPDATE TB_PRODUTOS SET nome = $nome, preco = $preco, tipoProdutoId = $tipoProdutoId, ingredientes = $ingredientes WHERE id = $id"
+      "UPDATE TB_PRODUTOS SET nome = $nome, preco = $preco, tipoProdutoId = $tipoProdutoId, ingredientes = $ingredientes, updated_at = $updated_at WHERE id = $id"
     )
 
     try {
@@ -63,7 +56,8 @@ export function useProductDatabase() {
         $nome: data.nome,
         $preco: data.preco,
         $tipoProdutoId: data.tipoProdutoId,
-        $ingredientes: data.ingredientes ?? null
+        $ingredientes: data.ingredientes ?? null,
+        $updated_at: Date.now(),
       })
     } catch (error) {
       throw error
@@ -72,15 +66,16 @@ export function useProductDatabase() {
     }
   }
 
-  async function remove(id: number) {
+  async function remove(id: string) {
     try {
-      await database.execAsync("DELETE FROM TB_PRODUTOS WHERE id = " + id)
+      const deletedAt = Date.now()
+      await database.execAsync(`UPDATE TB_PRODUTOS SET deleted_at = ${deletedAt}, updated_at = ${deletedAt} WHERE id = '${id}'`)
     } catch (error) {
       throw error
     }
   }
 
-  async function show(id: number) {
+  async function show(id: string) {
     try {
       const query = "SELECT * FROM TB_PRODUTOS WHERE origemProdutoId IS NULL AND id = ?"
 
@@ -94,7 +89,7 @@ export function useProductDatabase() {
     }
   }
 
-  async function showAdd(id: number) {
+  async function showAdd(id: string) {
     try {
       const query = "SELECT * FROM TB_PRODUTOS WHERE id = ?"
 
@@ -137,7 +132,7 @@ export function useProductDatabase() {
     }
   }
 
-  async function searchOrigemProdutoId(produtoId: number): Promise<ProductDatabase[]> {
+  async function searchOrigemProdutoId(produtoId: string): Promise<ProductDatabase[]> {
     try {
       const query = "SELECT * FROM TB_PRODUTOS WHERE origemProdutoId = ?"
 

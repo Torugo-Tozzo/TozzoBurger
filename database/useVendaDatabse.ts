@@ -1,48 +1,35 @@
 import { useSQLiteContext } from "expo-sqlite";
-
-export type VendaDatabase = {
-    id: number;
-    total: number;
-    horario: string;
-    cliente?: string;
-    excluida: boolean;
-};
-
-export type VendaProduto = {
-    id?: number;
-    vendaId: number;
-    produtoId: number;
-    quantidade: number;
-};
+import { VendaProduto, VendaDatabase } from "./types/Venda";
+import { generateUUID } from "./utils/uuid";
 
 export function useVendasDatabase() {
     const database = useSQLiteContext();
 
-    async function createVenda(produtos: { produtoId: number; quantidade: number }[], cliente?: string) {
+    async function createVenda(produtos: { produtoId: string; quantidade: number }[], cliente?: string) {
         const statementVenda = await database.prepareAsync(
-            "INSERT INTO TB_VENDAS (total, horario, cliente) VALUES ($total, $horario, $cliente)"
+            "INSERT INTO TB_VENDAS (id, total, horario, cliente, updated_at) VALUES ($id, $total, $horario, $cliente, $updated_at)"
         );
 
         try {
             const total = await calculateTotal(produtos);
             const horario = new Date().toISOString();
 
-            const vendaResult = await statementVenda.executeAsync({
-                $total: total,
-                $horario: horario,
-                $cliente: cliente || "Não informado",
-            });
+                        const vendaId = generateUUID();
+                        const updatedAt = Date.now();
 
-            const vendaId = vendaResult.lastInsertRowId;
+                        await statementVenda.executeAsync({
+                                $id: vendaId,
+                                $total: total,
+                                $horario: horario,
+                                $cliente: cliente ?? null,
+                                $updated_at: updatedAt,
+                        });
 
-            for (const { produtoId, quantidade } of produtos) {
-                await database.execAsync(`
-                  INSERT INTO RL_VENDA_PRODUTO (vendaId, produtoId, quantidade)
-                  VALUES (${vendaId}, ${produtoId}, ${quantidade})
-                `);
-            }
+                        for (const { produtoId, quantidade } of produtos) {
+                            await database.execAsync(`INSERT INTO RL_VENDA_PRODUTO (vendaId, produtoId, quantidade) VALUES ('${vendaId}', '${produtoId}', ${quantidade})`);
+                        }
 
-            return { vendaId };
+                        return { vendaId };
         } catch (error) {
             throw error;
         } finally {
@@ -50,7 +37,7 @@ export function useVendasDatabase() {
         }
     }
 
-    async function getVendaById(vendaId: number) {
+    async function getVendaById(vendaId: string) {
         try {
             const venda = await database.getFirstAsync<VendaDatabase>(
                 "SELECT * FROM TB_VENDAS WHERE id = ?",
@@ -73,18 +60,17 @@ export function useVendasDatabase() {
     }
 
 
-    async function removeVenda(vendaId: number) {
+    async function removeVenda(vendaId: string) {
         try {
-            await database.execAsync(
-                `UPDATE TB_VENDAS SET excluida = TRUE WHERE id = ${vendaId}`
-            );
+            const deletedAt = Date.now();
+            await database.execAsync(`UPDATE TB_VENDAS SET excluida = TRUE, deleted_at = ${deletedAt}, updated_at = ${deletedAt} WHERE id = '${vendaId}'`);
         } catch (error) {
             throw error;
         }
     }    
 
     async function calculateTotal(
-        produtos: { produtoId: number; quantidade: number }[]
+        produtos: { produtoId: string; quantidade: number }[]
     ): Promise<number> {
         let total = 0;
 

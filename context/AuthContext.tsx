@@ -3,7 +3,7 @@ import * as api from '@/services/api';
 import * as SecureStore from 'expo-secure-store';
 import { useSQLiteContext } from 'expo-sqlite';
 import { seedTipoProduto } from '@/database/initializeDatabase';
-import { sincronizarComServidor } from '@/database/sincronizacao';
+import { sincronizarComServidor } from '@/database/useSyncDatabase';
 
 type User = {
   id?: number | string;

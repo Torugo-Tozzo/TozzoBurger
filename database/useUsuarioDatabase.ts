@@ -1,11 +1,5 @@
 import { useSQLiteContext } from 'expo-sqlite'
-
-export type UsuarioDatabase = {
-  id: number
-  nome: string
-  estabelecimentoId?: number | null
-  nomeEstabelecimento?: string | null
-}
+import { UsuarioDatabase } from './types/Usuario'
 
 export function useUsuarioDatabase() {
   const database = useSQLiteContext()
