@@ -1,7 +1,7 @@
 import React, { useCallback } from "react";
 import { StyleSheet, FlatList, Alert } from "react-native";
 import { Text, View } from "@/components/Themed";
-import { useProductDatabase, ProductDatabase } from "@/database/useProductDatabase";
+import { useProductDatabase } from "@/database/useProductDatabase";
 import { useFocusEffect } from "@react-navigation/native";
 import { FiltroTipos } from "@/components/FiltroTipos";
 import { useProductList } from "@/hooks/useProductList"

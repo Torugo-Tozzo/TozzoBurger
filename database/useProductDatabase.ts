@@ -5,7 +5,7 @@ import { generateUUID } from "./utils/uuid"
 export function useProductDatabase() {
   const database = useSQLiteContext()
 
-  async function create(data: Omit<ProductDatabase, "id">) {
+  async function create(data: Omit<ProductDatabase, "id" | "updated_at">) {
     const statement = await database.prepareAsync(
       "INSERT INTO TB_PRODUTOS (id, nome, preco, tipoProdutoId, origemProdutoId, ingredientes, updated_at) VALUES ($id, $nome, $preco, $tipoProdutoId, $origemProdutoId, $ingredientes, $updated_at)"
     )
@@ -45,7 +45,7 @@ export function useProductDatabase() {
     }
   }
 
-  async function update(data: ProductDatabase) {
+  async function update(data: Omit<ProductDatabase, "updated_at">) {
     const statement = await database.prepareAsync(
       "UPDATE TB_PRODUTOS SET nome = $nome, preco = $preco, tipoProdutoId = $tipoProdutoId, ingredientes = $ingredientes, updated_at = $updated_at WHERE id = $id"
     )

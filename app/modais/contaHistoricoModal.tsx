@@ -2,7 +2,8 @@ import React, { useRef, useState } from 'react';
 import { StyleSheet, FlatList, Alert, ActivityIndicator, TouchableOpacity, Text as RNText } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { useVendasDatabase, VendaDatabase } from '@/database/useVendaDatabse';
+import { useVendasDatabase } from '@/database/useVendaDatabse';
+import { VendaDatabase } from '@/database/types/Venda';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { sendMessageToDevice } from '@/useBLE';
 import { usePrinterDatabase } from '@/database/usePrinterDatabase';
@@ -22,7 +23,7 @@ export default function ContaHistoricoModal() {
   const [produtos, setProdutos] = useState<{ nome: string; quantidade: number; preco: number }[]>([]);
   const [isPrinterConnected, setIsPrinterConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadingPrint, setLoadingPrint] = useState<number | null>(null);
+  const [loadingPrint, setLoadingPrint] = useState<string | null>(null);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -46,7 +47,7 @@ export default function ContaHistoricoModal() {
             return;
           }
 
-          const vendaData = await getVendaById(Number(vendaId));
+          const vendaData = await getVendaById(String(vendaId));
           if (!vendaData) {
             Alert.alert('Erro', 'Venda não encontrada.');
             router.back();

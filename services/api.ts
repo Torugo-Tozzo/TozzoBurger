@@ -1,4 +1,4 @@
-export const BASE_URL = 'https://9e2242c85406.ngrok-free.app';
+export const BASE_URL = 'https://952403d49072.ngrok-free.app';
 
 async function handleJsonResponse(res: Response) {
   const txt = await res.text();
@@ -55,7 +55,7 @@ export async function getMe(token: string) {
 }
 
 export async function sincronizar(token: string, payload: any) {
-  const url = `${BASE_URL}/sincronizacao`;
+  const url = `${BASE_URL}/sincronizacao/push`;
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -78,7 +78,7 @@ export async function sincronizar(token: string, payload: any) {
 }
 
 export async function getChanges(token: string) {
-  const url = `${BASE_URL}/sincronizacao/changes`;
+  const url = `${BASE_URL}/sincronizacao/pull`;
   try {
     const res = await fetch(url, {
       method: 'GET',

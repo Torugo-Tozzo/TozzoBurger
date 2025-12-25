@@ -215,12 +215,12 @@ export function useVendasDatabase() {
             
             query += ` GROUP BY P.id ORDER BY totalVendido DESC`;
             
-            const resultado = await database.getAllAsync<{
-              id: number;
-              nome: string;
-              totalVendido: number;
-              preco: number;
-            }>(query, params);
+                        const resultado = await database.getAllAsync<{
+                            id: string;
+                            nome: string;
+                            totalVendido: number;
+                            preco: number;
+                        }>(query, params);
             
             return resultado;
         } catch (error) {

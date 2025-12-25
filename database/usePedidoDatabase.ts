@@ -116,7 +116,7 @@ export function usePedidosDatabase() {
     }
   }
 
-  async function removePedido(pedidoId: number) {
+  async function removePedido(pedidoId: string) {
     try {
       const deletedAt = Date.now();
       await database.execAsync(`DELETE FROM RL_PEDIDO_PRODUTO WHERE pedidoId = '${pedidoId}'`);

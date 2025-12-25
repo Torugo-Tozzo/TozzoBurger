@@ -4,8 +4,9 @@ import { ProductItemVenda } from '@/components/ProductItemVenda';
 import { FiltroTipos } from '@/components/FiltroTipos';
 import { Input } from '@/components/Input';
 import useProductList from '@/hooks/useProductList';
-import { ProductDatabase, useProductDatabase } from "@/database/useProductDatabase";
-import { Link, router, useFocusEffect } from 'expo-router';
+import { useProductDatabase } from "@/database/useProductDatabase";
+import { ProductDatabase } from '@/database/types/Produto';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { useCart } from '@/context/CartContext';
 
@@ -48,7 +49,7 @@ export default function VendaScreen() {
     };
   
     const response = await create(novoProdutoData);
-    const novoProduto = await showAdd(Number(response.insertedRowId));
+    const novoProduto = await showAdd(response.id);
   
     if (novoProduto) {
       addToCart(novoProduto);

@@ -3,9 +3,7 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { View, Text } from "@/components/Themed";
 import Colors from '@/constants/Colors';
 import { useState } from "react";
-import { ProductDatabase } from "@/database/useProductDatabase";
-import { DarkTheme } from "@react-navigation/native";
-
+import { ProductDatabase } from "@/database/types/Produto";
 
 type Props = PressableProps & {
   data: ProductDatabase;
@@ -56,7 +54,7 @@ export function Product({ data, onDelete, onOpen, tipoNome, ...rest }: Props) {
             marginBottom: 4,
           }}
         >
-          {data.id} - {data.nome}
+          {data.nome}
         </Text>
         <Text style={{ fontSize: 14 }}>
           Preço: R$ {data.preco.toFixed(2)}

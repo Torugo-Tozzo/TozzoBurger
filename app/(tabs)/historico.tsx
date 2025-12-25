@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, FlatList, Alert, TouchableOpacity, useColorScheme, ActivityIndicator, Modal } from 'react-native';
 import { Text, View } from '@/components/Themed';
-import { useVendasDatabase, VendaDatabase } from '@/database/useVendaDatabse';
+import { useVendasDatabase } from '@/database/useVendaDatabse';
+import { VendaDatabase } from '@/database/types/Venda';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { usePrinterDatabase } from '@/database/usePrinterDatabase';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -22,7 +23,7 @@ export default function HistoricoScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const [title, setTitle] = useState('Histórico de Vendas (Últimos 3 dias)');
-  const [loadingPrint, setLoadingPrint] = useState<number | null>(null);
+  const [loadingPrint, setLoadingPrint] = useState<string | null>(null);
 
   const styles = StyleSheet.create({
     container: {
@@ -218,7 +219,7 @@ export default function HistoricoScreen() {
     }
   };
 
-  const handlePrint = async (vendaId: number) => {
+  const handlePrint = async (vendaId: string) => {
     setLoadingPrint(vendaId);
     let venda = await getVendaById(vendaId);
     if (!venda) {
@@ -249,7 +250,7 @@ export default function HistoricoScreen() {
     }
   };
 
-  const handleExcluir = (vendaId: number) => {
+  const handleExcluir = (vendaId: string) => {
     Alert.alert(
       'Confirmar Exclusão',
       'Tem certeza de que deseja excluir esta venda?',
@@ -280,7 +281,7 @@ export default function HistoricoScreen() {
     );
   };
 
-  const renderVendaItem = ({ item }: { item: VendaDatabase & { produtos: string[] } }) => (
+  const renderVendaItem = ({ item, index }: { item: VendaDatabase & { produtos: string[] }; index: number }) => (
     <View style={styles.item} lightColor="whitesmoke" darkColor="grey">
       <Text
         style={[
@@ -288,7 +289,7 @@ export default function HistoricoScreen() {
           item.excluida == true && { textDecorationLine: 'line-through', color: styles.disabledColor.color },
         ]}
       >
-        Venda #{item.id}
+        Venda #{index + 1}
       </Text>
       <Text
         style={[

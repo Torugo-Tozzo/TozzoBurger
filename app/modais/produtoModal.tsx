@@ -8,8 +8,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Input } from '@/components/Input';
 
 type ProdutoModalScreenProps = {
-  route: {
-    params: { productId?: number };
+  route?: {
+    params?: { productId?: string };
   };
 };
 
@@ -42,7 +42,7 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
 
   useEffect(() => {
     if (productId != null) {
-      let prodId = Number(productId);
+      const prodId = String(productId);
       async function fetchProduct() {
         try {
           const product = await show(prodId);
@@ -70,7 +70,7 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
 
       if (productId) {
         await update({
-          id: Number(productId),
+          id: String(productId),
           nome,
           preco: parseFloat(preco),
           tipoProdutoId,

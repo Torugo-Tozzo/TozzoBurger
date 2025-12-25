@@ -48,7 +48,7 @@ export default function ContaModalScreen() {
       } 
     };
 
-  const imprimeConta = async (vendaId: number): Promise<void> => await router.push(`/modais/contaHistoricoModal?vendaId=${vendaId}`);
+  const imprimeConta = async (vendaId: string): Promise<void> => await router.push(`/modais/contaHistoricoModal?vendaId=${vendaId}`);
 
   const finalizarCompra = async () => {
     try {
@@ -75,7 +75,7 @@ export default function ContaModalScreen() {
     }
   };
 
-  const alterarQuantidade = (itemId: number, operacao: 'incrementar' | 'decrementar') => {
+  const alterarQuantidade = (itemId: string, operacao: 'incrementar' | 'decrementar') => {
     const item = cart.find((cartItem) => cartItem.id === itemId);
     if (!item) return;
 

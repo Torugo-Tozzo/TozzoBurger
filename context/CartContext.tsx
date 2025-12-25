@@ -1,11 +1,11 @@
-import { ProductDatabase } from '@/database/useProductDatabase';
+import { ProductDatabase } from '@/database/types/Produto';
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 type CartContextType = {
   cart: ProductDatabase[];
   addToCart: (product: ProductDatabase) => void;
-  removeFromCart: (productId: number) => void;
-  updateCartItem: (productId: number, quantidade: number) => void; // Função para atualizar a quantidade do item
+  removeFromCart: (productId: string) => void;
+  updateCartItem: (productId: string, quantidade: number) => void; // Função para atualizar a quantidade do item
   clearCart: () => void;
 };
 
@@ -28,7 +28,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const removeFromCart = (productId: number) => {
+  const removeFromCart = (productId: string) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === productId);
       if (existingItem && (existingItem.quantidade ?? 0) > 1) {
@@ -42,7 +42,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const updateCartItem = (productId: number, quantidade: number) => {
+  const updateCartItem = (productId: string, quantidade: number) => {
     setCart((prevCart) => {
       // Se a quantidade for maior que 0, atualiza a quantidade
       if (quantidade > 0) {

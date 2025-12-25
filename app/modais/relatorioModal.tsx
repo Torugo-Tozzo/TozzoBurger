@@ -9,7 +9,7 @@ import { PieChart, ProgressChart } from 'react-native-chart-kit';
 import { Ionicons } from '@expo/vector-icons';
 
 type RelatorioProduto = {
-  id: number;
+  id: string;
   nome: string;
   preco: number;
   totalVendido: number;

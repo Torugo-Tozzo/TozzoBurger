@@ -61,7 +61,7 @@ export default function LoginScreen() {
           style={[styles.input, { backgroundColor: isDark ? '#111' : '#fff', borderColor: isDark ? '#333' : '#ddd', color: isDark ? '#fff' : '#000' }]}
           placeholderTextColor={isDark ? '#9b9b9b' : '#8a8a8a'}
         />
-        <Pressable style={[styles.button, { backgroundColor: isDark ? '#ff8a3a' : '#ff6b00' }]} onPress={handleLogin} disabled={loading}>
+        <Pressable style={[styles.button]} onPress={handleLogin} disabled={loading}>
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
   },
   button: {
     height: 48,
-    backgroundColor: '#ff6b00',
+    backgroundColor: '#0084ffff',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',

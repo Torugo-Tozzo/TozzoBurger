@@ -1,10 +1,9 @@
 import React, { useState, useRef } from "react";
 import { Animated, Pressable, useColorScheme, Modal, Easing, Button } from "react-native";
 import { Text, View } from "@/components/Themed";
-import { ProductDatabase } from "@/database/useProductDatabase";
+import { ProductDatabase } from "@/database/types/Produto";
 import { FontAwesome } from "@expo/vector-icons";
 import Colors from "@/constants/Colors";
-import { DarkTheme } from "@react-navigation/native";
 
 type Props = {
   data: ProductDatabase;
@@ -69,7 +68,7 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart, tipoNom
       }}
     >
       <View style={{ flex: 1 }} lightColor="#f9f9f9" darkColor="grey">
-        <Text style={{ fontSize: 16, fontWeight: "bold" }}>{data.id} - {data.nome}</Text>
+        <Text style={{ fontSize: 16, fontWeight: "bold" }}>{data.nome}</Text>
         <Text style={{ fontSize: 14 }}>Preço: R$ {data.preco.toFixed(2)}</Text>
       </View>
 
