@@ -68,7 +68,7 @@ export async function initializeDatabase(database: SQLiteDatabase) {
 
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS RL_PEDIDO_PRODUTO (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id VARCHAR(36) PRIMARY KEY NOT NULL,
       pedidoId VARCHAR(36) NOT NULL,
       produtoId VARCHAR(36) NOT NULL,
       quantidade INTEGER NOT NULL DEFAULT 1,
@@ -79,7 +79,7 @@ export async function initializeDatabase(database: SQLiteDatabase) {
 
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS RL_VENDA_PRODUTO (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id VARCHAR(36) PRIMARY KEY NOT NULL,
       vendaId VARCHAR(36) NOT NULL,
       produtoId VARCHAR(36) NOT NULL,
       quantidade INTEGER NOT NULL DEFAULT 1,

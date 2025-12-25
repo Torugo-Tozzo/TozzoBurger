@@ -26,7 +26,8 @@ export function useVendasDatabase() {
                         });
 
                         for (const { produtoId, quantidade } of produtos) {
-                            await database.execAsync(`INSERT INTO RL_VENDA_PRODUTO (vendaId, produtoId, quantidade) VALUES ('${vendaId}', '${produtoId}', ${quantidade})`);
+                            const relId = generateUUID();
+                            await database.execAsync(`INSERT INTO RL_VENDA_PRODUTO (id, vendaId, produtoId, quantidade) VALUES ('${relId}', '${vendaId}', '${produtoId}', ${quantidade})`);
                         }
 
                         return { vendaId };

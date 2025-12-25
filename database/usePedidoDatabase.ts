@@ -56,7 +56,8 @@ export function usePedidosDatabase() {
       });
 
       for (const { produtoId, quantidade } of produtos) {
-        await database.execAsync(`INSERT INTO RL_PEDIDO_PRODUTO (pedidoId, produtoId, quantidade) VALUES ('${pedidoId}', '${produtoId}', ${quantidade})`);
+        const relId = generateUUID();
+        await database.execAsync(`INSERT INTO RL_PEDIDO_PRODUTO (id, pedidoId, produtoId, quantidade) VALUES ('${relId}', '${pedidoId}', '${produtoId}', ${quantidade})`);
       }
 
       return { pedidoId };
@@ -96,7 +97,8 @@ export function usePedidosDatabase() {
         await database.execAsync(`DELETE FROM RL_PEDIDO_PRODUTO WHERE pedidoId = '${pedidoId}'`);
 
         for (const { produtoId, quantidade } of produtos) {
-          await database.execAsync(`INSERT INTO RL_PEDIDO_PRODUTO (pedidoId, produtoId, quantidade) VALUES ('${pedidoId}', '${produtoId}', ${quantidade})`);
+          const relId = generateUUID();
+          await database.execAsync(`INSERT INTO RL_PEDIDO_PRODUTO (id, pedidoId, produtoId, quantidade) VALUES ('${relId}', '${pedidoId}', '${produtoId}', ${quantidade})`);
         }
 
         const total = await calculateTotal(produtos);
