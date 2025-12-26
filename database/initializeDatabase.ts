@@ -1,7 +1,7 @@
 import { type SQLiteDatabase } from "expo-sqlite"
 
 export async function initializeDatabase(database: SQLiteDatabase) {
-  const SCHEMA_VERSION = 1000; //when update the DB schema, increment this value
+  const SCHEMA_VERSION = 1001; //when update the DB schema, increment this value
   let dbVersion = 0;
 
   try {
@@ -30,7 +30,8 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       origemProdutoId VARCHAR(36) NULL,
       ingredientes TEXT NULL,
       updated_at INTEGER NOT NULL,
-      deleted_at INTEGER NULL
+      deleted_at INTEGER NULL,
+      sync_status TEXT DEFAULT 'synced'
     );
   `);
 
@@ -49,8 +50,10 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       horario TEXT NOT NULL,
       cliente TEXT NULL,
       excluida BOOLEAN NULL,
+      origemVendaId VARCHAR(36) NULL,
       updated_at INTEGER NOT NULL,
-      deleted_at INTEGER NULL
+      deleted_at INTEGER NULL,
+      sync_status TEXT DEFAULT 'synced'
     );
   `);
 
@@ -61,8 +64,10 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       horario TEXT NOT NULL,
       cliente TEXT NULL,
       status TEXT NOT NULL,
+      origemPedidoId VARCHAR(36) NULL,
       updated_at INTEGER NOT NULL,
-      deleted_at INTEGER NULL
+      deleted_at INTEGER NULL,
+      sync_status TEXT DEFAULT 'synced'
     );
   `);
 
@@ -116,11 +121,13 @@ export async function initializeDatabase(database: SQLiteDatabase) {
   await seedTipoProduto(database);
 
   try {
-    await database.execAsync(`CREATE TABLE IF NOT EXISTS TB_SCHEMA (
-      version INTEGER NOT NULL,
-      estabelecimentoId INTEGER NULL,
-      usuarioId INTEGER NULL,
-      sincronizacaoAutomatica BOOLEAN NOT NULL DEFAULT 0
+    await database.execAsync(`
+      CREATE TABLE IF NOT EXISTS TB_SCHEMA (
+        version INTEGER NOT NULL,
+        estabelecimentoId INTEGER NULL,
+        usuarioId INTEGER NULL,
+        sincronizacaoAutomatica BOOLEAN NOT NULL DEFAULT 0,
+        lastSyncAt INTEGER NULL
     );`);
 
     const existing = await database.getFirstAsync<{
@@ -132,8 +139,13 @@ export async function initializeDatabase(database: SQLiteDatabase) {
 
     if (existing && typeof existing.version !== 'undefined') {
       await database.execAsync(`UPDATE TB_SCHEMA SET version = ${SCHEMA_VERSION};`);
+      try {
+        await database.execAsync(`ALTER TABLE TB_SCHEMA ADD COLUMN lastSyncAt INTEGER NULL;`);
+      } catch (err) {
+        // ignore if column already exists
+      }
     } else {
-      await database.execAsync(`INSERT INTO TB_SCHEMA (version, estabelecimentoId, usuarioId, sincronizacaoAutomatica) VALUES (${SCHEMA_VERSION}, NULL, NULL, 0);`);
+      await database.execAsync(`INSERT INTO TB_SCHEMA (version, estabelecimentoId, usuarioId, sincronizacaoAutomatica, lastSyncAt) VALUES (${SCHEMA_VERSION}, NULL, NULL, 0, NULL);`);
     }
   } catch (err) {
     console.warn('Failed to write TB_SCHEMA version:', err);

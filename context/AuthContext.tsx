@@ -4,6 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useSQLiteContext } from 'expo-sqlite';
 import { seedTipoProduto } from '@/database/initializeDatabase';
 import { sincronizarComServidor } from '@/database/useSyncDatabase';
+import { runWithLock } from '@/database/syncGuard';
 
 type User = {
   id?: number | string;
@@ -182,7 +183,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         // After user and local DB have been updated, synchronize with server
         try {
-          if (t) await sincronizarComServidor(database, t).catch((e) => console.warn('sync after login failed', e));
+          if (t) {
+            const res = await runWithLock(() => sincronizarComServidor(database, t)).catch((e) => {
+              console.warn('sync after login failed', e);
+              return null;
+            });
+            if (res === null) {
+              console.log('[sync] skipped login-triggered sync; another sync is in progress');
+            }
+          }
         } catch (err) {
           console.warn('Synchronization after login failed', err);
         }

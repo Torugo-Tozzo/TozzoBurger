@@ -1,6 +1,7 @@
 // hooks/useProductList.ts
 import { useState, useEffect } from "react"
-import { ProductDatabase, useProductDatabase } from "@/database/useProductDatabase"
+import {  useProductDatabase } from "@/database/useProductDatabase"
+import { ProductDatabase } from "@/database/types/Produto"
 
 export function useProductList() {
   const [search, setSearch] = useState("")

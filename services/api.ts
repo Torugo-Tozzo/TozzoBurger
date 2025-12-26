@@ -1,4 +1,4 @@
-export const BASE_URL = 'https://01472065eaf1.ngrok-free.app';
+export const BASE_URL = 'https://3bc6f4152c5c.ngrok-free.app';
 
 async function handleJsonResponse(res: Response) {
   const txt = await res.text();
@@ -77,8 +77,12 @@ export async function sincronizar(token: string, payload: any) {
   }
 }
 
-export async function getChanges(token: string) {
-  const url = `${BASE_URL}/sincronizacao/pull`;
+export async function getChanges(token: string, since?: string | null) {
+  let url = `${BASE_URL}/sincronizacao/pull`;
+  if (since) {
+    const q = encodeURIComponent(String(since));
+    url = `${url}?since=${q}`;
+  }
   try {
     const res = await fetch(url, {
       method: 'GET',

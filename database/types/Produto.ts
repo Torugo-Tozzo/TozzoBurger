@@ -8,4 +8,5 @@ export type ProductDatabase = {
   ingredientes?: string | null
   updated_at: number
   deleted_at?: number | null
+  sync_status?: string | null
 }

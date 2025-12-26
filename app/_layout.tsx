@@ -10,6 +10,8 @@ import { initializeDatabase } from '@/database/initializeDatabase';  // Importe 
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { useAuth } from '@/context/AuthContext';
+import { AutoSyncProvider } from '@/context/AutoSyncContext';
+import SyncIndicator from '@/components/SyncIndicator';
 import { useRouter } from 'expo-router';
 
 import { useColorScheme } from '@/components/useColorScheme';
@@ -52,9 +54,11 @@ export default function RootLayout() {
   return (
     <SQLiteProvider databaseName="database.db" onInit={initializeDatabase}>
       <AuthProvider>
-        <CartProvider>
-          <RootLayoutNav />
-        </CartProvider>
+        <AutoSyncProvider>
+          <CartProvider>
+            <RootLayoutNav />
+          </CartProvider>
+        </AutoSyncProvider>
       </AuthProvider>
     </SQLiteProvider>
   );
@@ -86,7 +90,7 @@ function RootLayoutNav() {
         backgroundColor={colorScheme === 'dark' ? '#000' : '#fff'} 
         translucent={true}
       />
-      <Stack>
+      <Stack screenOptions={{ headerRight: () => <SyncIndicator /> }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modais/contaModal" options={{ presentation: 'modal', title: 'Conta' }} />
         <Stack.Screen name="modais/produtoModal" options={{ presentation: 'modal', title: 'Produto' }} />

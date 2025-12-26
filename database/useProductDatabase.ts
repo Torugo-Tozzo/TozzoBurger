@@ -7,7 +7,7 @@ export function useProductDatabase() {
 
   async function create(data: Omit<ProductDatabase, "id" | "updated_at">) {
     const statement = await database.prepareAsync(
-      "INSERT INTO TB_PRODUTOS (id, nome, preco, tipoProdutoId, origemProdutoId, ingredientes, updated_at) VALUES ($id, $nome, $preco, $tipoProdutoId, $origemProdutoId, $ingredientes, $updated_at)"
+      "INSERT INTO TB_PRODUTOS (id, nome, preco, tipoProdutoId, origemProdutoId, ingredientes, updated_at, sync_status) VALUES ($id, $nome, $preco, $tipoProdutoId, $origemProdutoId, $ingredientes, $updated_at, $sync_status)"
     )
 
     try {
@@ -20,9 +20,35 @@ export function useProductDatabase() {
         $origemProdutoId: data.origemProdutoId ?? null,
         $ingredientes: data.ingredientes ?? null,
         $updated_at: Date.now(),
+        $sync_status: 'pending',
       })
 
       return { id }
+    } catch (error) {
+      throw error
+    } finally {
+      await statement.finalizeAsync()
+    }
+  }
+
+  async function createFromSync(data: ProductDatabase) {
+    const statement = await database.prepareAsync(
+      "INSERT INTO TB_PRODUTOS (id, nome, preco, tipoProdutoId, origemProdutoId, ingredientes, updated_at, sync_status) VALUES ($id, $nome, $preco, $tipoProdutoId, $origemProdutoId, $ingredientes, $updated_at, $sync_status)"
+    )
+
+    try {
+      await statement.executeAsync({
+        $id: data.id,
+        $nome: data.nome,
+        $preco: data.preco,
+        $tipoProdutoId: data.tipoProdutoId,
+        $origemProdutoId: data.origemProdutoId ?? null,
+        $ingredientes: data.ingredientes ?? null,
+        $updated_at: (data as any).updated_at ?? Date.now(),
+        $sync_status: 'synced',
+      })
+
+      return { id: data.id }
     } catch (error) {
       throw error
     } finally {
@@ -47,7 +73,7 @@ export function useProductDatabase() {
 
   async function update(data: Omit<ProductDatabase, "updated_at">) {
     const statement = await database.prepareAsync(
-      "UPDATE TB_PRODUTOS SET nome = $nome, preco = $preco, tipoProdutoId = $tipoProdutoId, ingredientes = $ingredientes, updated_at = $updated_at WHERE id = $id"
+      "UPDATE TB_PRODUTOS SET nome = $nome, preco = $preco, tipoProdutoId = $tipoProdutoId, ingredientes = $ingredientes, updated_at = $updated_at, sync_status = $sync_status WHERE id = $id"
     )
 
     try {
@@ -58,6 +84,7 @@ export function useProductDatabase() {
         $tipoProdutoId: data.tipoProdutoId,
         $ingredientes: data.ingredientes ?? null,
         $updated_at: Date.now(),
+        $sync_status: 'pending',
       })
     } catch (error) {
       throw error
@@ -69,7 +96,7 @@ export function useProductDatabase() {
   async function remove(id: string) {
     try {
       const deletedAt = Date.now()
-      await database.execAsync(`UPDATE TB_PRODUTOS SET deleted_at = ${deletedAt}, updated_at = ${deletedAt} WHERE id = '${id}'`)
+      await database.execAsync(`UPDATE TB_PRODUTOS SET deleted_at = ${deletedAt}, updated_at = ${deletedAt}, sync_status = 'pending' WHERE id = '${id}'`)
     } catch (error) {
       throw error
     }
@@ -148,5 +175,16 @@ export function useProductDatabase() {
     }
   }
 
-  return { create, searchByName, update, remove, show, getTipoProdutos, filterByTipo, searchOrigemProdutoId, showAdd }
+  return { 
+    create, 
+    createFromSync, 
+    searchByName, 
+    update, 
+    remove, 
+    show, 
+    getTipoProdutos, 
+    filterByTipo, 
+    searchOrigemProdutoId, 
+    showAdd 
+  }
 }

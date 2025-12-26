@@ -1,4 +1,4 @@
-import { VendaDatabase } from "@/database/useVendaDatabse";
+import { VendaDatabase } from "@/database/types/Venda";
 
 export interface Produto {
   nome: string;
@@ -6,7 +6,7 @@ export interface Produto {
   preco: number;
 }
 
-function removerAcentos(texto: string | undefined): string {
+function removerAcentos(texto: string | undefined | null): string {
   if (!texto) return "";
   return texto
     .normalize("NFD") // Separa o caractere base do acento (Ex: 'ç' vira 'c' + '¸')

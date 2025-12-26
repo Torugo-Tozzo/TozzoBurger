@@ -6,6 +6,7 @@ export type VendaDatabase = {
     excluida: boolean;
     updated_at: number;
     deleted_at?: number | null;
+    sync_status?: string | null;
 };
 
 export type VendaProduto = {

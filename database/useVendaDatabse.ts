@@ -7,7 +7,7 @@ export function useVendasDatabase() {
 
     async function createVenda(produtos: { produtoId: string; quantidade: number }[], cliente?: string) {
         const statementVenda = await database.prepareAsync(
-            "INSERT INTO TB_VENDAS (id, total, horario, cliente, updated_at) VALUES ($id, $total, $horario, $cliente, $updated_at)"
+            "INSERT INTO TB_VENDAS (id, total, horario, cliente, updated_at, sync_status) VALUES ($id, $total, $horario, $cliente, $updated_at, $sync_status)"
         );
 
         try {
@@ -18,11 +18,12 @@ export function useVendasDatabase() {
                         const updatedAt = Date.now();
 
                         await statementVenda.executeAsync({
-                                $id: vendaId,
-                                $total: total,
-                                $horario: horario,
-                                $cliente: cliente ?? null,
-                                $updated_at: updatedAt,
+                            $id: vendaId,
+                            $total: total,
+                            $horario: horario,
+                            $cliente: cliente ?? null,
+                            $updated_at: updatedAt,
+                            $sync_status: 'pending',
                         });
 
                         for (const { produtoId, quantidade } of produtos) {
@@ -37,6 +38,38 @@ export function useVendasDatabase() {
             await statementVenda.finalizeAsync();
         }
     }
+
+        async function createFromSync(data: VendaDatabase & { produtos?: VendaProduto[] }) {
+            const statementVenda = await database.prepareAsync(
+                "INSERT INTO TB_VENDAS (id, total, horario, cliente, updated_at, sync_status) VALUES ($id, $total, $horario, $cliente, $updated_at, $sync_status)"
+            );
+
+            try {
+                if (!data.id) throw new Error('ID inválido');
+
+                await statementVenda.executeAsync({
+                    $id: data.id,
+                    $total: data.total,
+                    $horario: data.horario,
+                    $cliente: data.cliente ?? null,
+                    $updated_at: (data as any).updated_at ?? Date.now(),
+                    $sync_status: 'synced',
+                });
+
+                if (Array.isArray(data.produtos)) {
+                    for (const { produtoId, quantidade } of data.produtos) {
+                        const relId = generateUUID();
+                        await database.execAsync(`INSERT INTO RL_VENDA_PRODUTO (id, vendaId, produtoId, quantidade) VALUES ('${relId}', '${data.id}', '${produtoId}', ${quantidade})`);
+                    }
+                }
+
+                return { vendaId: data.id };
+            } catch (error) {
+                throw error;
+            } finally {
+                await statementVenda.finalizeAsync();
+            }
+        }
 
     async function getVendaById(vendaId: string) {
         try {
@@ -64,7 +97,7 @@ export function useVendasDatabase() {
     async function removeVenda(vendaId: string) {
         try {
             const deletedAt = Date.now();
-            await database.execAsync(`UPDATE TB_VENDAS SET excluida = TRUE, deleted_at = ${deletedAt}, updated_at = ${deletedAt} WHERE id = '${vendaId}'`);
+            await database.execAsync(`UPDATE TB_VENDAS SET excluida = TRUE, deleted_at = ${deletedAt}, updated_at = ${deletedAt}, sync_status = 'pending' WHERE id = '${vendaId}'`);
         } catch (error) {
             throw error;
         }
@@ -232,6 +265,7 @@ export function useVendasDatabase() {
 
     return { 
         createVenda, 
+        createFromSync,
         removeVenda, 
         listVendasRecentes, 
         getVendaById, 

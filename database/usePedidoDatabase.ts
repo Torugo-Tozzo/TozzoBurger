@@ -34,7 +34,7 @@ export function usePedidosDatabase() {
     status: PedidoStatus = STATUS_PEDIDO.ABERTO
   ) {
     const stmt = await database.prepareAsync(
-      "INSERT INTO TB_PEDIDOS (id, total, horario, cliente, status, updated_at) VALUES ($id, $total, $horario, $cliente, $status, $updated_at)"
+      "INSERT INTO TB_PEDIDOS (id, total, horario, cliente, status, updated_at, sync_status) VALUES ($id, $total, $horario, $cliente, $status, $updated_at, $sync_status)"
     );
 
     try {
@@ -53,6 +53,7 @@ export function usePedidosDatabase() {
         $cliente: cliente ?? null,
         $status: status,
         $updated_at: updatedAt,
+        $sync_status: 'pending',
       });
 
       for (const { produtoId, quantidade } of produtos) {
@@ -61,6 +62,37 @@ export function usePedidosDatabase() {
       }
 
       return { pedidoId };
+    } finally {
+      await stmt.finalizeAsync();
+    }
+  }
+
+  async function createFromSync(data: PedidoDatabase & { produtos?: PedidoProduto[] }) {
+    const stmt = await database.prepareAsync(
+      "INSERT INTO TB_PEDIDOS (id, total, horario, cliente, status, updated_at, sync_status) VALUES ($id, $total, $horario, $cliente, $status, $updated_at, $sync_status)"
+    );
+
+    try {
+      if (!isValidStatus(data.status)) throw new Error('Status inválido');
+
+      await stmt.executeAsync({
+        $id: data.id,
+        $total: data.total,
+        $horario: data.horario,
+        $cliente: data.cliente ?? null,
+        $status: data.status,
+        $updated_at: (data as any).updated_at ?? Date.now(),
+        $sync_status: 'synced',
+      });
+
+      if (Array.isArray(data.produtos)) {
+        for (const { produtoId, quantidade } of data.produtos) {
+          const relId = generateUUID();
+          await database.execAsync(`INSERT INTO RL_PEDIDO_PRODUTO (id, pedidoId, produtoId, quantidade) VALUES ('${relId}', '${data.id}', '${produtoId}', ${quantidade})`);
+        }
+      }
+
+      return { pedidoId: data.id };
     } finally {
       await stmt.finalizeAsync();
     }
@@ -102,16 +134,16 @@ export function usePedidosDatabase() {
         }
 
         const total = await calculateTotal(produtos);
-        await database.execAsync(`UPDATE TB_PEDIDOS SET total = ${total}, updated_at = ${Date.now()} WHERE id = '${pedidoId}'`);
+        await database.execAsync(`UPDATE TB_PEDIDOS SET total = ${total}, updated_at = ${Date.now()}, sync_status = 'pending' WHERE id = '${pedidoId}'`);
       }
 
       if (typeof cliente !== 'undefined') {
-        await database.execAsync(`UPDATE TB_PEDIDOS SET cliente = '${cliente}', updated_at = ${Date.now()} WHERE id = '${pedidoId}'`);
+        await database.execAsync(`UPDATE TB_PEDIDOS SET cliente = '${cliente}', updated_at = ${Date.now()}, sync_status = 'pending' WHERE id = '${pedidoId}'`);
       }
 
       if (typeof status !== 'undefined') {
         if (!isValidStatus(status)) throw new Error('Status inválido');
-        await database.execAsync(`UPDATE TB_PEDIDOS SET status = '${status}', updated_at = ${Date.now()} WHERE id = '${pedidoId}'`);
+        await database.execAsync(`UPDATE TB_PEDIDOS SET status = '${status}', updated_at = ${Date.now()}, sync_status = 'pending' WHERE id = '${pedidoId}'`);
       }
     } catch (error) {
       throw error;
@@ -121,8 +153,8 @@ export function usePedidosDatabase() {
   async function removePedido(pedidoId: string) {
     try {
       const deletedAt = Date.now();
-      await database.execAsync(`DELETE FROM RL_PEDIDO_PRODUTO WHERE pedidoId = '${pedidoId}'`);
-      await database.execAsync(`UPDATE TB_PEDIDOS SET deleted_at = ${deletedAt}, updated_at = ${deletedAt} WHERE id = '${pedidoId}'`);
+      await database.execAsync(`UPDATE TB_PEDIDOS SET deleted_at = ${deletedAt}, updated_at = ${deletedAt}, sync_status = 'pending' WHERE id = '${pedidoId}'`);
+      // keep RL_PEDIDO_PRODUTO rows for safety; backend should treat tombstoned pedido
     } catch (error) {
       throw error;
     }
@@ -207,6 +239,7 @@ export function usePedidosDatabase() {
 
   return {
     createPedido,
+    createFromSync,
     getPedidoById,
     updatePedido,
     removePedido,

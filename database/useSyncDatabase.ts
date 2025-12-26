@@ -3,49 +3,80 @@ import * as api from '@/services/api';
 
 export async function sincronizarComServidor(database: SQLiteDatabase, token: string) {
   try {
-    // Collect local data to push: send full records (IDs are UUID strings)
-    const produtosLocal: any[] = await database.getAllAsync(`SELECT id, nome, tipoProdutoId, preco, origemProdutoId, ingredientes, updated_at, deleted_at FROM TB_PRODUTOS;`).catch(() => []);
-    const vendasRows: any[] = await database.getAllAsync(`SELECT id, total, horario, cliente, excluida, updated_at, deleted_at FROM TB_VENDAS;`).catch(() => []);
-    const pedidosRows: any[] = await database.getAllAsync(`SELECT id, total, horario, cliente, status, updated_at, deleted_at FROM TB_PEDIDOS;`).catch(() => []);
+    // read last sync timestamp (if any)
+    const schema = await database.getFirstAsync<{ lastSyncAt?: number }>(`SELECT lastSyncAt FROM TB_SCHEMA LIMIT 1`).catch(() => null);
+    const since = schema && typeof schema.lastSyncAt !== 'undefined' ? schema.lastSyncAt : null;
 
-    // Attach items for vendas and pedidos
-    const vendasLocal = [] as any[];
+    // Collect local products to push: only items changed since last sync (if we have `since`), otherwise push all
+    // Prefer explicit pending-state push: send only rows marked as pending
+    const produtosLocal: any[] = await database.getAllAsync(
+      `SELECT id, nome, tipoProdutoId, preco, origemProdutoId, ingredientes, updated_at, deleted_at FROM TB_PRODUTOS WHERE sync_status = 'pending' OR sync_status IS NULL;`
+    ).catch(() => []);
+
+    // Collect vendas and pedidos to push: only those where every item already has origemProdutoId (so we can reference server product ids)
+    const vendasRows: any[] = await database.getAllAsync(`SELECT id, total, horario, cliente, excluida, updated_at, deleted_at FROM TB_VENDAS WHERE sync_status = 'pending' OR sync_status IS NULL;`).catch(() => []);
+
+    const pedidosRows: any[] = await database.getAllAsync(`SELECT id, total, horario, cliente, status, updated_at, deleted_at FROM TB_PEDIDOS WHERE sync_status = 'pending' OR sync_status IS NULL;`).catch(() => []);
+
+    const vendasLocal: any[] = [];
     for (const v of vendasRows) {
       const items = await database.getAllAsync(`SELECT produtoId, quantidade FROM RL_VENDA_PRODUTO WHERE vendaId = '${String(v.id).replace(/'/g, "''")}'`).catch(() => []);
-      vendasLocal.push({ ...v, itens: items });
+      // For now, do not require origemProdutoId: send local produtoId as-is
+      const mappedItems: any[] = items.map((it: any) => ({ produtoId: it.produtoId, quantidade: it.quantidade }));
+      vendasLocal.push({ ...v, itens: mappedItems });
     }
 
-    const pedidosLocal = [] as any[];
+    const pedidosLocal: any[] = [];
     for (const p of pedidosRows) {
       const items = await database.getAllAsync(`SELECT produtoId, quantidade FROM RL_PEDIDO_PRODUTO WHERE pedidoId = '${String(p.id).replace(/'/g, "''")}'`).catch(() => []);
-      pedidosLocal.push({ ...p, itens: items });
+      // For now, do not require origemProdutoId: send local produtoId as-is
+      const mappedItems: any[] = items.map((it: any) => ({ produtoId: it.produtoId, quantidade: it.quantidade }));
+      pedidosLocal.push({ ...p, itens: mappedItems });
     }
 
     const payload = { produtos: produtosLocal, vendas: vendasLocal, pedidos: pedidosLocal };
+    console.log('[sync] push: payload counts', { produtos: produtosLocal.length, vendas: vendasLocal.length, pedidos: pedidosLocal.length });
 
     // push local data to server (POST /sincronizacao/push)
-    const syncRes: any = await api.sincronizar(token, payload).catch(() => null);
+    const syncRes: any = await api.sincronizar(token, payload).catch((err) => {
+      console.warn('[sync] push failed', err);
+      return null;
+    });
 
     // If server returned id maps (idMobile -> idServidor), apply them locally
     if (syncRes) {
+      // If push succeeded but server did not return explicit maps for vendas/pedidos,
+      // mark the records we pushed as 'synced' to avoid repeatedly re-sending them.
+      // We do this only for vendas and pedidos (not produtos) because produtos
+      // require server-origin IDs (origemProdutoId) to be safe to mark fully synced.
+      try {
+        if (Array.isArray(vendasLocal) && vendasLocal.length) {
+          const ids = vendasLocal.map(v => `'${String(v.id).replace(/'/g, "''")}'`).join(',');
+          if (ids.length) {
+            await database.execAsync(`UPDATE TB_VENDAS SET sync_status = 'synced' WHERE id IN (${ids});`).catch(() => {});
+          }
+        }
+        if (Array.isArray(pedidosLocal) && pedidosLocal.length) {
+          const ids = pedidosLocal.map(p => `'${String(p.id).replace(/'/g, "''")}'`).join(',');
+          if (ids.length) {
+            await database.execAsync(`UPDATE TB_PEDIDOS SET sync_status = 'synced' WHERE id IN (${ids});`).catch(() => {});
+          }
+        }
+      } catch (err) {
+        // ignore; we still proceed to per-map handling below
+      }
       const mapaProdutos = syncRes.mapaProdutos || syncRes.mapa_produtos || null;
       const mapaPedidos = syncRes.mapaPedidos || syncRes.mapa_pedidos || null;
+      const mapaVendas = syncRes.mapaVendas || syncRes.mapa_vendas || null;
 
       if (mapaProdutos && typeof mapaProdutos === 'object') {
         try {
           await database.execAsync('BEGIN;');
           for (const localId of Object.keys(mapaProdutos)) {
             const serverId = String(mapaProdutos[localId]);
-            await database.execAsync(`UPDATE RL_PEDIDO_PRODUTO SET produtoId = '${serverId}' WHERE produtoId = '${String(localId).replace(/'/g, "''")}'`).catch(() => {});
-            await database.execAsync(`UPDATE RL_VENDA_PRODUTO SET produtoId = '${serverId}' WHERE produtoId = '${String(localId).replace(/'/g, "''")}'`).catch(() => {});
-            await database.execAsync(`UPDATE TB_PRODUTOS SET origemProdutoId = '${serverId}' WHERE origemProdutoId = '${String(localId).replace(/'/g, "''")}'`).catch(() => {});
-
-            const exists = await database.getFirstAsync(`SELECT id FROM TB_PRODUTOS WHERE id = ?`, [serverId]).catch(() => null);
-            if (!exists) {
-              await database.execAsync(`UPDATE TB_PRODUTOS SET id = '${serverId}' WHERE id = '${String(localId).replace(/'/g, "''")}'`).catch(() => {});
-            } else {
-              await database.execAsync(`DELETE FROM TB_PRODUTOS WHERE id = '${String(localId).replace(/'/g, "''")}'`).catch(() => {});
-            }
+            // set origemProdutoId on local product so we don't send it again
+            await database.execAsync(`UPDATE TB_PRODUTOS SET origemProdutoId = '${serverId}', sync_status = 'synced' WHERE id = '${String(localId).replace(/'/g, "''")}'`).catch(() => {});
+            console.log('[sync] mapaProdutos applied', { localId, serverId });
           }
           await database.execAsync('COMMIT;');
         } catch (err) {
@@ -54,18 +85,28 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
       }
 
       if (mapaPedidos && typeof mapaPedidos === 'object') {
+        console.log('[sync] mapaPedidos', mapaPedidos);
         try {
           await database.execAsync('BEGIN;');
           for (const localId of Object.keys(mapaPedidos)) {
             const serverId = String(mapaPedidos[localId]);
-            await database.execAsync(`UPDATE RL_PEDIDO_PRODUTO SET pedidoId = '${serverId}' WHERE pedidoId = '${String(localId).replace(/'/g, "''")}'`).catch(() => {});
+            await database.execAsync(`UPDATE TB_PEDIDOS SET sync_status = 'synced' WHERE id = '${String(localId).replace(/'/g, "''")}'`).catch(() => {});
+            console.log('[sync] mapaPedidos applied', { localId, serverId });
+          }
+          await database.execAsync('COMMIT;');
+        } catch (err) {
+          await database.execAsync('ROLLBACK;').catch(() => {});
+        }
+      }
 
-            const exists = await database.getFirstAsync(`SELECT id FROM TB_PEDIDOS WHERE id = ?`, [serverId]).catch(() => null);
-            if (!exists) {
-              await database.execAsync(`UPDATE TB_PEDIDOS SET id = '${serverId}' WHERE id = '${String(localId).replace(/'/g, "''")}'`).catch(() => {});
-            } else {
-              await database.execAsync(`DELETE FROM TB_PEDIDOS WHERE id = '${String(localId).replace(/'/g, "''")}'`).catch(() => {});
-            }
+      if (mapaVendas && typeof mapaVendas === 'object') {
+        console.log('[sync] mapaVendas', mapaVendas);
+        try {
+          await database.execAsync('BEGIN;');
+          for (const localId of Object.keys(mapaVendas)) {
+            const serverId = String(mapaVendas[localId]);
+            await database.execAsync(`UPDATE TB_VENDAS SET sync_status = 'synced' WHERE id = '${String(localId).replace(/'/g, "''")}'`).catch(() => {});
+            console.log('[sync] mapaVendas applied', { localId, serverId });
           }
           await database.execAsync('COMMIT;');
         } catch (err) {
@@ -75,16 +116,36 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
     }
 
     // then pull authoritative state from server (GET /sincronizacao/pull)
-    const changes = await api.getChanges(token).catch(() => null);
+    // Convert stored lastSyncAt (epoch ms) to ISO string expected by the API.
+    let sinceIso: string | undefined = undefined;
+    if (schema && typeof schema.lastSyncAt !== 'undefined' && schema.lastSyncAt !== null) {
+      const raw = schema.lastSyncAt;
+      const s = raw == null ? '' : String(raw).trim();
+      const num = /^\d+$/.test(s) ? Number(s) : NaN;
+      if (!Number.isNaN(num)) {
+        sinceIso = new Date(num).toISOString();
+      }
+    }
+
+    const changes = sinceIso
+      ? await api.getChanges(token, sinceIso).catch((err) => {
+          console.warn('[sync] pull failed', err);
+          return null;
+        })
+      : await api.getChanges(token).catch((err) => {
+          console.warn('[sync] pull failed', err);
+          return null;
+        });
 
     // Replace TB_TP_PRODUTO if server provided tipos
     if (changes && Array.isArray(changes.tipos)) {
       try {
         await database.execAsync('BEGIN;');
-        await database.execAsync('DELETE FROM TB_TP_PRODUTO;');
+        // Upsert received tipos; avoid blind DELETE to prevent destructive behavior on mobile
         for (const t of changes.tipos) {
           const cor = t.cor ? String(t.cor).replace(/'/g, "''") : '#9E9E9E';
-          await database.execAsync(`INSERT OR IGNORE INTO TB_TP_PRODUTO (id, descricao, cor) VALUES (${Number(t.id)}, '${String(t.descricao).replace(/'/g, "''")}', '${cor}');`).catch(() => {});
+          const idNum = Number(t.id);
+          await database.execAsync(`INSERT OR REPLACE INTO TB_TP_PRODUTO (id, descricao, cor) VALUES (${idNum}, '${String(t.descricao).replace(/'/g, "''")}', '${cor}');`).catch(() => {});
         }
         await database.execAsync('COMMIT;');
       } catch (err) {
@@ -92,7 +153,7 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
       }
     }
 
-    // Upsert produtos: compare updated_at and respect deleted_at per registro
+    // Upsert produtos: match by origemProdutoId OR id to avoid duplicates; respect deleted_at
     if (changes && Array.isArray(changes.produtos)) {
       try {
         await database.execAsync('BEGIN;');
@@ -100,27 +161,29 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           const id = String(p.id).replace(/'/g, "''");
           const nome = String(p.nome ?? '').replace(/'/g, "''");
           const ingredientes = p.ingredientes ? String(p.ingredientes).replace(/'/g, "''") : null;
+          console.log('[sync] produto recebido', { id, nome, preco: p.preco, tipoProdutoId: p.tipoProdutoId, origemProdutoId: p.origemProdutoId, updated_at: p.updated_at, deleted_at: p.deleted_at });
           const tipoProdutoId = typeof p.tipoProdutoId !== 'undefined' && p.tipoProdutoId !== null ? Number(p.tipoProdutoId) : null;
           const origemProdutoId = p.origemProdutoId ? String(p.origemProdutoId).replace(/'/g, "''") : null;
           const updatedAt = typeof p.updated_at !== 'undefined' && p.updated_at !== null ? Number(p.updated_at) : 0;
           const deletedAt = typeof p.deleted_at !== 'undefined' && p.deleted_at !== null ? Number(p.deleted_at) : null;
 
-          const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_PRODUTOS WHERE id = ?`, [id]).catch(() => null);
+          // try to find local by origemProdutoId OR id
+          const local = await database.getFirstAsync<{ updated_at?: number; id?: string }>(`SELECT id, updated_at FROM TB_PRODUTOS WHERE origemProdutoId = ? OR id = ? LIMIT 1`, [id, id]).catch(() => null);
 
-          if (deletedAt) {
-            // server says deleted -> remove locally
-            await database.execAsync(`DELETE FROM RL_PEDIDO_PRODUTO WHERE produtoId = '${id}'`).catch(() => {});
-            await database.execAsync(`DELETE FROM RL_VENDA_PRODUTO WHERE produtoId = '${id}'`).catch(() => {});
-            await database.execAsync(`DELETE FROM TB_PRODUTOS WHERE id = '${id}'`).catch(() => {});
+          if (deletedAt !== null && !Number.isNaN(deletedAt)) {
+            // server says deleted -> mark locally as deleted (soft-delete) instead of removing rows
+            await database.execAsync(`UPDATE TB_PRODUTOS SET deleted_at = ${deletedAt}, updated_at = ${updatedAt} WHERE id = '${id}' OR origemProdutoId = '${id}'`).catch(() => {});
             continue;
           }
 
           if (!local) {
-            await database.execAsync(`INSERT INTO TB_PRODUTOS (id, nome, tipoProdutoId, preco, origemProdutoId, ingredientes, updated_at, deleted_at) VALUES ('${id}', '${nome}', ${tipoProdutoId === null ? 'NULL' : tipoProdutoId}, ${Number(p.preco ?? 0)}, ${origemProdutoId ? `'${origemProdutoId}'` : 'NULL'}, ${ingredientes ? `'${ingredientes}'` : 'NULL'}, ${updatedAt}, ${deletedAt === null ? 'NULL' : deletedAt});`).catch(() => {});
+            await database.execAsync(`INSERT OR IGNORE INTO TB_PRODUTOS (id, nome, tipoProdutoId, preco, origemProdutoId, ingredientes, updated_at, deleted_at) VALUES ('${id}', '${nome}', ${tipoProdutoId === null ? 'NULL' : tipoProdutoId}, ${Number(p.preco ?? 0)}, ${origemProdutoId ? `'${origemProdutoId}'` : 'NULL'}, ${ingredientes ? `'${ingredientes}'` : 'NULL'}, ${updatedAt}, ${deletedAt === null ? 'NULL' : deletedAt});`).catch(() => {});
           } else {
             const localUpdated = Number(local.updated_at || 0);
             if (updatedAt >= localUpdated) {
-              await database.execAsync(`UPDATE TB_PRODUTOS SET nome = '${nome}', tipoProdutoId = ${tipoProdutoId === null ? 'NULL' : tipoProdutoId}, preco = ${Number(p.preco ?? 0)}, origemProdutoId = ${origemProdutoId ? `'${origemProdutoId}'` : 'NULL'}, ingredientes = ${ingredientes ? `'${ingredientes}'` : 'NULL'}, updated_at = ${updatedAt}, deleted_at = ${deletedAt === null ? 'NULL' : deletedAt} WHERE id = '${id}'`).catch(() => {});
+              // update the found record (may be the local id or a mapped record)
+              const targetId = String((local.id ?? id)).replace(/'/g, "''");
+              await database.execAsync(`UPDATE TB_PRODUTOS SET nome = '${nome}', tipoProdutoId = ${tipoProdutoId === null ? 'NULL' : tipoProdutoId}, preco = ${Number(p.preco ?? 0)}, origemProdutoId = ${origemProdutoId ? `'${origemProdutoId}'` : 'NULL'}, ingredientes = ${ingredientes ? `'${ingredientes}'` : 'NULL'}, updated_at = ${updatedAt}, deleted_at = ${deletedAt === null ? 'NULL' : deletedAt}, sync_status = 'synced' WHERE id = '${targetId}'`).catch(() => {});
             }
           }
         }
@@ -142,15 +205,15 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           const updatedAt = typeof ped.updated_at !== 'undefined' && ped.updated_at !== null ? Number(ped.updated_at) : 0;
           const deletedAt = typeof ped.deleted_at !== 'undefined' && ped.deleted_at !== null ? Number(ped.deleted_at) : null;
 
-          const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_PEDIDOS WHERE id = ?`, [id]).catch(() => null);
-
-          if (deletedAt) {
-            await database.execAsync(`DELETE FROM RL_PEDIDO_PRODUTO WHERE pedidoId = '${id}'`).catch(() => {});
-            await database.execAsync(`DELETE FROM TB_PEDIDOS WHERE id = '${id}'`).catch(() => {});
+          if (deletedAt !== null && !Number.isNaN(deletedAt)) {
+            // mark pedido as deleted instead of removing it
+            await database.execAsync(`UPDATE TB_PEDIDOS SET deleted_at = ${deletedAt}, updated_at = ${updatedAt} WHERE id = '${id}'`).catch(() => {});
             continue;
           }
 
           const itensArray = Array.isArray(ped.itens) ? ped.itens : Array.isArray(ped.items) ? ped.items : [];
+
+          const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_PEDIDOS WHERE id = ?`, [id]).catch(() => null);
 
           if (!local) {
             await database.execAsync(`INSERT INTO TB_PEDIDOS (id, total, horario, cliente, status, updated_at, deleted_at) VALUES ('${id}', ${Number(ped.total ?? 0)}, '${horario}', ${cliente ? `'${cliente}'` : 'NULL'}, '${status}', ${updatedAt}, ${deletedAt === null ? 'NULL' : deletedAt});`).catch(() => {});
@@ -163,7 +226,7 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           } else {
             const localUpdated = Number(local.updated_at || 0);
             if (updatedAt >= localUpdated) {
-              await database.execAsync(`UPDATE TB_PEDIDOS SET total = ${Number(ped.total ?? 0)}, horario = '${horario}', cliente = ${cliente ? `'${cliente}'` : 'NULL'}, status = '${status}', updated_at = ${updatedAt}, deleted_at = ${deletedAt === null ? 'NULL' : deletedAt} WHERE id = '${id}'`).catch(() => {});
+              await database.execAsync(`UPDATE TB_PEDIDOS SET total = ${Number(ped.total ?? 0)}, horario = '${horario}', cliente = ${cliente ? `'${cliente}'` : 'NULL'}, status = '${status}', updated_at = ${updatedAt}, deleted_at = ${deletedAt === null ? 'NULL' : deletedAt}, sync_status = 'synced' WHERE id = '${id}'`).catch(() => {});
               // replace items
               await database.execAsync(`DELETE FROM RL_PEDIDO_PRODUTO WHERE pedidoId = '${id}'`).catch(() => {});
               if (itensArray.length) {
@@ -193,15 +256,16 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           const updatedAt = typeof ven.updated_at !== 'undefined' && ven.updated_at !== null ? Number(ven.updated_at) : 0;
           const deletedAt = typeof ven.deleted_at !== 'undefined' && ven.deleted_at !== null ? Number(ven.deleted_at) : null;
 
-          const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_VENDAS WHERE id = ?`, [id]).catch(() => null);
-
-          if (deletedAt) {
-            await database.execAsync(`DELETE FROM RL_VENDA_PRODUTO WHERE vendaId = '${id}'`).catch(() => {});
-            await database.execAsync(`DELETE FROM TB_VENDAS WHERE id = '${id}'`).catch(() => {});
+          if (deletedAt !== null && !Number.isNaN(deletedAt)) {
+            // mark venda as deleted (soft-delete) instead of removing it
+            await database.execAsync(`UPDATE TB_VENDAS SET deleted_at = ${deletedAt}, updated_at = ${updatedAt}, excluida = 1 WHERE id = '${id}'`).catch(() => {});
             continue;
           }
 
           const itensArray = Array.isArray(ven.itens) ? ven.itens : Array.isArray(ven.items) ? ven.items : [];
+          console.log('[sync] venda itens', { id, itensArray });
+
+          const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_VENDAS WHERE id = ?`, [id]).catch(() => null);
 
           if (!local) {
             await database.execAsync(`INSERT INTO TB_VENDAS (id, total, horario, cliente, excluida, updated_at, deleted_at) VALUES ('${id}', ${Number(ven.total ?? 0)}, '${horario}', ${cliente ? `'${cliente}'` : 'NULL'}, ${excluida}, ${updatedAt}, ${deletedAt === null ? 'NULL' : deletedAt});`).catch(() => {});
@@ -214,7 +278,7 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           } else {
             const localUpdated = Number(local.updated_at || 0);
             if (updatedAt >= localUpdated) {
-              await database.execAsync(`UPDATE TB_VENDAS SET total = ${Number(ven.total ?? 0)}, horario = '${horario}', cliente = ${cliente ? `'${cliente}'` : 'NULL'}, excluida = ${excluida}, updated_at = ${updatedAt}, deleted_at = ${deletedAt === null ? 'NULL' : deletedAt} WHERE id = '${id}'`).catch(() => {});
+              await database.execAsync(`UPDATE TB_VENDAS SET total = ${Number(ven.total ?? 0)}, horario = '${horario}', cliente = ${cliente ? `'${cliente}'` : 'NULL'}, excluida = ${excluida}, updated_at = ${updatedAt}, deleted_at = ${deletedAt === null ? 'NULL' : deletedAt}, sync_status = 'synced' WHERE id = '${id}'`).catch(() => {});
               await database.execAsync(`DELETE FROM RL_VENDA_PRODUTO WHERE vendaId = '${id}'`).catch(() => {});
               if (itensArray.length) {
                 for (const it of itensArray) {
@@ -229,6 +293,20 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
       } catch (err) {
         await database.execAsync('ROLLBACK;').catch(() => {});
       }
+    }
+
+    // update lastSyncAt in schema — only if push and pull were successful
+    try {
+      if (syncRes && changes !== null) {
+        // prefer server-provided timestamp if present
+        const serverTime = (changes && (changes.serverTime || changes.now || changes.timestamp)) || null;
+        const nowToStore = serverTime && typeof serverTime === 'string' ? Date.parse(serverTime) : (typeof serverTime === 'number' ? serverTime : Date.now());
+        if (!Number.isNaN(nowToStore)) {
+          await database.execAsync(`UPDATE TB_SCHEMA SET lastSyncAt = ${nowToStore};`).catch(() => {});
+        }
+      }
+    } catch (err) {
+      // ignore
     }
 
     return changes;

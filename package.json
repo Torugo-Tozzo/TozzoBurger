@@ -43,7 +43,8 @@
     "react-native-svg": "15.8.0",
     "react-native-view-shot": "~4.0.3",
     "react-native-web": "~0.19.13",
-    "expo-crypto": "~14.0.2"
+    "expo-crypto": "~14.0.2",
+    "@react-native-community/netinfo": "11.4.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

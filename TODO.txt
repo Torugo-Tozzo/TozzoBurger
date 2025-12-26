@@ -8,3 +8,5 @@ npx expo run:android
 - Não obrigar sincronização mas mostrar sempre se foi ou não sincronizado 
 - Apagar pasta android se realmente não for necessaria.
 - Trocar expo-sqlite pelo expo-watermelonDB. (etapa anterior necessaria antes). //app.json
+
+- ARRUMAR A sincronizacao fazer ela periodica por mudanças/foco/chamada da api para o dispositivo, sei lá analisar
