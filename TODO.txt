@@ -9,4 +9,3 @@ npx expo run:android
 - Apagar pasta android se realmente não for necessaria.
 - Trocar expo-sqlite pelo expo-watermelonDB. (etapa anterior necessaria antes). //app.json
 
-- ARRUMAR A sincronizacao fazer ela periodica por mudanças/foco/chamada da api para o dispositivo, sei lá analisar

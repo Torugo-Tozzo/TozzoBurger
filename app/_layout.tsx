@@ -10,8 +10,8 @@ import { initializeDatabase } from '@/database/initializeDatabase';  // Importe 
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { useAuth } from '@/context/AuthContext';
+import { useAutoSync } from '@/context/AutoSyncContext';
 import { AutoSyncProvider } from '@/context/AutoSyncContext';
-import SyncIndicator from '@/components/SyncIndicator';
 import { useRouter } from 'expo-router';
 
 import { useColorScheme } from '@/components/useColorScheme';
@@ -68,6 +68,7 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const { user, loading } = useAuth();
   const router = useRouter();
+  const { isSyncing, lastSync } = useAutoSync();
   // Redirect to login or main tabs depending on auth
   // Use replace so user can't go back to the wrong screen
   useEffect(() => {
@@ -75,10 +76,29 @@ function RootLayoutNav() {
     const pathname = (router as any).pathname as string | undefined;
     if (!user && pathname !== '/login') {
       (router as any).replace('/login');
-    } else if (user && pathname === '/login') {
-      (router as any).replace('/(tabs)');
+      return;
     }
-  }, [loading, user, router]);
+
+    // If user just logged in and we're on the login page, delay navigation
+    // until sync has completed or a timeout elapses to ensure DB is populated.
+    if (user && pathname === '/login') {
+      let mounted = true;
+      (async () => {
+        const start = Date.now();
+        while (mounted) {
+          // proceed when sync is idle and we have at least one lastSync OR timeout (20s)
+          if ((!isSyncing && lastSync !== null) || Date.now() - start > 20000) {
+            if (mounted) (router as any).replace('/(tabs)');
+            return;
+          }
+          // sleep 250ms
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise((r) => setTimeout(r, 250));
+        }
+      })();
+      return () => { mounted = false; };
+    }
+  }, [loading, user, router, isSyncing, lastSync]);
 
   // While auth is rehydrating, don't render navigation (prevents flicker)
   if (loading) return null;
@@ -90,7 +110,7 @@ function RootLayoutNav() {
         backgroundColor={colorScheme === 'dark' ? '#000' : '#fff'} 
         translucent={true}
       />
-      <Stack screenOptions={{ headerRight: () => <SyncIndicator /> }}>
+      <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modais/contaModal" options={{ presentation: 'modal', title: 'Conta' }} />
         <Stack.Screen name="modais/produtoModal" options={{ presentation: 'modal', title: 'Produto' }} />

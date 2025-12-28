@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react"
 import {  useProductDatabase } from "@/database/useProductDatabase"
 import { ProductDatabase } from "@/database/types/Produto"
+import { useAutoSync } from '@/context/AutoSyncContext'
 
 export function useProductList() {
   const [search, setSearch] = useState("")
@@ -48,10 +49,12 @@ export function useProductList() {
   }
 
   // Carregar os produtos e tipos de produto quando a pesquisa mudar
+  // e também recarregar quando uma sincronização remota for aplicada (lastSync)
+  const { lastSync } = useAutoSync();
   useEffect(() => {
     list()
     loadTiposProduto()
-  }, [search])
+  }, [search, lastSync])
 
   return {
     search,

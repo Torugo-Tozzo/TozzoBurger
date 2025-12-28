@@ -6,10 +6,13 @@ import { useAuth } from '@/context/AuthContext';
 import { sincronizarComServidor } from '@/database/useSyncDatabase';
 import { runWithLock } from '@/database/syncGuard';
 
+type LastSyncResult = { ok: boolean | null; message?: string | null; time?: number | null };
+
 type AutoSyncContextType = {
   isSyncing: boolean;
   lastSync: number | null;
-  triggerSync: () => Promise<void>;
+  lastSyncResult: LastSyncResult;
+  triggerSync: () => Promise<any | null | undefined>;
 };
 
 const AutoSyncContext = createContext<AutoSyncContextType | undefined>(undefined);
@@ -19,38 +22,55 @@ export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) =>
   const { token } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<number | null>(null);
+  const [lastSyncResult, setLastSyncResult] = useState<LastSyncResult>({ ok: null, message: null, time: null });
   const pendingRef = useRef(false);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState as AppStateStatus);
 
   const doSync = async () => {
-    if (!token) return;
+    if (!token) return null;
     if (isSyncing) {
       pendingRef.current = true;
-      return;
+      return null;
     }
 
     // Use global lock to avoid parallel syncs initiated from other places
-    const res = await runWithLock(async () => {
-      setIsSyncing(true);
-      try {
-        return await sincronizarComServidor(database as any, token);
-      } finally {
-        setIsSyncing(false);
+    let res: any = null;
+    try {
+      res = await runWithLock(async () => {
+        setIsSyncing(true);
+        try {
+          return await sincronizarComServidor(database as any, token);
+        } finally {
+          setIsSyncing(false);
+        }
+      });
+    } catch (err: any) {
+      // sync threw — record failure and return
+      const msg = err?.message ?? String(err);
+      setLastSyncResult({ ok: false, message: msg, time: Date.now() });
+      console.warn('AutoSync failed', err);
+      // schedule pending retry if needed
+      if (pendingRef.current) {
+        pendingRef.current = false;
+        setTimeout(() => doSync(), 800);
       }
-    });
+      return null;
+    }
 
     if (res === null) {
       // someone else is syncing; schedule a retry
       pendingRef.current = true;
-      return;
+      return res;
     }
 
     try {
       const serverTime = res && (res.serverTime || res.now || res.timestamp) ? res.serverTime || res.now || res.timestamp : null;
       const parsed = serverTime ? (typeof serverTime === 'string' ? Date.parse(serverTime) : Number(serverTime)) : Date.now();
       setLastSync(!Number.isNaN(parsed) ? parsed : Date.now());
+      setLastSyncResult({ ok: true, message: null, time: Date.now() });
     } catch (err) {
       console.warn('AutoSync post-sync handling failed', err);
+      setLastSyncResult({ ok: false, message: String(err ?? 'post-sync error'), time: Date.now() });
     } finally {
       if (pendingRef.current) {
         pendingRef.current = false;
@@ -58,6 +78,8 @@ export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) =>
         setTimeout(() => doSync(), 800);
       }
     }
+
+    return res;
   };
 
   useEffect(() => {
@@ -96,6 +118,7 @@ export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) =>
   const value: AutoSyncContextType = {
     isSyncing,
     lastSync,
+    lastSyncResult,
     triggerSync: async () => doSync(),
   };
 
