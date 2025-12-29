@@ -49,9 +49,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name='relatorio'
+        name='pedidos'
         options={{
-          title: 'Relatório',
+          title: 'Pedidos',
           tabBarIcon: ({ color }) => <TabBarIcon name="area-chart" color={color} />,
         }}
       />

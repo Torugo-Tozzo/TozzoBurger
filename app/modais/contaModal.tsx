@@ -9,10 +9,14 @@ import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { captureScreen } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import { usePedidosDatabase } from '@/database/usePedidoDatabase';
+import { useProductDatabase } from '@/database/useProductDatabase';
 
 export default function ContaModalScreen() {
-  const { cart, clearCart, updateCartItem } = useCart(); // Acessando o carrinho e a função de atualizar o item
+  const { cart, clearCart, updateCartItem, addToCart } = useCart();
   const { createVenda } = useVendasDatabase();
+  const { createPedido, getPedidoById } = usePedidosDatabase();
+  const { show: showProduto } = useProductDatabase();
   const [cliente, setCliente] = useState('');
 
   const colorScheme = useColorScheme();
@@ -41,7 +45,6 @@ export default function ContaModalScreen() {
           format: 'png',
           quality: 0.8,
         });
-  
         await Sharing.shareAsync(uri);
       } catch (error) {
         console.error("Erro ao capturar e compartilhar:", error);
@@ -72,6 +75,23 @@ export default function ContaModalScreen() {
     } catch (error) {
       console.error(error);
       Alert.alert("Erro", "Não foi possível finalizar a compra.");
+    }
+  };
+
+  const gerarPedido = async () => {
+    try {
+      const produtos = cart.map(({ id, quantidade }) => ({
+        produtoId: id,
+        quantidade: quantidade ?? 0,
+      }));
+
+      const { pedidoId } = await createPedido(produtos, cliente);
+      await clearCart();
+      router.back();
+      Alert.alert('Pedido Gerado!', `Pedido ${pedidoId} criado com sucesso.`);
+    } catch (error) {
+      console.error('Erro ao gerar pedido:', error);
+      Alert.alert('Erro', 'Não foi possível gerar o pedido.');
     }
   };
 
@@ -230,10 +250,17 @@ export default function ContaModalScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, isCartEmpty && styles.buttonDisabled]}  // Aplicar estilo para botão desabilitado
+          onPress={gerarPedido}
+          disabled={isCartEmpty}  // Desabilitar botão se o carrinho estiver vazio
+        >
+          <Text style={styles.buttonText}>Gerar Pedido</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, isCartEmpty && styles.buttonDisabled]}  // Aplicar estilo para botão desabilitado
           onPress={finalizarCompra}
           disabled={isCartEmpty}  // Desabilitar botão se o carrinho estiver vazio
         >
-          <Text style={styles.buttonText}>Vender</Text>
+          <Text style={styles.buttonText}>Gerar Venda</Text>
         </TouchableOpacity>
       </View>
 

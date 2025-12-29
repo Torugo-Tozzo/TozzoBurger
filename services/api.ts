@@ -1,4 +1,4 @@
-export const BASE_URL = 'https://022ad6ba066c.ngrok-free.app';
+export const BASE_URL = 'https://4beccbf96a2f.ngrok-free.app';
 
 async function handleJsonResponse(res: Response) {
   const txt = await res.text();

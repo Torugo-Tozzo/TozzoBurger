@@ -5,7 +5,12 @@ import { generateUUID } from "./utils/uuid";
 type PedidoStatus = typeof STATUS_PEDIDO[keyof typeof STATUS_PEDIDO];
 
 function isValidStatus(value: any): value is PedidoStatus {
-  return value === STATUS_PEDIDO.ABERTO || value === STATUS_PEDIDO.FECHADO;
+  return (
+    value === STATUS_PEDIDO.ABERTO ||
+    value === STATUS_PEDIDO.EM_PREPARO ||
+    value === STATUS_PEDIDO.ENTREGANDO ||
+    value === STATUS_PEDIDO.FECHADO
+  );
 }
 
 export function usePedidosDatabase() {
@@ -167,7 +172,7 @@ export function usePedidosDatabase() {
       const iso = tresDiasAtras.toISOString();
 
       const pedidos = await database.getAllAsync<PedidoDatabase>(
-        `SELECT * FROM TB_PEDIDOS WHERE horario >= ? ORDER BY horario DESC`,
+        `SELECT * FROM TB_PEDIDOS ORDER BY horario DESC`,
         [iso]
       );
 

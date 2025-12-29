@@ -13,5 +13,7 @@ export type PedidoDatabase = {
 
 export const STATUS_PEDIDO = {
   ABERTO: 'ABERTO',
+  EM_PREPARO: 'EM_PREPARO',
+  ENTREGANDO: 'ENTREGANDO',
   FECHADO: 'FECHADO',
 } as const;

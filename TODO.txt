@@ -9,3 +9,7 @@ npx expo run:android
 - Apagar pasta android se realmente não for necessaria.
 - Trocar expo-sqlite pelo expo-watermelonDB. (etapa anterior necessaria antes). //app.json
 
+- Arrumar os RLvenda_produto e rl_pedido_produto
+- Colocar linha amarela/vermelha em produtos / vendas / pedidos não syncados com o servidor
+- Criar a tela dos pedidos (na onde é a do relatorio).
+- Remover logs de sync
