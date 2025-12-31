@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, Alert, FlatList } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, Alert, FlatList } from 'react-native';
 import { View, Text } from '@/components/Themed';
 import { usePedidosDatabase } from '@/database/usePedidoDatabase';
+import PedidoItem from '@/components/PedidoItem';
 import { router } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 
 export default function Pedidos() {
   const { listPedidosRecentes, removePedido } = usePedidosDatabase();
@@ -17,9 +19,11 @@ export default function Pedidos() {
     }
   }
 
-  useEffect(() => {
-    load();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [])
+  );
 
   const handleEdit = (pedidoId: string) => {
     router.push({ pathname: '/modais/pedidoModal', params: { pedidoId } });
@@ -33,25 +37,13 @@ export default function Pedidos() {
   };
 
   const renderPedido = (pedido: any, index: number) => (
-    <View style={styles.pedidoItem} key={pedido.id}>
-      <View style={styles.pedidoLeft}>
-        <Text style={styles.counter}>{index + 1}</Text>
-        <View style={styles.info}>
-          <Text style={styles.cliente}>{pedido.cliente ?? 'Cliente não informado'}</Text>
-          <Text style={styles.produtos}>{(pedido.produtos || []).join(', ')}</Text>
-        </View>
-      </View>
-
-      <View style={styles.actions}>
-        <Text style={styles.status}>{pedido.status}</Text>
-        <TouchableOpacity style={styles.editButton} onPress={() => handleEdit(pedido.id)}>
-          <Text style={styles.buttonText}>Editar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.deleteButton} onPress={() => handleDelete(pedido.id)}>
-          <Text style={styles.buttonText}>Excluir</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    <PedidoItem
+      key={pedido.id}
+      data={pedido}
+      index={index}
+      onEdit={() => handleEdit(pedido.id)}
+      onDelete={() => handleDelete(pedido.id)}
+    />
   );
 
   return (

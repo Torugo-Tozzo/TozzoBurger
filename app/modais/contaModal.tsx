@@ -157,18 +157,13 @@ export default function ContaModalScreen() {
       fontSize: 18,
       fontWeight: "bold",
     },
-    buttonContainer: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-    },
-    button: {
-      backgroundColor: "#007BFF",
-      padding: 10,
-      borderRadius: 8,
-      flex: 1,
-      marginHorizontal: 5,
-      alignItems: "center",
-    },
+    topRow: { flexDirection: 'row', marginTop: 12, alignItems: 'center' },
+    bottomRow: { flexDirection: 'row', marginTop: 12, alignItems: 'center' },
+    smallBtn: { backgroundColor: '#007BFF', padding: 10, borderRadius: 8, flex: 3, marginRight: 8, alignItems: 'center', justifyContent: 'center' },
+    smallBtnRed: { backgroundColor: '#F44336', padding: 10, borderRadius: 8, flex: 3, marginRight: 8, alignItems: 'center', justifyContent: 'center' },
+    largeBtn: { backgroundColor: '#007BFF', padding: 10, borderRadius: 8, flex: 7, alignItems: 'center', justifyContent: 'center' },
+    largeBtnOrange: { backgroundColor: '#f59e0b', padding: 10, borderRadius: 8, flex: 7, alignItems: 'center', justifyContent: 'center' },
+    largeBtnGreen: { backgroundColor: '#10b981', padding: 10, borderRadius: 8, flex: 7, alignItems: 'center', justifyContent: 'center' },
     buttonText: {
       color: "#fff",
       fontSize: 16,
@@ -233,34 +228,39 @@ export default function ContaModalScreen() {
       <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
       <Text style={styles.totalText}>Total: R$ {total.toFixed(2)}</Text>
 
-      <View style={styles.buttonContainer}>
+      <View style={styles.topRow}>
         <TouchableOpacity
-          style={[styles.button, isCartEmpty && styles.buttonDisabled]}  // Aplicar estilo para botão desabilitado
-          onPress={limparConta}
-          disabled={isCartEmpty}  // Desabilitar botão se o carrinho estiver vazio
-        >
-          <Text style={styles.buttonText}>Limpar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, isCartEmpty && styles.buttonDisabled, {flex: 0.25}]}  // Aplicar estilo para botão desabilitado
+          style={[styles.smallBtn, isCartEmpty && styles.buttonDisabled]}
           onPress={handleShare}
-          disabled={isCartEmpty}  // Desabilitar botão se o carrinho estiver vazio
+          disabled={isCartEmpty}
         >
-          <Ionicons name="share-social" size={24} color="white" />
+          <Ionicons name="share-social" size={22} color="white" />
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={[styles.button, isCartEmpty && styles.buttonDisabled]}  // Aplicar estilo para botão desabilitado
+          style={[styles.largeBtnOrange, isCartEmpty && styles.buttonDisabled]}
           onPress={gerarPedido}
-          disabled={isCartEmpty}  // Desabilitar botão se o carrinho estiver vazio
+          disabled={isCartEmpty}
         >
           <Text style={styles.buttonText}>Gerar Pedido</Text>
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.bottomRow}>
         <TouchableOpacity
-          style={[styles.button, isCartEmpty && styles.buttonDisabled]}  // Aplicar estilo para botão desabilitado
-          onPress={finalizarCompra}
-          disabled={isCartEmpty}  // Desabilitar botão se o carrinho estiver vazio
+          style={[styles.smallBtnRed, isCartEmpty && styles.buttonDisabled]}
+          onPress={limparConta}
+          disabled={isCartEmpty}
         >
-          <Text style={styles.buttonText}>Gerar Venda</Text>
+          <FontAwesome name="trash" size={20} color="#fff" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.largeBtnGreen, isCartEmpty && styles.buttonDisabled]}
+          onPress={finalizarCompra}
+          disabled={isCartEmpty}
+        >
+          <Text style={styles.buttonText}>Vender Direto</Text>
         </TouchableOpacity>
       </View>
 

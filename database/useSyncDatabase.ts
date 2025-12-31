@@ -1,5 +1,6 @@
 import { type SQLiteDatabase } from 'expo-sqlite';
 import * as api from '@/services/api';
+import { generateUUID } from './utils/uuid';
 
 export async function sincronizarComServidor(database: SQLiteDatabase, token: string) {
   try {
@@ -20,22 +21,63 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
 
     const vendasLocal: any[] = [];
     for (const v of vendasRows) {
-      const items = await database.getAllAsync(`SELECT produtoId, quantidade FROM RL_VENDA_PRODUTO WHERE vendaId = '${String(v.id).replace(/'/g, "''")}'`).catch(() => []);
-      // For now, do not require origemProdutoId: send local produtoId as-is
-      const mappedItems: any[] = items.map((it: any) => ({ produtoId: it.produtoId, quantidade: it.quantidade }));
+      // include relation id and prefer produto origem (server id) when available
+      const items = await database.getAllAsync(
+        `SELECT R.id as relId, R.vendaId as vendaId, R.produtoId as produtoId, R.quantidade as quantidade, P.origemProdutoId as origemProdutoId
+         FROM RL_VENDA_PRODUTO R
+         LEFT JOIN TB_PRODUTOS P ON P.id = R.produtoId
+         WHERE R.vendaId = '${String(v.id).replace(/'/g, "''")}'`
+      ).catch(() => []);
+
+      const mappedItems: any[] = (items || []).map((it: any) => ({
+        id: it.relId ? String(it.relId).replace(/'/g, "''") : generateUUID(),
+        vendaId: String(v.id).replace(/'/g, "''"),
+        produtoId: it.origemProdutoId ? String(it.origemProdutoId).replace(/'/g, "''") : String(it.produtoId).replace(/'/g, "''"),
+        quantidade: Number(it.quantidade ?? 1),
+      }));
+
       vendasLocal.push({ ...v, itens: mappedItems });
     }
 
     const pedidosLocal: any[] = [];
     for (const p of pedidosRows) {
-      const items = await database.getAllAsync(`SELECT produtoId, quantidade FROM RL_PEDIDO_PRODUTO WHERE pedidoId = '${String(p.id).replace(/'/g, "''")}'`).catch(() => []);
-      // For now, do not require origemProdutoId: send local produtoId as-is
-      const mappedItems: any[] = items.map((it: any) => ({ produtoId: it.produtoId, quantidade: it.quantidade }));
+      // include relation id and prefer produto origem (server id) when available
+      const items = await database.getAllAsync(
+        `SELECT R.id as relId, R.pedidoId as pedidoId, R.produtoId as produtoId, R.quantidade as quantidade, P.origemProdutoId as origemProdutoId
+         FROM RL_PEDIDO_PRODUTO R
+         LEFT JOIN TB_PRODUTOS P ON P.id = R.produtoId
+         WHERE R.pedidoId = '${String(p.id).replace(/'/g, "''")}'`
+      ).catch(() => []);
+
+      const mappedItems: any[] = (items || []).map((it: any) => ({
+        id: it.relId ? String(it.relId).replace(/'/g, "''") : generateUUID(),
+        pedidoId: String(p.id).replace(/'/g, "''"),
+        produtoId: it.origemProdutoId ? String(it.origemProdutoId).replace(/'/g, "''") : String(it.produtoId).replace(/'/g, "''"),
+        quantidade: Number(it.quantidade ?? 1),
+      }));
+
       pedidosLocal.push({ ...p, itens: mappedItems });
     }
 
     const payload = { produtos: produtosLocal, vendas: vendasLocal, pedidos: pedidosLocal };
     console.log('[sync] push: payload counts', { produtos: produtosLocal.length, vendas: vendasLocal.length, pedidos: pedidosLocal.length });
+
+    // Detailed debug: log full payload when there is anything to push
+    try {
+      if ((produtosLocal && produtosLocal.length) || (vendasLocal && vendasLocal.length) || (pedidosLocal && pedidosLocal.length)) {
+        console.log('[sync] push payload full', {
+          produtos: produtosLocal && produtosLocal.length ? produtosLocal : [],
+          vendas: vendasLocal && vendasLocal.length ? vendasLocal : [],
+          pedidos: pedidosLocal && pedidosLocal.length ? pedidosLocal : [],
+        });
+
+        if (produtosLocal && produtosLocal.length) console.log('[sync] produtos ->', produtosLocal);
+        if (vendasLocal && vendasLocal.length) console.log('[sync] vendas ->', vendasLocal);
+        if (pedidosLocal && pedidosLocal.length) console.log('[sync] pedidos ->', pedidosLocal);
+      }
+    } catch (errLog) {
+      console.warn('[sync] failed to log push payload', errLog);
+    }
 
     // push local data to server (POST /sincronizacao/push)
     const syncRes: any = await api.sincronizar(token, payload).catch((err) => {
@@ -220,7 +262,8 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
             if (itensArray.length) {
               for (const it of itensArray) {
                 const produtoId = String(it.produtoId).replace(/'/g, "''");
-                await database.execAsync(`INSERT INTO RL_PEDIDO_PRODUTO (pedidoId, produtoId, quantidade) VALUES ('${id}', '${produtoId}', ${Number(it.quantidade ?? 1)});`).catch(() => {});
+                const relId = it.id ? String(it.id).replace(/'/g, "''") : generateUUID();
+                await database.execAsync(`INSERT INTO RL_PEDIDO_PRODUTO (id, pedidoId, produtoId, quantidade) VALUES ('${relId}', '${id}', '${produtoId}', ${Number(it.quantidade ?? 1)});`).catch(() => {});
               }
             }
           } else {
@@ -232,7 +275,8 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
               if (itensArray.length) {
                 for (const it of itensArray) {
                   const produtoId = String(it.produtoId).replace(/'/g, "''");
-                  await database.execAsync(`INSERT INTO RL_PEDIDO_PRODUTO (pedidoId, produtoId, quantidade) VALUES ('${id}', '${produtoId}', ${Number(it.quantidade ?? 1)});`).catch(() => {});
+                  const relId = it.id ? String(it.id).replace(/'/g, "''") : generateUUID();
+                  await database.execAsync(`INSERT INTO RL_PEDIDO_PRODUTO (id, pedidoId, produtoId, quantidade) VALUES ('${relId}', '${id}', '${produtoId}', ${Number(it.quantidade ?? 1)});`).catch(() => {});
                 }
               }
             }
@@ -272,7 +316,8 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
             if (itensArray.length) {
               for (const it of itensArray) {
                 const produtoId = String(it.produtoId).replace(/'/g, "''");
-                await database.execAsync(`INSERT INTO RL_VENDA_PRODUTO (vendaId, produtoId, quantidade) VALUES ('${id}', '${produtoId}', ${Number(it.quantidade ?? 1)});`).catch(() => {});
+                const relId = it.id ? String(it.id).replace(/'/g, "''") : generateUUID();
+                await database.execAsync(`INSERT INTO RL_VENDA_PRODUTO (id, vendaId, produtoId, quantidade) VALUES ('${relId}', '${id}', '${produtoId}', ${Number(it.quantidade ?? 1)});`).catch(() => {});
               }
             }
           } else {
@@ -283,7 +328,8 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
               if (itensArray.length) {
                 for (const it of itensArray) {
                   const produtoId = String(it.produtoId).replace(/'/g, "''");
-                  await database.execAsync(`INSERT INTO RL_VENDA_PRODUTO (vendaId, produtoId, quantidade) VALUES ('${id}', '${produtoId}', ${Number(it.quantidade ?? 1)});`).catch(() => {});
+                  const relId = it.id ? String(it.id).replace(/'/g, "''") : generateUUID();
+                  await database.execAsync(`INSERT INTO RL_VENDA_PRODUTO (id, vendaId, produtoId, quantidade) VALUES ('${relId}', '${id}', '${produtoId}', ${Number(it.quantidade ?? 1)});`).catch(() => {});
                 }
               }
             }

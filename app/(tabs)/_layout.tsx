@@ -52,13 +52,13 @@ export default function TabLayout() {
         name='pedidos'
         options={{
           title: 'Pedidos',
-          tabBarIcon: ({ color }) => <TabBarIcon name="area-chart" color={color} />,
+          tabBarIcon: ({ color }) => <TabBarIcon name="list" color={color} />,
         }}
       />
       <Tabs.Screen
         name="historico"
         options={{
-          title: 'Histórico',
+          title: 'Vendas',
           tabBarIcon: ({ color }) => <TabBarIcon name="clock-o" color={color} />,
         }}
       />

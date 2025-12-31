@@ -131,24 +131,65 @@ export function usePedidosDatabase() {
   ) {
     try {
       if (Array.isArray(produtos)) {
-        await database.execAsync(`DELETE FROM RL_PEDIDO_PRODUTO WHERE pedidoId = '${pedidoId}'`);
+        // Preserve existing relation IDs when possible so server can correlate items.
+        const pedidoIdEsc = String(pedidoId).replace(/'/g, "''");
+
+        const existing = await database.getAllAsync<{ id: string; produtoId: string; quantidade: number }>(
+          `SELECT id, produtoId, quantidade FROM RL_PEDIDO_PRODUTO WHERE pedidoId = ?`,
+          [pedidoId]
+        );
+
+        // map produtoId -> list of relation ids (handle potential duplicates)
+        const existingMap = new Map<string, string[]>();
+        for (const row of existing || []) {
+          const key = String(row.produtoId);
+          if (!existingMap.has(key)) existingMap.set(key, []);
+          existingMap.get(key)!.push(row.id);
+        }
+
+        const usedIds = new Set<string>();
 
         for (const { produtoId, quantidade } of produtos) {
-          const relId = generateUUID();
-          await database.execAsync(`INSERT INTO RL_PEDIDO_PRODUTO (id, pedidoId, produtoId, quantidade) VALUES ('${relId}', '${pedidoId}', '${produtoId}', ${quantidade})`);
+          const prodKey = String(produtoId);
+          let relId: string | undefined;
+
+          const list = existingMap.get(prodKey);
+          if (list && list.length) {
+            // reuse an existing relation id for the same produtoId
+            relId = list.shift();
+            // update quantidade in case it changed
+            await database.execAsync(`UPDATE RL_PEDIDO_PRODUTO SET quantidade = ${Number(quantidade)} WHERE id = '${String(relId).replace(/'/g, "''")}'`);
+          } else {
+            relId = generateUUID();
+            await database.execAsync(`INSERT INTO RL_PEDIDO_PRODUTO (id, pedidoId, produtoId, quantidade) VALUES ('${String(relId).replace(/'/g, "''")}', '${pedidoIdEsc}', '${String(produtoId).replace(/'/g, "''")}', ${Number(quantidade)})`);
+          }
+
+          if (relId) usedIds.add(relId);
+        }
+
+        // remove any leftover relations that were not reused
+        try {
+          const toDelete = (existing || []).filter(r => !usedIds.has(r.id)).map(r => `'${String(r.id).replace(/'/g, "''")}'`);
+          if (toDelete.length) {
+            await database.execAsync(`DELETE FROM RL_PEDIDO_PRODUTO WHERE id IN (${toDelete.join(',')})`);
+          }
+        } catch (errDel) {
+          // if delete fails, ignore silently — not critical for sync correctness
         }
 
         const total = await calculateTotal(produtos);
-        await database.execAsync(`UPDATE TB_PEDIDOS SET total = ${total}, updated_at = ${Date.now()}, sync_status = 'pending' WHERE id = '${pedidoId}'`);
+        await database.execAsync(`UPDATE TB_PEDIDOS SET total = ${total}, updated_at = ${Date.now()}, sync_status = 'pending' WHERE id = '${pedidoIdEsc}'`);
       }
 
       if (typeof cliente !== 'undefined') {
-        await database.execAsync(`UPDATE TB_PEDIDOS SET cliente = '${cliente}', updated_at = ${Date.now()}, sync_status = 'pending' WHERE id = '${pedidoId}'`);
+        const safeCliente = cliente === null ? 'NULL' : `'${String(cliente).replace(/'/g, "''")}'`;
+        await database.execAsync(`UPDATE TB_PEDIDOS SET cliente = ${safeCliente}, updated_at = ${Date.now()}, sync_status = 'pending' WHERE id = '${pedidoId}'`);
       }
 
       if (typeof status !== 'undefined') {
-        if (!isValidStatus(status)) throw new Error('Status inválido');
-        await database.execAsync(`UPDATE TB_PEDIDOS SET status = '${status}', updated_at = ${Date.now()}, sync_status = 'pending' WHERE id = '${pedidoId}'`);
+        if (status !== null && !isValidStatus(status)) throw new Error('Status inválido');
+        const safeStatus = status === null ? 'NULL' : `'${String(status).replace(/'/g, "''")}'`;
+        await database.execAsync(`UPDATE TB_PEDIDOS SET status = ${safeStatus}, updated_at = ${Date.now()}, sync_status = 'pending' WHERE id = '${pedidoId}'`);
       }
     } catch (error) {
       throw error;
@@ -242,10 +283,27 @@ export function usePedidosDatabase() {
     }
   }
 
+  async function getProdutosByPedidoId(pedidoId: string) {
+    try {
+      const produtos = await database.getAllAsync<{ nome: string; quantidade: number }>(
+        `SELECT P.nome, PP.quantidade
+         FROM RL_PEDIDO_PRODUTO PP
+         JOIN TB_PRODUTOS P ON PP.produtoId = P.id
+         WHERE PP.pedidoId = ?`,
+        [pedidoId]
+      );
+
+      return produtos;
+    } catch (err) {
+      throw err;
+    }
+  }
+
   return {
     createPedido,
     createFromSync,
     getPedidoById,
+      getProdutosByPedidoId,
     updatePedido,
     removePedido,
     listPedidosRecentes,

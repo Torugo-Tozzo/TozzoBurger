@@ -58,7 +58,7 @@ export function useProductDatabase() {
 
   async function searchByName(name: string) {
     try {
-      const query = "SELECT * FROM TB_PRODUTOS WHERE origemProdutoId IS NULL AND nome LIKE ?"
+      const query = "SELECT * FROM TB_PRODUTOS WHERE deleted_at IS NULL AND nome LIKE ?"
 
       const response = await database.getAllAsync<ProductDatabase>(
         query,
@@ -146,7 +146,7 @@ export function useProductDatabase() {
 
   async function filterByTipo(tipoProdutoId: number): Promise<ProductDatabase[]> {
     try {
-      const query = "SELECT * FROM TB_PRODUTOS WHERE origemProdutoId IS NULL AND tipoProdutoId = ?"
+      const query = "SELECT * FROM TB_PRODUTOS WHERE deleted_at IS NULL AND tipoProdutoId = ?"
   
       const response = await database.getAllAsync<ProductDatabase>(
         query,
