@@ -23,7 +23,9 @@ export function useProductDatabase() {
         $sync_status: 'pending',
       })
 
-      return { id }
+        console.log('[db] produto criado', { id })
+
+        return { id }
     } catch (error) {
       throw error
     } finally {
@@ -104,7 +106,7 @@ export function useProductDatabase() {
 
   async function show(id: string) {
     try {
-      const query = "SELECT * FROM TB_PRODUTOS WHERE origemProdutoId IS NULL AND id = ?"
+      const query = "SELECT * FROM TB_PRODUTOS WHERE id = ?"
 
       const response = await database.getFirstAsync<ProductDatabase>(query, [
         id,

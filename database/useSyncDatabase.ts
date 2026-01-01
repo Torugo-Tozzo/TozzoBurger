@@ -355,6 +355,13 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
       // ignore
     }
 
+    // debug: dump full TB_PRODUTOS after sync for inspection
+    try {
+      const pf = await database.getAllAsync(`SELECT * FROM TB_PRODUTOS;`).catch(() => null);
+      console.log('[sync] TB_PRODUTOS dump', Array.isArray(pf) ? pf : []);
+    } catch (err) {
+      console.warn('[sync] failed to dump TB_PRODUTOS', err);
+    }
     return changes;
   } catch (err) {
     console.warn('Sincronização falhou', err);
