@@ -198,8 +198,9 @@ export function usePedidosDatabase() {
 
   async function removePedido(pedidoId: string) {
     try {
-      const deletedAt = Date.now();
-      await database.execAsync(`UPDATE TB_PEDIDOS SET deleted_at = ${deletedAt}, updated_at = ${deletedAt}, sync_status = 'pending' WHERE id = '${pedidoId}'`);
+      const deletedAtIso = new Date().toISOString();
+      const idEsc = String(pedidoId).replace(/'/g, "''");
+      await database.execAsync(`UPDATE TB_PEDIDOS SET deleted_at = '${deletedAtIso}', updated_at = '${deletedAtIso}', sync_status = 'pending' WHERE id = '${idEsc}'`);
       // keep RL_PEDIDO_PRODUTO rows for safety; backend should treat tombstoned pedido
     } catch (error) {
       throw error;
@@ -213,7 +214,7 @@ export function usePedidosDatabase() {
       const iso = tresDiasAtras.toISOString();
 
       const pedidos = await database.getAllAsync<PedidoDatabase>(
-        `SELECT * FROM TB_PEDIDOS ORDER BY horario DESC`,
+        `SELECT * FROM TB_PEDIDOS WHERE (deleted_at IS NULL) AND horario >= ? ORDER BY horario DESC`,
         [iso]
       );
 
@@ -255,7 +256,7 @@ export function usePedidosDatabase() {
       const fimDoDia = `${data}T23:59:59.999Z`;
 
       const pedidos = await database.getAllAsync<PedidoDatabase>(
-        "SELECT * FROM TB_PEDIDOS WHERE horario BETWEEN ? AND ?",
+        "SELECT * FROM TB_PEDIDOS WHERE horario BETWEEN ? AND ? AND (deleted_at IS NULL)",
         [inicioDoDia, fimDoDia]
       );
 

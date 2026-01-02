@@ -2,6 +2,15 @@ import { type SQLiteDatabase } from 'expo-sqlite';
 import * as api from '@/services/api';
 import { generateUUID } from './utils/uuid';
 
+function parseTimestamp(val: any): number | null {
+  if (val === undefined || val === null) return null;
+  if (typeof val === 'number' && !Number.isNaN(val)) return val;
+  const s = String(val).trim();
+  if (/^\d+$/.test(s)) return Number(s);
+  const parsed = Date.parse(s);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 export async function sincronizarComServidor(database: SQLiteDatabase, token: string) {
   try {
     // read last sync timestamp (if any)
@@ -179,6 +188,20 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           return null;
         });
 
+    // Debug: log full changes payload for diagnosis of missing deletions
+    try {
+      console.log('[sync] pull changes', changes);
+    } catch (err) {
+      // ignore logging errors
+    }
+
+    // derive a base server timestamp to use when individual items don't provide `updated_at`
+    // support several possible server time fields including `checkpoint`
+    const baseServerTimeRaw = changes
+      ? parseTimestamp((changes.serverTime || changes.now || changes.timestamp || changes.checkpoint) as any)
+      : null;
+    const baseServerTime = baseServerTimeRaw !== null ? baseServerTimeRaw : Date.now();
+
     // Replace TB_TP_PRODUTO if server provided tipos
     if (changes && Array.isArray(changes.tipos)) {
       try {
@@ -203,29 +226,47 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           const id = String(p.id).replace(/'/g, "''");
           const nome = String(p.nome ?? '').replace(/'/g, "''");
           const ingredientes = p.ingredientes ? String(p.ingredientes).replace(/'/g, "''") : null;
-          console.log('[sync] produto recebido', { id, nome, preco: p.preco, tipoProdutoId: p.tipoProdutoId, origemProdutoId: p.origemProdutoId, updated_at: p.updated_at, deleted_at: p.deleted_at });
+          // moved logging below after timestamp parsing to show ISO values
           const tipoProdutoId = typeof p.tipoProdutoId !== 'undefined' && p.tipoProdutoId !== null ? Number(p.tipoProdutoId) : null;
           const origemProdutoId = p.origemProdutoId ? String(p.origemProdutoId).replace(/'/g, "''") : null;
-          const updatedAt = typeof p.updated_at !== 'undefined' && p.updated_at !== null ? Number(p.updated_at) : 0;
-          const deletedAt = typeof p.deleted_at !== 'undefined' && p.deleted_at !== null ? Number(p.deleted_at) : null;
+          // accept both snake_case and camelCase timestamp fields from server
+          const updatedAtRaw = parseTimestamp(p.updated_at ?? p.updatedAt);
+          const updatedAt = updatedAtRaw !== null ? updatedAtRaw : baseServerTime;
+          const deletedAtRaw = parseTimestamp(p.deleted_at ?? p.deletedAt);
+          const deletedAt = deletedAtRaw !== null ? deletedAtRaw : null;
+          const updatedIso = updatedAt !== null && !Number.isNaN(Number(updatedAt)) ? new Date(Number(updatedAt)).toISOString() : null;
+          const deletedIso = deletedAt !== null && !Number.isNaN(Number(deletedAt)) ? new Date(Number(deletedAt)).toISOString() : null;
+
+          console.log('[sync] produto recebido', {
+            id,
+            nome,
+            preco: p.preco,
+            tipoProdutoId: p.tipoProdutoId,
+            origemProdutoId: p.origemProdutoId,
+            updated_at_raw: p.updated_at ?? p.updatedAt,
+            updated_at_iso: updatedIso,
+            deleted_at_raw: p.deleted_at ?? p.deletedAt,
+            deleted_at_iso: deletedIso,
+          });
 
           // try to find local by origemProdutoId OR id
           const local = await database.getFirstAsync<{ updated_at?: number; id?: string }>(`SELECT id, updated_at FROM TB_PRODUTOS WHERE origemProdutoId = ? OR id = ? LIMIT 1`, [id, id]).catch(() => null);
 
           if (deletedAt !== null && !Number.isNaN(deletedAt)) {
             // server says deleted -> mark locally as deleted (soft-delete) instead of removing rows
-            await database.execAsync(`UPDATE TB_PRODUTOS SET deleted_at = ${deletedAt}, updated_at = ${updatedAt} WHERE id = '${id}' OR origemProdutoId = '${id}'`).catch(() => {});
+            await database.execAsync(`UPDATE TB_PRODUTOS SET deleted_at = '${deletedIso}', updated_at = '${updatedIso}' WHERE id = '${id}' OR origemProdutoId = '${id}'`).catch(() => {});
             continue;
           }
 
           if (!local) {
-            await database.execAsync(`INSERT OR IGNORE INTO TB_PRODUTOS (id, nome, tipoProdutoId, preco, origemProdutoId, ingredientes, updated_at, deleted_at) VALUES ('${id}', '${nome}', ${tipoProdutoId === null ? 'NULL' : tipoProdutoId}, ${Number(p.preco ?? 0)}, ${origemProdutoId ? `'${origemProdutoId}'` : 'NULL'}, ${ingredientes ? `'${ingredientes}'` : 'NULL'}, ${updatedAt}, ${deletedAt === null ? 'NULL' : deletedAt});`).catch(() => {});
+            await database.execAsync(`INSERT OR IGNORE INTO TB_PRODUTOS (id, nome, tipoProdutoId, preco, origemProdutoId, ingredientes, updated_at, deleted_at) VALUES ('${id}', '${nome}', ${tipoProdutoId === null ? 'NULL' : tipoProdutoId}, ${Number(p.preco ?? 0)}, ${origemProdutoId ? `'${origemProdutoId}'` : 'NULL'}, ${ingredientes ? `'${ingredientes}'` : 'NULL'}, '${updatedIso}', ${deletedIso === null ? 'NULL' : `'${deletedIso}'`});`).catch(() => {});
           } else {
-            const localUpdated = Number(local.updated_at || 0);
+            const localUpdated = Number(parseTimestamp(local.updated_at) || 0);
             if (updatedAt >= localUpdated) {
               // update the found record (may be the local id or a mapped record)
               const targetId = String((local.id ?? id)).replace(/'/g, "''");
-              await database.execAsync(`UPDATE TB_PRODUTOS SET nome = '${nome}', tipoProdutoId = ${tipoProdutoId === null ? 'NULL' : tipoProdutoId}, preco = ${Number(p.preco ?? 0)}, origemProdutoId = ${origemProdutoId ? `'${origemProdutoId}'` : 'NULL'}, ingredientes = ${ingredientes ? `'${ingredientes}'` : 'NULL'}, updated_at = ${updatedAt}, deleted_at = ${deletedAt === null ? 'NULL' : deletedAt}, sync_status = 'synced' WHERE id = '${targetId}'`).catch(() => {});
+              const deletedSet = deletedIso === null ? '' : `, deleted_at = '${deletedIso}'`;
+              await database.execAsync(`UPDATE TB_PRODUTOS SET nome = '${nome}', tipoProdutoId = ${tipoProdutoId === null ? 'NULL' : tipoProdutoId}, preco = ${Number(p.preco ?? 0)}, origemProdutoId = ${origemProdutoId ? `'${origemProdutoId}'` : 'NULL'}, ingredientes = ${ingredientes ? `'${ingredientes}'` : 'NULL'}, updated_at = '${updatedIso}'${deletedSet}, sync_status = 'synced' WHERE id = '${targetId}'`).catch(() => {});
             }
           }
         }
@@ -244,8 +285,10 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           const horario = ped.horario ? String(ped.horario).replace(/'/g, "''") : new Date().toISOString();
           const cliente = typeof ped.cliente !== 'undefined' && ped.cliente !== null ? String(ped.cliente).replace(/'/g, "''") : null;
           const status = ped.status ? String(ped.status).replace(/'/g, "''") : 'ABERTO';
-          const updatedAt = typeof ped.updated_at !== 'undefined' && ped.updated_at !== null ? Number(ped.updated_at) : 0;
-          const deletedAt = typeof ped.deleted_at !== 'undefined' && ped.deleted_at !== null ? Number(ped.deleted_at) : null;
+          const updatedAtRaw = parseTimestamp(ped.updated_at ?? ped.updatedAt);
+          const updatedAt = updatedAtRaw !== null ? updatedAtRaw : baseServerTime;
+          const deletedAtRaw = parseTimestamp(ped.deleted_at ?? ped.deletedAt);
+          const deletedAt = deletedAtRaw !== null ? deletedAtRaw : null;
 
           if (deletedAt !== null && !Number.isNaN(deletedAt)) {
             // mark pedido as deleted instead of removing it
@@ -297,12 +340,18 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           const horario = ven.horario ? String(ven.horario).replace(/'/g, "''") : new Date().toISOString();
           const cliente = typeof ven.cliente !== 'undefined' && ven.cliente !== null ? String(ven.cliente).replace(/'/g, "''") : null;
           const excluida = ven.excluida ? 1 : 0;
-          const updatedAt = typeof ven.updated_at !== 'undefined' && ven.updated_at !== null ? Number(ven.updated_at) : 0;
-          const deletedAt = typeof ven.deleted_at !== 'undefined' && ven.deleted_at !== null ? Number(ven.deleted_at) : null;
+          const updatedAtRaw = parseTimestamp(ven.updated_at ?? ven.updatedAt);
+          const updatedAt = updatedAtRaw !== null ? updatedAtRaw : baseServerTime;
+          const deletedAtRaw = parseTimestamp(ven.deleted_at ?? ven.deletedAt);
+          const deletedAt = deletedAtRaw !== null ? deletedAtRaw : null;
 
-          if (deletedAt !== null && !Number.isNaN(deletedAt)) {
-            // mark venda as deleted (soft-delete) instead of removing it
-            await database.execAsync(`UPDATE TB_VENDAS SET deleted_at = ${deletedAt}, updated_at = ${updatedAt}, excluida = 1 WHERE id = '${id}'`).catch(() => {});
+          const venExcluidaFlag = ven.excluida === true || ven.excluida === 1 || String(ven.excluida) === '1' || String(ven.excluida) === 'true';
+          const isVendaDeleted = (deletedAt !== null && !Number.isNaN(deletedAt)) || venExcluidaFlag;
+          if (isVendaDeleted) {
+            // use ISO strings for stored timestamps when marking as deleted
+            const updatedIso = new Date(updatedAt).toISOString();
+            const deletedIso = deletedAt !== null && !Number.isNaN(deletedAt) ? new Date(Number(deletedAt)).toISOString() : updatedIso;
+            await database.execAsync(`UPDATE TB_VENDAS SET deleted_at = '${deletedIso}', updated_at = '${updatedIso}', excluida = 1 WHERE id = '${id}'`).catch(() => {});
             continue;
           }
 

@@ -97,8 +97,9 @@ export function useProductDatabase() {
 
   async function remove(id: string) {
     try {
-      const deletedAt = Date.now()
-      await database.execAsync(`UPDATE TB_PRODUTOS SET deleted_at = ${deletedAt}, updated_at = ${deletedAt}, sync_status = 'pending' WHERE id = '${id}'`)
+      const deletedAtIso = new Date().toISOString();
+      const idEsc = String(id).replace(/'/g, "''");
+      await database.execAsync(`UPDATE TB_PRODUTOS SET deleted_at = '${deletedAtIso}', updated_at = '${deletedAtIso}', sync_status = 'pending' WHERE id = '${idEsc}'`)
     } catch (error) {
       throw error
     }
@@ -106,7 +107,7 @@ export function useProductDatabase() {
 
   async function show(id: string) {
     try {
-      const query = "SELECT * FROM TB_PRODUTOS WHERE id = ?"
+      const query = "SELECT * FROM TB_PRODUTOS WHERE id = ? AND deleted_at IS NULL"
 
       const response = await database.getFirstAsync<ProductDatabase>(query, [
         id,
@@ -120,7 +121,7 @@ export function useProductDatabase() {
 
   async function showAdd(id: string) {
     try {
-      const query = "SELECT * FROM TB_PRODUTOS WHERE id = ?"
+      const query = "SELECT * FROM TB_PRODUTOS WHERE id = ? AND deleted_at IS NULL"
 
       const response = await database.getFirstAsync<ProductDatabase>(query, [
         id,
@@ -163,7 +164,7 @@ export function useProductDatabase() {
 
   async function searchOrigemProdutoId(produtoId: string): Promise<ProductDatabase[]> {
     try {
-      const query = "SELECT * FROM TB_PRODUTOS WHERE origemProdutoId = ?"
+      const query = "SELECT * FROM TB_PRODUTOS WHERE origemProdutoId = ? AND deleted_at IS NULL"
 
       const response = await database.getAllAsync<ProductDatabase>(
         query,

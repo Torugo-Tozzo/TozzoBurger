@@ -2,12 +2,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Alert, FlatList } from 'react-native';
 import { View, Text } from '@/components/Themed';
 import { usePedidosDatabase } from '@/database/usePedidoDatabase';
+import { useAutoSync } from '@/context/AutoSyncContext';
 import PedidoItem from '@/components/PedidoItem';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 
 export default function Pedidos() {
   const { listPedidosRecentes, removePedido } = usePedidosDatabase();
+  const { lastSync } = useAutoSync();
   const [pedidosPorData, setPedidosPorData] = useState<Record<string, any[]>>({});
 
   async function load() {
@@ -24,6 +26,10 @@ export default function Pedidos() {
       load();
     }, [])
   );
+
+  useEffect(() => {
+    load();
+  }, [lastSync]);
 
   const handleEdit = (pedidoId: string) => {
     router.push({ pathname: '/modais/pedidoModal', params: { pedidoId } });

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, FlatList, Alert, TouchableOpacity, useColorScheme, ActivityIndicator, Modal } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useVendasDatabase } from '@/database/useVendaDatabse';
+import { useAutoSync } from '@/context/AutoSyncContext';
 import { VendaDatabase } from '@/database/types/Venda';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { usePrinterDatabase } from '@/database/usePrinterDatabase';
@@ -18,6 +19,7 @@ export default function HistoricoScreen() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [loading, setLoading] = useState(true);
   const { listVendasRecentes, listVendasPorDia, removeVenda, getVendaById } = useVendasDatabase();
+  const { lastSync } = useAutoSync();
   const { showAdd } = useProductDatabase();
   const { getPrinter } = usePrinterDatabase();
   const router = useRouter();
@@ -195,6 +197,10 @@ export default function HistoricoScreen() {
       fetchVendas();
     }, [fetchVendas])
   );
+
+  useEffect(() => {
+    fetchVendas();
+  }, [lastSync]);
 
   const formatCalendarDate = (date: Date): string => {
     const year = date.getFullYear();

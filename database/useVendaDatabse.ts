@@ -96,8 +96,9 @@ export function useVendasDatabase() {
 
     async function removeVenda(vendaId: string) {
         try {
-            const deletedAt = Date.now();
-            await database.execAsync(`UPDATE TB_VENDAS SET excluida = TRUE, deleted_at = ${deletedAt}, updated_at = ${deletedAt}, sync_status = 'pending' WHERE id = '${vendaId}'`);
+            const deletedAtIso = new Date().toISOString();
+            const idEsc = String(vendaId).replace(/'/g, "''");
+            await database.execAsync(`UPDATE TB_VENDAS SET excluida = TRUE, deleted_at = '${deletedAtIso}', updated_at = '${deletedAtIso}', sync_status = 'pending' WHERE id = '${idEsc}'`);
         } catch (error) {
             throw error;
         }
