@@ -39,7 +39,11 @@ export async function initializeDatabase(database: SQLiteDatabase) {
     CREATE TABLE IF NOT EXISTS TB_TP_PRODUTO (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       descricao TEXT NOT NULL,
-      cor TEXT NOT NULL DEFAULT '#9E9E9E'
+      cor TEXT NOT NULL DEFAULT '#9E9E9E',
+      ativo BOOLEAN NOT NULL DEFAULT 1,
+      updated_at INTEGER NOT NULL,
+      deleted_at INTEGER NULL,
+      sync_status TEXT DEFAULT 'synced'
     );
   `);
 

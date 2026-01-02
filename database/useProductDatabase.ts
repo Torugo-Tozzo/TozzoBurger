@@ -60,12 +60,9 @@ export function useProductDatabase() {
 
   async function searchByName(name: string) {
     try {
-      const query = "SELECT * FROM TB_PRODUTOS WHERE deleted_at IS NULL AND nome LIKE ?"
+      const query = `SELECT P.* FROM TB_PRODUTOS P JOIN TB_TP_PRODUTO T ON P.tipoProdutoId = T.id WHERE P.deleted_at IS NULL AND T.ativo = 1 AND P.nome LIKE ?`
 
-      const response = await database.getAllAsync<ProductDatabase>(
-        query,
-        `%${name}%`
-      )
+      const response = await database.getAllAsync<ProductDatabase>(query, `%${name}%`)
 
       return response
     } catch (error) {
@@ -135,7 +132,7 @@ export function useProductDatabase() {
 
   async function getTipoProdutos() {
     try {
-      const query = "SELECT id, descricao FROM TB_TP_PRODUTO"
+      const query = "SELECT id, descricao FROM TB_TP_PRODUTO WHERE deleted_at IS NULL AND ativo = 1"
 
       const response = await database.getAllAsync<{ id: number; descricao: string }>(
         query
@@ -149,13 +146,10 @@ export function useProductDatabase() {
 
   async function filterByTipo(tipoProdutoId: number): Promise<ProductDatabase[]> {
     try {
-      const query = "SELECT * FROM TB_PRODUTOS WHERE deleted_at IS NULL AND tipoProdutoId = ?"
-  
-      const response = await database.getAllAsync<ProductDatabase>(
-        query,
-        [tipoProdutoId]
-      )
-  
+      const query = `SELECT P.* FROM TB_PRODUTOS P JOIN TB_TP_PRODUTO T ON P.tipoProdutoId = T.id WHERE P.deleted_at IS NULL AND T.ativo = 1 AND P.tipoProdutoId = ?`
+
+      const response = await database.getAllAsync<ProductDatabase>(query, [tipoProdutoId])
+
       return response
     } catch (error) {
       throw error
@@ -164,12 +158,9 @@ export function useProductDatabase() {
 
   async function searchOrigemProdutoId(produtoId: string): Promise<ProductDatabase[]> {
     try {
-      const query = "SELECT * FROM TB_PRODUTOS WHERE origemProdutoId = ? AND deleted_at IS NULL"
+      const query = `SELECT P.* FROM TB_PRODUTOS P JOIN TB_TP_PRODUTO T ON P.tipoProdutoId = T.id WHERE P.origemProdutoId = ? AND P.deleted_at IS NULL AND T.ativo = 1`
 
-      const response = await database.getAllAsync<ProductDatabase>(
-        query,
-        [produtoId]
-      )
+      const response = await database.getAllAsync<ProductDatabase>(query, [produtoId])
 
       return response
     } catch (error) {

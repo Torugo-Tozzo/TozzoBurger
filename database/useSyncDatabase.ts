@@ -136,13 +136,11 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
       }
 
       if (mapaPedidos && typeof mapaPedidos === 'object') {
-        console.log('[sync] mapaPedidos', mapaPedidos);
         try {
           await database.execAsync('BEGIN;');
           for (const localId of Object.keys(mapaPedidos)) {
             const serverId = String(mapaPedidos[localId]);
             await database.execAsync(`UPDATE TB_PEDIDOS SET sync_status = 'synced' WHERE id = '${String(localId).replace(/'/g, "''")}'`).catch(() => {});
-            console.log('[sync] mapaPedidos applied', { localId, serverId });
           }
           await database.execAsync('COMMIT;');
         } catch (err) {
@@ -203,14 +201,36 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
     const baseServerTime = baseServerTimeRaw !== null ? baseServerTimeRaw : Date.now();
 
     // Replace TB_TP_PRODUTO if server provided tipos
-    if (changes && Array.isArray(changes.tipos)) {
+    if (changes && Array.isArray(changes.tiposProduto)) {
       try {
         await database.execAsync('BEGIN;');
-        // Upsert received tipos; avoid blind DELETE to prevent destructive behavior on mobile
-        for (const t of changes.tipos) {
-          const cor = t.cor ? String(t.cor).replace(/'/g, "''") : '#9E9E9E';
+        // Apply tipos received from server using conditional upserts:
+        // - do INSERT when local row doesn't exist
+        // - do UPDATE only when server updated_at >= local.updated_at
+        // - honor deleted_at by setting deleted_at and ativo = 0
+        for (const t of changes.tiposProduto) {
           const idNum = Number(t.id);
-          await database.execAsync(`INSERT OR REPLACE INTO TB_TP_PRODUTO (id, descricao, cor) VALUES (${idNum}, '${String(t.descricao).replace(/'/g, "''")}', '${cor}');`).catch(() => {});
+          if (Number.isNaN(idNum)) continue;
+          const descricao = String(t.descricao ?? '').replace(/'/g, "''");
+          const cor = t.cor ? String(t.cor).replace(/'/g, "''") : '#9E9E9E';
+          const ativoFlag = typeof t.ativo !== 'undefined' && t.ativo !== null ? (t.ativo ? 1 : 0) : 1;
+          const updatedAtRaw = parseTimestamp(t.updated_at ?? t.updatedAt);
+          const updatedAt = updatedAtRaw !== null ? updatedAtRaw : Date.now();
+          const deletedAtRaw = parseTimestamp(t.deleted_at ?? t.deletedAt);
+          const deletedAt = deletedAtRaw !== null ? deletedAtRaw : null;
+
+          const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_TP_PRODUTO WHERE id = ? LIMIT 1`, [idNum]).catch(() => null);
+
+          if (!local) {
+            await database.execAsync(`INSERT OR IGNORE INTO TB_TP_PRODUTO (id, descricao, cor, ativo, updated_at, deleted_at) VALUES (${idNum}, '${descricao}', '${cor}', ${ativoFlag}, ${updatedAt}, ${deletedAt === null ? 'NULL' : deletedAt});`).catch(() => {});
+            continue;
+          }
+
+          const localUpdated = Number(parseTimestamp(local.updated_at) || 0);
+          if (updatedAt >= localUpdated) {
+            const deletedSet = deletedAt === null ? 'deleted_at = NULL' : `deleted_at = ${deletedAt}`;
+            await database.execAsync(`UPDATE TB_TP_PRODUTO SET descricao = '${descricao}', cor = '${cor}', ativo = ${ativoFlag}, updated_at = ${updatedAt}, ${deletedSet} WHERE id = ${idNum}`).catch(() => {});
+          }
         }
         await database.execAsync('COMMIT;');
       } catch (err) {
@@ -403,14 +423,7 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
     } catch (err) {
       // ignore
     }
-
-    // debug: dump full TB_PRODUTOS after sync for inspection
-    try {
-      const pf = await database.getAllAsync(`SELECT * FROM TB_PRODUTOS;`).catch(() => null);
-      console.log('[sync] TB_PRODUTOS dump', Array.isArray(pf) ? pf : []);
-    } catch (err) {
-      console.warn('[sync] failed to dump TB_PRODUTOS', err);
-    }
+    
     return changes;
   } catch (err) {
     console.warn('Sincronização falhou', err);
