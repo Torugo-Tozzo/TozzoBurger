@@ -94,9 +94,11 @@ export function useProductDatabase() {
 
   async function remove(id: string) {
     try {
-      const deletedAtIso = new Date().toISOString();
-      const idEsc = String(id).replace(/'/g, "''");
-      await database.execAsync(`UPDATE TB_PRODUTOS SET deleted_at = '${deletedAtIso}', updated_at = '${deletedAtIso}', sync_status = 'pending' WHERE id = '${idEsc}'`)
+      const now = Date.now();
+      await database.runAsync(
+        'UPDATE TB_PRODUTOS SET deleted_at = ?, updated_at = ?, sync_status = ? WHERE id = ?',
+        [now, now, 'pending', id]
+      );
     } catch (error) {
       throw error
     }

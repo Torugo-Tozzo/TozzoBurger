@@ -5,9 +5,9 @@ import { generateUUID } from "./utils/uuid";
 export function useVendasDatabase() {
     const database = useSQLiteContext();
 
-    async function createVenda(produtos: { produtoId: string; quantidade: number }[], cliente?: string) {
+    async function createVenda(produtos: { produtoId: string; quantidade: number }[], cliente?: string, criadoPor?: string | number | null) {
         const statementVenda = await database.prepareAsync(
-            "INSERT INTO TB_VENDAS (id, total, horario, cliente, updated_at, sync_status) VALUES ($id, $total, $horario, $cliente, $updated_at, $sync_status)"
+            "INSERT INTO TB_VENDAS (id, total, horario, cliente, updated_at, sync_status, criado_por) VALUES ($id, $total, $horario, $cliente, $updated_at, $sync_status, $criado_por)"
         );
 
         try {
@@ -24,11 +24,19 @@ export function useVendasDatabase() {
                             $cliente: cliente ?? null,
                             $updated_at: updatedAt,
                             $sync_status: 'pending',
+                            $criado_por: criadoPor != null ? String(criadoPor) : null,
                         });
 
                         for (const { produtoId, quantidade } of produtos) {
                             const relId = generateUUID();
-                            await database.execAsync(`INSERT INTO RL_VENDA_PRODUTO (id, vendaId, produtoId, quantidade) VALUES ('${relId}', '${vendaId}', '${produtoId}', ${quantidade})`);
+                            const relStmt = await database.prepareAsync(
+                                'INSERT INTO RL_VENDA_PRODUTO (id, vendaId, produtoId, quantidade) VALUES ($id, $vendaId, $produtoId, $quantidade)'
+                            );
+                            try {
+                                await relStmt.executeAsync({ $id: relId, $vendaId: vendaId, $produtoId: produtoId, $quantidade: quantidade });
+                            } finally {
+                                await relStmt.finalizeAsync();
+                            }
                         }
 
                         return { vendaId };
@@ -59,7 +67,14 @@ export function useVendasDatabase() {
                 if (Array.isArray(data.produtos)) {
                     for (const { produtoId, quantidade } of data.produtos) {
                         const relId = generateUUID();
-                        await database.execAsync(`INSERT INTO RL_VENDA_PRODUTO (id, vendaId, produtoId, quantidade) VALUES ('${relId}', '${data.id}', '${produtoId}', ${quantidade})`);
+                        const relStmt = await database.prepareAsync(
+                            'INSERT INTO RL_VENDA_PRODUTO (id, vendaId, produtoId, quantidade) VALUES ($id, $vendaId, $produtoId, $quantidade)'
+                        );
+                        try {
+                            await relStmt.executeAsync({ $id: relId, $vendaId: data.id, $produtoId: produtoId, $quantidade: quantidade });
+                        } finally {
+                            await relStmt.finalizeAsync();
+                        }
                     }
                 }
 
@@ -96,9 +111,15 @@ export function useVendasDatabase() {
 
     async function removeVenda(vendaId: string) {
         try {
-            const deletedAtIso = new Date().toISOString();
-            const idEsc = String(vendaId).replace(/'/g, "''");
-            await database.execAsync(`UPDATE TB_VENDAS SET excluida = TRUE, deleted_at = '${deletedAtIso}', updated_at = '${deletedAtIso}', sync_status = 'pending' WHERE id = '${idEsc}'`);
+            const now = Date.now();
+            const stmt = await database.prepareAsync(
+                'UPDATE TB_VENDAS SET excluida = 1, deleted_at = $deletedAt, updated_at = $updatedAt, sync_status = $syncStatus WHERE id = $id'
+            );
+            try {
+                await stmt.executeAsync({ $deletedAt: now, $updatedAt: now, $syncStatus: 'pending', $id: vendaId });
+            } finally {
+                await stmt.finalizeAsync();
+            }
         } catch (error) {
             throw error;
         }
@@ -129,7 +150,7 @@ export function useVendasDatabase() {
             const seteDiasAtrasISO = seteDiasAtras.toISOString();
     
             const vendas = await database.getAllAsync<VendaDatabase>(
-                `SELECT * FROM TB_VENDAS WHERE horario >= ? ORDER BY horario DESC`,
+                `SELECT * FROM TB_VENDAS WHERE horario >= ? AND (deleted_at IS NULL) AND (excluida IS NULL OR excluida = 0) ORDER BY horario DESC LIMIT 500`,
                 [seteDiasAtrasISO]
             );
     
@@ -179,7 +200,7 @@ export function useVendasDatabase() {
             const fimDoDia = `${data}T23:59:59.999Z`;
     
             const vendas = await database.getAllAsync<VendaDatabase>(
-                "SELECT * FROM TB_VENDAS WHERE horario BETWEEN ? AND ?",
+                "SELECT * FROM TB_VENDAS WHERE horario BETWEEN ? AND ? AND (deleted_at IS NULL) AND (excluida IS NULL OR excluida = 0)",
                 [inicioDoDia, fimDoDia]
             );
     

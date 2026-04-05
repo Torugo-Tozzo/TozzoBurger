@@ -3,6 +3,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Link, Tabs } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import SyncIndicator from '@/components/SyncIndicator';
+import { useAuth } from '@/context/AuthContext';
 
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -18,6 +19,8 @@ function TabBarIcon(props: {
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { user } = useAuth();
+  const isCliente = user?.role === 'CLIENTE';
 
   return (
     <Tabs
@@ -29,10 +32,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Vender',
+          title: isCliente ? 'Cardápio' : 'Vender',
           headerTitleAlign: 'center',
-          tabBarIcon: ({ color }) => <TabBarIcon name="dollar" color={color} />,
-          headerLeft: () => (
+          tabBarIcon: ({ color }) => <TabBarIcon name={isCliente ? 'cutlery' : 'dollar'} color={color} />,
+          headerLeft: isCliente ? undefined : () => (
             <Link href="/modais/adicionalModal" asChild>
               <Pressable>
                 {({ pressed }) => (
@@ -59,6 +62,7 @@ export default function TabLayout() {
         name="historico"
         options={{
           title: 'Vendas',
+          href: isCliente ? null : '/historico',
           tabBarIcon: ({ color }) => <TabBarIcon name="clock-o" color={color} />,
         }}
       />
@@ -66,6 +70,7 @@ export default function TabLayout() {
         name="produtos"
         options={{
           title: 'Produtos',
+          href: isCliente ? null : '/produtos',
           tabBarIcon: ({ color }) => <TabBarIcon name="book" color={color} />,
           headerRight: () => (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>

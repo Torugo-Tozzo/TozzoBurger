@@ -11,11 +11,22 @@ type Props = {
   onAddToCart: (product: ProductDatabase) => void;
   onAdicionaltoCart: (product: ProductDatabase, ehAdd: boolean) => void;
 };
-export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart, tipoNome }: Props) {
+
+const tipoColors: Record<number, string> = {
+  1: "#ef4444",
+  2: "#f59e0b",
+  3: "#10b981",
+  4: "#3b82f6",
+  5: "#8b5cf6",
+  6: "#ec4899",
+  7: "#14b8a6",
+  8: "#06b6d4",
+};
+
+function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome }: Props) {
   const [modalVisible, setModalVisible] = useState(false);
   const colorScheme = useColorScheme();
 
-  // Controle de animações separadas
   const buttonScaleAnim = useRef(new Animated.Value(1)).current;
   const iconScaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -40,18 +51,8 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart, tipoNom
     setModalVisible(true);
   };
 
-  const tipoColors: Record<number, string> = {
-    1: "#ef4444",
-    2: "#f59e0b",
-    3: "#10b981",
-    4: "#3b82f6",
-    5: "#8b5cf6",
-    6: "#ec4899",
-    7: "#14b8a6",
-    8: "#06b6d4",
-  };
-
   const tipoLabel = tipoNome ?? (data as any).tipoNome ?? `Tipo ${data.tipoProdutoId}`;
+  const modalBg = colorScheme === "dark" ? "#333" : "#fff";
 
   return (
     <View
@@ -116,7 +117,6 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart, tipoNom
         </Pressable>
       </Animated.View>
 
-      {/* Modal para mostrar os ingredientes */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -133,7 +133,7 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart, tipoNom
         >
           <View
             style={{
-              backgroundColor: useColorScheme() === "dark" ? "#333" : "#fff",
+              backgroundColor: modalBg,
               padding: 20,
               borderRadius: 10,
               width: "80%",
@@ -152,3 +152,5 @@ export function ProductItemVenda({ data, onAddToCart, onAdicionaltoCart, tipoNom
     </View>
   );
 }
+
+export const ProductItemVenda = React.memo(ProductItemVendaInner);

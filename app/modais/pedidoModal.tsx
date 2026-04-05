@@ -7,6 +7,8 @@ import { usePedidosDatabase } from '@/database/usePedidoDatabase';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { useVendasDatabase } from '@/database/useVendaDatabse';
 import { STATUS_PEDIDO } from '@/database/types/Pedido';
+import { useAuth } from '@/context/AuthContext';
+import { useAutoSync } from '@/context/AutoSyncContext';
 
 type PedidoStatus = typeof STATUS_PEDIDO[keyof typeof STATUS_PEDIDO];
 
@@ -23,8 +25,14 @@ export default function PedidoModal() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const { user } = useAuth();
+  const isCliente = user?.role === 'CLIENTE';
+  const { triggerSync } = useAutoSync();
   const colorScheme = useColorScheme();
   const isDarkMode = colorScheme === 'dark';
+
+  const pedidoAceito = status !== STATUS_PEDIDO.ABERTO;
+  const clienteBloqueado = isCliente;
 
   const bg = isDarkMode ? '#0b0b0b' : '#fff';
   const surface = isDarkMode ? '#121212' : '#fff';
@@ -76,6 +84,7 @@ export default function PedidoModal() {
     try {
       const produtosPayload = (pedido.produtos || []).map((p: any) => ({ produtoId: p.produtoId, quantidade: p.quantidade }));
       await updatePedido(pedido.id, produtosPayload, cliente, status);
+      triggerSync().catch((e) => console.warn('[sync] trigger failed', e));
       Alert.alert('Salvo', 'Pedido atualizado.');
       router.back();
     } catch (err) {
@@ -104,7 +113,7 @@ export default function PedidoModal() {
     if (!pedido) return;
     try {
       const produtos = (pedido.produtos || []).map((p: any) => ({ produtoId: p.produtoId, quantidade: p.quantidade }));
-      const { vendaId } = await createVenda(produtos, cliente ?? '');
+      const { vendaId } = await createVenda(produtos, cliente ?? '', user?.id);
       await updatePedido(pedido.id, undefined, undefined, STATUS_PEDIDO.FECHADO);
       Alert.alert('Venda Gerada', `Venda ${vendaId} gerada a partir do pedido.`);
       router.back();
@@ -120,11 +129,15 @@ export default function PedidoModal() {
         <Text style={styles.prodNome}>{item.nome ?? item.produtoId}</Text>
         <Text style={styles.unitPrice}>{`R$ ${Number(item.preco ?? 0).toFixed(2)} / un.`}</Text>
       </RNView>
-      <RNView style={styles.quantityRow}>
-        <TouchableOpacity onPress={() => changeQuantidade(item.produtoId, -1)} style={styles.qtyBtn}><Text style={styles.qtyBtnText}>-</Text></TouchableOpacity>
+      {clienteBloqueado ? (
         <Text style={styles.qtyText}>{item.quantidade}</Text>
-        <TouchableOpacity onPress={() => changeQuantidade(item.produtoId, 1)} style={styles.qtyBtn}><Text style={styles.qtyBtnText}>+</Text></TouchableOpacity>
-      </RNView>
+      ) : (
+        <RNView style={styles.quantityRow}>
+          <TouchableOpacity onPress={() => changeQuantidade(item.produtoId, -1)} style={styles.qtyBtn}><Text style={styles.qtyBtnText}>-</Text></TouchableOpacity>
+          <Text style={styles.qtyText}>{item.quantidade}</Text>
+          <TouchableOpacity onPress={() => changeQuantidade(item.produtoId, 1)} style={styles.qtyBtn}><Text style={styles.qtyBtnText}>+</Text></TouchableOpacity>
+        </RNView>
+      )}
     </RNView>
   );
 
@@ -170,15 +183,21 @@ export default function PedidoModal() {
       <Text style={[styles.title, { color: textColor }]}>Pedido</Text>
 
       <Text style={[styles.label, { color: textColor }]}>Cliente</Text>
-      <TextInput style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} value={cliente} onChangeText={setCliente} placeholder='Nome do cliente' placeholderTextColor={subText} />
+      <TextInput style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} value={cliente} onChangeText={setCliente} placeholder='Nome do cliente' placeholderTextColor={subText} editable={!clienteBloqueado} />
 
       <Text style={[styles.label, { color: textColor }]}>Status</Text>
-      <RNView style={styles.statusRow}>
-        <TouchableOpacity onPress={() => setStatus(STATUS_PEDIDO.ABERTO)} style={[styles.statusBtn, status === STATUS_PEDIDO.ABERTO && styles.statusActive]}><Text style={{ color: textColor }}>ABERTO</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => setStatus(STATUS_PEDIDO.EM_PREPARO)} style={[styles.statusBtn, status === STATUS_PEDIDO.EM_PREPARO && styles.statusActive]}><Text style={{ color: textColor }}>EM_PREPARO</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => setStatus(STATUS_PEDIDO.ENTREGANDO)} style={[styles.statusBtn, status === STATUS_PEDIDO.ENTREGANDO && styles.statusActive]}><Text style={{ color: textColor }}>ENTREGANDO</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => setStatus(STATUS_PEDIDO.FECHADO)} style={[styles.statusBtn, status === STATUS_PEDIDO.FECHADO && styles.statusActive]}><Text style={{ color: textColor }}>FECHADO</Text></TouchableOpacity>
-      </RNView>
+      {isCliente ? (
+        <RNView style={styles.statusRow}>
+          <RNView style={[styles.statusBtn, styles.statusActive]}><Text style={{ color: textColor }}>{status}</Text></RNView>
+        </RNView>
+      ) : (
+        <RNView style={styles.statusRow}>
+          <TouchableOpacity onPress={() => setStatus(STATUS_PEDIDO.ABERTO)} style={[styles.statusBtn, status === STATUS_PEDIDO.ABERTO && styles.statusActive]}><Text style={{ color: textColor }}>ABERTO</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => setStatus(STATUS_PEDIDO.EM_PREPARO)} style={[styles.statusBtn, status === STATUS_PEDIDO.EM_PREPARO && styles.statusActive]}><Text style={{ color: textColor }}>EM_PREPARO</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => setStatus(STATUS_PEDIDO.ENTREGANDO)} style={[styles.statusBtn, status === STATUS_PEDIDO.ENTREGANDO && styles.statusActive]}><Text style={{ color: textColor }}>ENTREGANDO</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => setStatus(STATUS_PEDIDO.FECHADO)} style={[styles.statusBtn, status === STATUS_PEDIDO.FECHADO && styles.statusActive]}><Text style={{ color: textColor }}>FECHADO</Text></TouchableOpacity>
+        </RNView>
+      )}
 
       <Text style={[styles.label, { color: textColor }]}>Itens</Text>
       <FlatList
@@ -193,10 +212,14 @@ export default function PedidoModal() {
         <Text style={[styles.totalValue, { color: textColor }]}>{`R$ ${itensTotal.toFixed(2)}`}</Text>
       </RNView>
 
-      <RNView style={styles.buttonsRow}>
-        <TouchableOpacity style={[styles.btn, styles.btnSpacing]} onPress={handleEditInConta}><Text style={styles.btnText}>Add Item</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.btn} onPress={handleGerarVenda}><Text style={styles.btnText}>Gerar Venda</Text></TouchableOpacity>
-      </RNView>
+      {!clienteBloqueado && (
+        <RNView style={styles.buttonsRow}>
+          <TouchableOpacity style={[styles.btn, styles.btnSpacing]} onPress={handleEditInConta}><Text style={styles.btnText}>Add Item</Text></TouchableOpacity>
+          {!isCliente && (
+            <TouchableOpacity style={styles.btn} onPress={handleGerarVenda}><Text style={styles.btnText}>Gerar Venda</Text></TouchableOpacity>
+          )}
+        </RNView>
+      )}
 
       <Modal visible={pickerVisible} transparent animationType="slide">
         <Pressable style={[styles.modalOverlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.4)' }]} onPress={() => setPickerVisible(false)} />
@@ -214,12 +237,20 @@ export default function PedidoModal() {
         </RNView>
       </Modal>
 
-      <RNView style={styles.buttonsRow}>
-        <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-          <FontAwesome name="trash" size={18} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}><Text style={styles.btnText}>Salvar Pedido</Text></TouchableOpacity>
-      </RNView>
+      {clienteBloqueado ? (
+        <RNView style={[styles.totalRow, { backgroundColor: 'transparent', marginTop: 12 }]}>
+          <Text style={{ color: subText, fontStyle: 'italic' }}>Pedido enviado — sem edição</Text>
+        </RNView>
+      ) : (
+        <RNView style={styles.buttonsRow}>
+          {!isCliente && (
+            <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+              <FontAwesome name="trash" size={18} color="#fff" />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}><Text style={styles.btnText}>Salvar Pedido</Text></TouchableOpacity>
+        </RNView>
+      )}
     </View>
   );
 }

@@ -10,7 +10,7 @@ type Props = PressableProps & {
   data: PedidoDatabase;
   index?: number;
   onEdit: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
 };
 
 export function PedidoItem({ data, index, onEdit, onDelete, ...rest }: Props) {

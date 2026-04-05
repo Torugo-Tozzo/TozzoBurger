@@ -1,4 +1,4 @@
-export const BASE_URL = 'https://api.tozzo.uk';
+export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://bdd8-177-138-46-148.ngrok-free.app';
 
 async function handleJsonResponse(res: Response) {
   const txt = await res.text();

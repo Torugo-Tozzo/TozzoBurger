@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/RN/TozzoBurger/app -name *.tsx -type f)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

@@ -3,4 +3,5 @@ export type UsuarioDatabase = {
   nome: string
   estabelecimentoId?: number | null
   nomeEstabelecimento?: string | null
+  role?: string | null
 }

@@ -9,6 +9,7 @@ export type PedidoDatabase = {
   updated_at: number;
   deleted_at?: number | null;
   sync_status?: string | null;
+  criado_por?: string | null;
 };
 
 export const STATUS_PEDIDO = {

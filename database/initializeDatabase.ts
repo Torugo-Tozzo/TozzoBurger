@@ -1,7 +1,7 @@
 import { type SQLiteDatabase } from "expo-sqlite"
 
 export async function initializeDatabase(database: SQLiteDatabase) {
-  const SCHEMA_VERSION = 1001; //when update the DB schema, increment this value
+  const SCHEMA_VERSION = 1004; //when update the DB schema, increment this value
   let dbVersion = 0;
 
   try {
@@ -57,7 +57,8 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       origemVendaId VARCHAR(36) NULL,
       updated_at INTEGER NOT NULL,
       deleted_at INTEGER NULL,
-      sync_status TEXT DEFAULT 'synced'
+      sync_status TEXT DEFAULT 'synced',
+      criado_por TEXT NULL
     );
   `);
 
@@ -71,7 +72,8 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       origemPedidoId VARCHAR(36) NULL,
       updated_at INTEGER NOT NULL,
       deleted_at INTEGER NULL,
-      sync_status TEXT DEFAULT 'synced'
+      sync_status TEXT DEFAULT 'synced',
+      criado_por TEXT NULL
     );
   `);
 
@@ -81,8 +83,8 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       pedidoId VARCHAR(36) NOT NULL,
       produtoId VARCHAR(36) NOT NULL,
       quantidade INTEGER NOT NULL DEFAULT 1,
-      FOREIGN KEY (pedidoId) REFERENCES TB_PEDIDOS (id),
-      FOREIGN KEY (produtoId) REFERENCES TB_PRODUTOS (id)
+      FOREIGN KEY (pedidoId) REFERENCES TB_PEDIDOS (id) ON DELETE CASCADE,
+      FOREIGN KEY (produtoId) REFERENCES TB_PRODUTOS (id) ON DELETE CASCADE
     );
   `);
 
@@ -92,8 +94,8 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       vendaId VARCHAR(36) NOT NULL,
       produtoId VARCHAR(36) NOT NULL,
       quantidade INTEGER NOT NULL DEFAULT 1,
-      FOREIGN KEY (vendaId) REFERENCES TB_VENDAS (id),
-      FOREIGN KEY (produtoId) REFERENCES TB_PRODUTOS (id)
+      FOREIGN KEY (vendaId) REFERENCES TB_VENDAS (id) ON DELETE CASCADE,
+      FOREIGN KEY (produtoId) REFERENCES TB_PRODUTOS (id) ON DELETE CASCADE
     );
   `);
 
@@ -111,7 +113,8 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       nome TEXT NOT NULL,
       email TEXT UNIQUE,
       estabelecimentoId INTEGER NOT NULL,
-      nomeEstabelecimento TEXT NULL
+      nomeEstabelecimento TEXT NULL,
+      role TEXT NULL DEFAULT 'FUNCIONARIO'
     );
   `);
 
@@ -145,6 +148,21 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       await database.execAsync(`UPDATE TB_SCHEMA SET version = ${SCHEMA_VERSION};`);
       try {
         await database.execAsync(`ALTER TABLE TB_SCHEMA ADD COLUMN lastSyncAt INTEGER NULL;`);
+      } catch (err) {
+        // ignore if column already exists
+      }
+      try {
+        await database.execAsync(`ALTER TABLE TB_USUARIO ADD COLUMN role TEXT NULL DEFAULT 'FUNCIONARIO';`);
+      } catch (err) {
+        // ignore if column already exists
+      }
+      try {
+        await database.execAsync(`ALTER TABLE TB_PEDIDOS ADD COLUMN criado_por TEXT NULL;`);
+      } catch (err) {
+        // ignore if column already exists
+      }
+      try {
+        await database.execAsync(`ALTER TABLE TB_VENDAS ADD COLUMN criado_por TEXT NULL;`);
       } catch (err) {
         // ignore if column already exists
       }
@@ -184,10 +202,10 @@ async function seedTipoProduto(database: SQLiteDatabase) {
   ];
 
   for (const tipo of tipos) {
-    await database.execAsync(`
-      INSERT OR IGNORE INTO TB_TP_PRODUTO (id, descricao, cor)
-      VALUES (${tipo.id}, '${tipo.descricao}', '${tipo.cor}');
-    `);
+    await database.runAsync(
+      'INSERT OR IGNORE INTO TB_TP_PRODUTO (id, descricao, cor) VALUES (?, ?, ?)',
+      [tipo.id, tipo.descricao, tipo.cor]
+    );
   }
 }
 

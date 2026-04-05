@@ -11,13 +11,18 @@ import { captureScreen } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { usePedidosDatabase } from '@/database/usePedidoDatabase';
 import { useProductDatabase } from '@/database/useProductDatabase';
+import { useAuth } from '@/context/AuthContext';
+import { useAutoSync } from '@/context/AutoSyncContext';
 
 export default function ContaModalScreen() {
   const { cart, clearCart, updateCartItem, addToCart } = useCart();
   const { createVenda } = useVendasDatabase();
-  const { createPedido, getPedidoById } = usePedidosDatabase();
+  const { createPedido, getPedidoById, countPedidosAbertos } = usePedidosDatabase();
   const { show: showProduto } = useProductDatabase();
-  const [cliente, setCliente] = useState('');
+  const { user } = useAuth();
+  const isCliente = user?.role === 'CLIENTE';
+  const { triggerSync } = useAutoSync();
+  const [cliente, setCliente] = useState(isCliente ? (user?.nome ?? '') : '');
 
   const colorScheme = useColorScheme();
   const placeholderColor = colorScheme === "dark" ? "#ccc" : "#666";
@@ -60,7 +65,7 @@ export default function ContaModalScreen() {
         quantidade: quantidade ?? 0,
       }));
 
-      const { vendaId } = await createVenda(produtos, cliente);
+      const { vendaId } = await createVenda(produtos, cliente, user?.id);
       await clearCart(); 
       router.back(); 
 
@@ -80,13 +85,22 @@ export default function ContaModalScreen() {
 
   const gerarPedido = async () => {
     try {
+      if (isCliente) {
+        const abertos = await countPedidosAbertos(user?.id);
+        if (abertos >= 3) {
+          Alert.alert('Limite atingido', 'Você já possui 3 pedidos abertos. Aguarde um ser aceito ou fechado para criar outro.');
+          return;
+        }
+      }
+
       const produtos = cart.map(({ id, quantidade }) => ({
         produtoId: id,
         quantidade: quantidade ?? 0,
       }));
 
-      const { pedidoId } = await createPedido(produtos, cliente);
+      const { pedidoId } = await createPedido(produtos, cliente, undefined, user?.id);
       await clearCart();
+      triggerSync().catch((e) => console.warn('[sync] trigger failed', e));
       router.back();
       Alert.alert('Pedido Gerado!', `Pedido ${pedidoId} criado com sucesso.`);
     } catch (error) {
@@ -190,11 +204,12 @@ export default function ContaModalScreen() {
       </Text>
       <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
       <TextInput
-        style={styles.input}
+        style={[styles.input, isCliente && { backgroundColor: colorScheme === 'dark' ? '#1a1a1a' : '#e9e9e9' }]}
         placeholder="Nome do Cliente"
         value={cliente}
         onChangeText={setCliente}
         placeholderTextColor={placeholderColor}
+        editable={!isCliente}
       />
       <FlatList
         data={cart}
@@ -229,16 +244,18 @@ export default function ContaModalScreen() {
       <Text style={styles.totalText}>Total: R$ {total.toFixed(2)}</Text>
 
       <View style={styles.topRow}>
-        <TouchableOpacity
-          style={[styles.smallBtn, isCartEmpty && styles.buttonDisabled]}
-          onPress={handleShare}
-          disabled={isCartEmpty}
-        >
-          <Ionicons name="share-social" size={22} color="white" />
-        </TouchableOpacity>
+        {!isCliente && (
+          <TouchableOpacity
+            style={[styles.smallBtn, isCartEmpty && styles.buttonDisabled]}
+            onPress={handleShare}
+            disabled={isCartEmpty}
+          >
+            <Ionicons name="share-social" size={22} color="white" />
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
-          style={[styles.largeBtnOrange, isCartEmpty && styles.buttonDisabled]}
+          style={[isCliente ? styles.largeBtn : styles.largeBtnOrange, isCartEmpty && styles.buttonDisabled]}
           onPress={gerarPedido}
           disabled={isCartEmpty}
         >
@@ -255,13 +272,15 @@ export default function ContaModalScreen() {
           <FontAwesome name="trash" size={20} color="#fff" />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.largeBtnGreen, isCartEmpty && styles.buttonDisabled]}
-          onPress={finalizarCompra}
-          disabled={isCartEmpty}
-        >
-          <Text style={styles.buttonText}>Vender Direto</Text>
-        </TouchableOpacity>
+        {!isCliente && (
+          <TouchableOpacity
+            style={[styles.largeBtnGreen, isCartEmpty && styles.buttonDisabled]}
+            onPress={finalizarCompra}
+            disabled={isCartEmpty}
+          >
+            <Text style={styles.buttonText}>Vender Direto</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <StatusBar style={Platform.OS === 'ios' ? 'light' : 'auto'} />

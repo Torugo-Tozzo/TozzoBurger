@@ -11,6 +11,7 @@ type User = {
   nome?: string;
   email?: string;
   estabelecimentoId?: number | string | null;
+  role?: string | null;
 };
 
 type AuthContextData = {
@@ -47,11 +48,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const usuarioId = schema && typeof schema.usuarioId !== 'undefined' ? schema.usuarioId : null;
                 if (!usuarioId) {
                       const uid = Number((me as any).id);
-                      if (!isNaN(uid)) {
-                        await database.execAsync(`UPDATE TB_SCHEMA SET usuarioId = ${uid};`);
-                      } else {
-                        await database.execAsync(`UPDATE TB_SCHEMA SET usuarioId = NULL;`);
-                      }
+                      await database.runAsync('UPDATE TB_SCHEMA SET usuarioId = ?', [!isNaN(uid) ? uid : null]);
                 }
               } catch (err) {
                 console.warn('Failed to run seedProdutosPadrao after rehydrate', err);
@@ -71,18 +68,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             } else {
               console.warn('Network/server error validating token — keeping stored token', err);
               try {
-                const prev = await database.getFirstAsync<{ 
-                  id?: number; 
-                  nome?: string; 
-                  email?: string; 
-                  estabelecimentoId?: number | string; nomeEstabelecimento?: string 
-                }>(`SELECT id, nome, email, estabelecimentoId, nomeEstabelecimento FROM TB_USUARIO LIMIT 1`).catch(() => null);
+                const prev = await database.getFirstAsync<{
+                  id?: number;
+                  nome?: string;
+                  email?: string;
+                  estabelecimentoId?: number | string; nomeEstabelecimento?: string;
+                  role?: string | null;
+                }>(`SELECT id, nome, email, estabelecimentoId, nomeEstabelecimento, role FROM TB_USUARIO LIMIT 1`).catch(() => null);
                 if (prev && mounted) {
                   setUser({
                     id: prev.id,
                     nome: prev.nome,
                     email: prev.email,
                     estabelecimentoId: prev.estabelecimentoId,
+                    role: prev.role ?? 'FUNCIONARIO',
                   });
                 }
               } catch (e) {
@@ -124,28 +123,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const me = await api.getMe(t);
         setUser(me || null);
 
-        // Destructive swap logic:
-        // - If no previous user in TB_USUARIO => insert current user (same as before)
-        // - If previous user exists and estabelecimentoId differs => delete product-related tables and replace user
-        // - If previous user exists and estabelecimentoId equals => replace only the user record
-        const esc = (v: any) => (v === null || typeof v === 'undefined' ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`);
-
         try {
           const prev = await database.getFirstAsync<{ id?: number; email?: string; estabelecimentoId?: string }>(`SELECT id, email, estabelecimentoId FROM TB_USUARIO LIMIT 1`).catch(() => null);
           const meId = (me as any)?.id;
           const meEmail = (me as any)?.email ?? null;
           const meEstab = (me as any)?.estabelecimentoId ?? null;
+          const meRole = (me as any)?.role ?? 'FUNCIONARIO';
+          const meNome = (me as any)?.nome ?? null;
+          const meNomeEstab = (me as any)?.nomeEstabelecimento ?? null;
+          const meIdNum = isNaN(Number(meId)) ? null : Number(meId);
+
+          const insertUser = async () => {
+            await database.execAsync('DELETE FROM TB_USUARIO;');
+            await database.runAsync(
+              'INSERT INTO TB_USUARIO (nome, email, estabelecimentoId, nomeEstabelecimento, role) VALUES (?, ?, ?, ?, ?)',
+              [meNome, meEmail, meEstab, meNomeEstab, meRole]
+            );
+          };
 
           if (!prev) {
-            // no previous user -> insert current
-            await database.execAsync('DELETE FROM TB_USUARIO;');
-            await database.execAsync(`INSERT INTO TB_USUARIO (nome, email, estabelecimentoId, nomeEstabelecimento) VALUES (${esc((me as any)?.nome)}, ${esc(meEmail)}, ${esc(meEstab)}, ${esc((me as any)?.nomeEstabelecimento)});`);
-            await database.execAsync(`UPDATE TB_SCHEMA SET usuarioId = ${isNaN(Number(meId)) ? 'NULL' : Number(meId)}, estabelecimentoId = ${esc(meEstab)};`).catch(() => {});
-            // seed default types for all users
-            await seedTipoProduto(database).catch(() => {});
+            await insertUser();
+            await database.runAsync('UPDATE TB_SCHEMA SET usuarioId = ?, estabelecimentoId = ?', [meIdNum, meEstab]).catch((e) => console.warn('[auth] db op failed', e));
+            await seedTipoProduto(database).catch((e) => console.warn('[auth] db op failed', e));
           } else {
             if (String(prev.estabelecimentoId) !== String(meEstab)) {
-              // destructive: clear product-related tables and replace user
               try {
                 await database.execAsync('BEGIN;');
                 const deletes = [
@@ -158,24 +159,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   'DELETE FROM TB_IMPRESSORAS;'
                 ];
                 for (const d of deletes) {
-                  await database.execAsync(d).catch(() => {});
+                  await database.execAsync(d).catch((e) => console.warn('[auth] db op failed', e));
                 }
-                await database.execAsync('DELETE FROM TB_USUARIO;').catch(() => {});
-                await database.execAsync(`INSERT INTO TB_USUARIO (nome, email, estabelecimentoId, nomeEstabelecimento) VALUES (${esc((me as any)?.nome)}, ${esc(meEmail)}, ${esc(meEstab)}, ${esc((me as any)?.nomeEstabelecimento)});`).catch(() => {});
-                await database.execAsync(`UPDATE TB_SCHEMA SET usuarioId = ${isNaN(Number(meId)) ? 'NULL' : Number(meId)}, estabelecimentoId = ${esc(meEstab)};`).catch(() => {});
+                await database.execAsync('DELETE FROM TB_USUARIO;').catch((e) => console.warn('[auth] db op failed', e));
+                await database.runAsync(
+                  'INSERT INTO TB_USUARIO (nome, email, estabelecimentoId, nomeEstabelecimento, role) VALUES (?, ?, ?, ?, ?)',
+                  [meNome, meEmail, meEstab, meNomeEstab, meRole]
+                ).catch((e) => console.warn('[auth] db op failed', e));
+                await database.runAsync('UPDATE TB_SCHEMA SET usuarioId = ?, estabelecimentoId = ?', [meIdNum, meEstab]).catch((e) => console.warn('[auth] db op failed', e));
                 await database.execAsync('COMMIT;');
               } catch (err) {
-                await database.execAsync('ROLLBACK;').catch(() => {});
+                await database.execAsync('ROLLBACK;').catch((e) => console.warn('[auth] db op failed', e));
                 console.warn('Failed during destructive swap; rolled back', err);
               }
 
-                // reseed default types for all users
-                await seedTipoProduto(database).catch(() => {});
+                await seedTipoProduto(database).catch((e) => console.warn('[auth] db op failed', e));
             } else {
-              // same estabelecimento: replace only user
-              await database.execAsync('DELETE FROM TB_USUARIO;').catch(() => {});
-              await database.execAsync(`INSERT INTO TB_USUARIO (nome, email, estabelecimentoId, nomeEstabelecimento) VALUES (${esc((me as any)?.nome)}, ${esc(meEmail)}, ${esc(meEstab)}, ${esc((me as any)?.nomeEstabelecimento)});`).catch(() => {});
-              await database.execAsync(`UPDATE TB_SCHEMA SET usuarioId = ${isNaN(Number(meId)) ? 'NULL' : Number(meId)};`).catch(() => {});
+              await database.execAsync('DELETE FROM TB_USUARIO;').catch((e) => console.warn('[auth] db op failed', e));
+              await database.runAsync(
+                'INSERT INTO TB_USUARIO (nome, email, estabelecimentoId, nomeEstabelecimento, role) VALUES (?, ?, ?, ?, ?)',
+                [meNome, meEmail, meEstab, meNomeEstab, meRole]
+              ).catch((e) => console.warn('[auth] db op failed', e));
+              await database.runAsync('UPDATE TB_SCHEMA SET usuarioId = ?', [meIdNum]).catch((e) => console.warn('[auth] db op failed', e));
             }
           }
         } catch (err) {

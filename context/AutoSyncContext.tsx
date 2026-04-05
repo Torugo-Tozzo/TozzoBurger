@@ -10,6 +10,8 @@ type LastSyncResult = { ok: boolean | null; message?: string | null; time?: numb
 
 type AutoSyncContextType = {
   isSyncing: boolean;
+  isOnline: boolean;
+  pendingCount: number;
   lastSync: number | null;
   lastSyncResult: LastSyncResult;
   triggerSync: () => Promise<any | null | undefined>;
@@ -21,10 +23,26 @@ export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) =>
   const database = useSQLiteContext();
   const { token } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
   const [lastSync, setLastSync] = useState<number | null>(null);
   const [lastSyncResult, setLastSyncResult] = useState<LastSyncResult>({ ok: null, message: null, time: null });
   const pendingRef = useRef(false);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState as AppStateStatus);
+
+  const refreshPendingCount = async () => {
+    try {
+      const rows = await (database as any).getAllAsync(
+        `SELECT
+          (SELECT COUNT(*) FROM TB_PRODUTOS WHERE sync_status = 'pending') +
+          (SELECT COUNT(*) FROM TB_VENDAS WHERE sync_status = 'pending') +
+          (SELECT COUNT(*) FROM TB_PEDIDOS WHERE sync_status = 'pending') as total`
+      );
+      setPendingCount(rows?.[0]?.total ?? 0);
+    } catch {
+      // ignore
+    }
+  };
 
   const doSync = async () => {
     if (!token) return null;
@@ -33,7 +51,7 @@ export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) =>
       return null;
     }
 
-    // Use global lock to avoid parallel syncs initiated from other places
+    await refreshPendingCount();
     let res: any = null;
     try {
       res = await runWithLock(async () => {
@@ -68,6 +86,7 @@ export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) =>
       const parsed = serverTime ? (typeof serverTime === 'string' ? Date.parse(serverTime) : Number(serverTime)) : Date.now();
       setLastSync(!Number.isNaN(parsed) ? parsed : Date.now());
       setLastSyncResult({ ok: true, message: null, time: Date.now() });
+      await refreshPendingCount();
     } catch (err) {
       console.warn('AutoSync post-sync handling failed', err);
       setLastSyncResult({ ok: false, message: String(err ?? 'post-sync error'), time: Date.now() });
@@ -87,7 +106,7 @@ export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) =>
       const prev = appStateRef.current;
       appStateRef.current = next;
       if ((prev === 'background' || prev === 'inactive') && next === 'active') {
-        doSync().catch(() => {});
+        doSync().catch((e) => console.warn('[auto-sync] sync failed', e));
       }
     };
 
@@ -98,8 +117,9 @@ export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) =>
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
       const connected = state.isConnected ?? state.isInternetReachable ?? false;
+      setIsOnline(connected);
       if (connected) {
-        doSync().catch(() => {});
+        doSync().catch((e) => console.warn('[auto-sync] sync failed', e));
       }
     });
     return () => unsubscribe();
@@ -109,7 +129,7 @@ export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) =>
   useEffect(() => {
     if (token) {
       // slight delay to allow DB to be ready
-      const t = setTimeout(() => { doSync().catch(() => {}); }, 500);
+      const t = setTimeout(() => { doSync().catch((e) => console.warn('[auto-sync] sync failed', e)); }, 500);
       return () => clearTimeout(t);
     }
     return;
@@ -117,6 +137,8 @@ export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) =>
 
   const value: AutoSyncContextType = {
     isSyncing,
+    isOnline,
+    pendingCount,
     lastSync,
     lastSyncResult,
     triggerSync: async () => doSync(),

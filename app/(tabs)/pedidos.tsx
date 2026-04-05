@@ -6,15 +6,20 @@ import { useAutoSync } from '@/context/AutoSyncContext';
 import PedidoItem from '@/components/PedidoItem';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
 
 export default function Pedidos() {
-  const { listPedidosRecentes, removePedido } = usePedidosDatabase();
+  const { listPedidosRecentes, listPedidosRecentesPorUsuario, removePedido } = usePedidosDatabase();
   const { lastSync } = useAutoSync();
+  const { user } = useAuth();
+  const isCliente = user?.role === 'CLIENTE';
   const [pedidosPorData, setPedidosPorData] = useState<Record<string, any[]>>({});
 
   async function load() {
     try {
-      const data = await listPedidosRecentes();
+      const data = isCliente && user?.id
+        ? await listPedidosRecentesPorUsuario(user.id)
+        : await listPedidosRecentes();
       setPedidosPorData(data);
     } catch (err) {
       console.error('Erro ao carregar pedidos:', err);
@@ -48,7 +53,7 @@ export default function Pedidos() {
       data={pedido}
       index={index}
       onEdit={() => handleEdit(pedido.id)}
-      onDelete={() => handleDelete(pedido.id)}
+      onDelete={isCliente ? undefined : () => handleDelete(pedido.id)}
     />
   );
 

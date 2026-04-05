@@ -6,6 +6,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { usePrinterDatabase } from '@/database/usePrinterDatabase'; // Importando o hook de banco de dados
 import { listNearbyDevices, connectToDevice, disconnectFromDevice } from '@/useBLE'; // Importando os métodos de BLE
 import { useAuth } from '@/context/AuthContext';
+import Constants from 'expo-constants';
 
 const BluetoothScreen = () => {
   const { setPrinter, getPrinter, removePrinter } = usePrinterDatabase(); // Métodos do banco de dados
@@ -14,6 +15,7 @@ const BluetoothScreen = () => {
   const [isScanning, setIsScanning] = useState(false); // Estado para controlar se está escaneando
 
   const { user, login, logout, token } = useAuth();
+  const isCliente = user?.role === 'CLIENTE';
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const [email, setEmail] = useState('');
@@ -143,25 +145,27 @@ const BluetoothScreen = () => {
         </View>
       </View>
 
-      <View style={[styles.section, { backgroundColor: isDark ? '#111' : '#fff', borderColor: isDark ? '#222' : '#e6e6e6' }]}>
-        <View style={[styles.sectionHeader, { backgroundColor: isDark ? '#0d0d0d' : '#fafafa' }] }>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#fff' : '#000' }]}>Impressora</Text>
+      {!isCliente && (
+        <View style={[styles.section, { backgroundColor: isDark ? '#111' : '#fff', borderColor: isDark ? '#222' : '#e6e6e6' }]}>
+          <View style={[styles.sectionHeader, { backgroundColor: isDark ? '#0d0d0d' : '#fafafa' }] }>
+            <Text style={[styles.sectionTitle, { color: isDark ? '#fff' : '#000' }]}>Impressora</Text>
+          </View>
+          <View style={styles.sectionContent}>
+            {connectedPrinter ? (
+              <View>
+                <Text style={{ fontSize: 18, marginBottom: 10, color: isDark ? '#fff' : '#000' }}>Impressora conectada: {connectedPrinter}</Text>
+                <Button title="Remover Impressora" onPress={handleRemovePrinter} />
+              </View>
+            ) : (
+              <View>
+                <Button title="Adicionar Impressora" onPress={handleScanDevices} />
+              </View>
+            )}
+          </View>
         </View>
-        <View style={styles.sectionContent}>
-          {connectedPrinter ? (
-            <View>
-              <Text style={{ fontSize: 18, marginBottom: 10, color: isDark ? '#fff' : '#000' }}>Impressora conectada: {connectedPrinter}</Text>
-              <Button title="Remover Impressora" onPress={handleRemovePrinter} />
-            </View>
-          ) : (
-            <View>
-              <Button title="Adicionar Impressora" onPress={handleScanDevices} />
-            </View>
-          )}
-        </View>
-      </View>
+      )}
 
-      {isScanning ? (
+      {!isCliente && (isScanning ? (
         <ActivityIndicator size="large" color={isDark ? '#fff' : '#0000ff'} />
       ) : (
         <FlatList
@@ -174,7 +178,11 @@ const BluetoothScreen = () => {
             </View>
           )}
         />
-      )}
+      ))}
+
+      <Text style={{ textAlign: 'center', color: isDark ? '#555' : '#aaa', fontSize: 12, marginTop: 16 }}>
+        v{Constants.expoConfig?.version ?? '?'}
+      </Text>
     </View>
   );
 };
