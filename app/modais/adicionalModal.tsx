@@ -26,20 +26,20 @@ export default function AdicionalModalScreen() {
                 return;
             }
 
-            let response = await create({
+            // create gera UUID string — o antigo insertedRowId numérico virava NaN aqui
+            const response = await create({
                 nome,
                 preco: parseFloat(preco),
                 tipoProdutoId: 8,
             });
-            
-            let produtoCriadoId = Number(response.insertedRowId);
 
             await addToCart({
-                id: produtoCriadoId,
+                id: response.id,
                 nome,
                 preco: parseFloat(preco),
                 tipoProdutoId: 8,
                 quantidade: 1,
+                updated_at: Date.now(),
             });
 
             router.back();

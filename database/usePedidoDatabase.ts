@@ -167,7 +167,7 @@ export function usePedidosDatabase() {
 
           const list = existingMap.get(prodKey);
           if (list && list.length) {
-            relId = list.shift();
+            relId = list.shift()!;
             const updateRelStmt = await database.prepareAsync(
               'UPDATE RL_PEDIDO_PRODUTO SET quantidade = $quantidade WHERE id = $id'
             );
