@@ -1,4 +1,5 @@
-export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://bdd8-177-138-46-148.ngrok-free.app';
+// Fallback = produção. Para dev/homolog, defina EXPO_PUBLIC_API_URL no .env (ver .env.example).
+export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.tozzo.uk';
 
 async function handleJsonResponse(res: Response) {
   const txt = await res.text();
