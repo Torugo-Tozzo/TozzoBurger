@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, FlatList, Alert, ActivityIndicator, TextInput, StyleSheet } from 'react-native';
+import { Button, Alert, ActivityIndicator, TextInput, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
@@ -7,6 +7,7 @@ import { usePrinterDatabase } from '@/database/usePrinterDatabase'; // Importand
 import { listNearbyDevices, connectToDevice, disconnectFromDevice } from '@/useBLE'; // Importando os métodos de BLE
 import { useAuth } from '@/context/AuthContext';
 import Constants from 'expo-constants';
+import { useSyncRefresh } from '@/hooks/useSyncRefresh';
 
 const BluetoothScreen = () => {
   const { setPrinter, getPrinter, removePrinter } = usePrinterDatabase(); // Métodos do banco de dados
@@ -21,6 +22,7 @@ const BluetoothScreen = () => {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+  const { refreshing, onRefresh } = useSyncRefresh();
 
   useEffect(() => {
     // Verifica se já existe uma impressora registrada
@@ -104,8 +106,11 @@ const BluetoothScreen = () => {
   };
 
   return (
-    <View style={[{ flex: 1, padding: 20 }, { backgroundColor: isDark ? '#000' : '#fff' }]}>
-     
+    <ScrollView
+      style={{ flex: 1, backgroundColor: isDark ? '#000' : '#fff' }}
+      contentContainerStyle={{ padding: 20 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
 
       {/* Sections: User / Printer */}
       <View style={[styles.section, { backgroundColor: isDark ? '#111' : '#fff', borderColor: isDark ? '#222' : '#e6e6e6' }]}>
@@ -168,22 +173,18 @@ const BluetoothScreen = () => {
       {!isCliente && (isScanning ? (
         <ActivityIndicator size="large" color={isDark ? '#fff' : '#0000ff'} />
       ) : (
-        <FlatList
-          data={devices}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={{ marginVertical: 10 }}>
-              <Text style={{ textAlign: 'center', margin: 10, color: isDark ? '#fff' : '#000' }}>{item.name || 'Dispositivo desconhecido'}</Text>
-              <Button title="Registrar Impressora" onPress={() => handleConnect(item)} />
-            </View>
-          )}
-        />
+        devices.map((item) => (
+          <View key={item.id} style={{ marginVertical: 10 }}>
+            <Text style={{ textAlign: 'center', margin: 10, color: isDark ? '#fff' : '#000' }}>{item.name || 'Dispositivo desconhecido'}</Text>
+            <Button title="Registrar Impressora" onPress={() => handleConnect(item)} />
+          </View>
+        ))
       ))}
 
       <Text style={{ textAlign: 'center', color: isDark ? '#555' : '#aaa', fontSize: 12, marginTop: 16 }}>
         v{Constants.expoConfig?.version ?? '?'}
       </Text>
-    </View>
+    </ScrollView>
   );
 };
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Alert, FlatList } from 'react-native';
+import { StyleSheet, Alert, FlatList, RefreshControl } from 'react-native';
 import { View, Text } from '@/components/Themed';
 import { usePedidosDatabase } from '@/database/usePedidoDatabase';
 import { useAutoSync } from '@/context/AutoSyncContext';
@@ -7,11 +7,13 @@ import PedidoItem from '@/components/PedidoItem';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useSyncRefresh } from '@/hooks/useSyncRefresh';
 
 export default function Pedidos() {
   const { listPedidosRecentes, listPedidosRecentesPorUsuario, removePedido } = usePedidosDatabase();
   const { lastSync } = useAutoSync();
   const { user } = useAuth();
+  const { refreshing, onRefresh } = useSyncRefresh();
   const isCliente = user?.role === 'CLIENTE';
   const [pedidosPorData, setPedidosPorData] = useState<Record<string, any[]>>({});
 
@@ -63,6 +65,7 @@ export default function Pedidos() {
       <FlatList
         data={Object.keys(pedidosPorData)}
         keyExtractor={(d) => d}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={({ item: dataKey }) => (
           <View style={styles.group}>
             <Text style={styles.date}>{dataKey}</Text>

@@ -1,4 +1,4 @@
-import { FlatList, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { View } from '@/components/Themed';
 import { ProductItemVenda } from '@/components/ProductItemVenda';
 import { FiltroTipos } from '@/components/FiltroTipos';
@@ -9,6 +9,7 @@ import { ProductDatabase } from '@/database/types/Produto';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback } from 'react';
 import { useCart, useCartActions } from '@/context/CartContext';
+import { useSyncRefresh } from '@/hooks/useSyncRefresh';
 
 /** Componente isolado — só ele re-renderiza quando o cart muda */
 function CartButton() {
@@ -27,6 +28,7 @@ export default function VendaScreen() {
   const { searchOrigemProdutoId, create, showAdd } = useProductDatabase();
   // Apenas funções estáveis — NÃO lê `cart`, então não re-renderiza quando cart muda
   const { addToCart, addIfNotInCart } = useCartActions();
+  const { refreshing, onRefresh } = useSyncRefresh();
 
   useFocusEffect(
     useCallback(() => {
@@ -85,6 +87,7 @@ export default function VendaScreen() {
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         contentContainerStyle={listContentStyle}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       />
 
       <CartButton />

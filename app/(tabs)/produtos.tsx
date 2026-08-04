@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import { StyleSheet, FlatList, Alert } from "react-native";
+import { StyleSheet, FlatList, Alert, RefreshControl } from "react-native";
 import { Text, View } from "@/components/Themed";
 import { useProductDatabase } from "@/database/useProductDatabase";
 import { useFocusEffect } from "@react-navigation/native";
@@ -8,10 +8,12 @@ import { useProductList } from "@/hooks/useProductList"
 import { Input } from "@/components/Input"
 import { Product } from "@/components/Product"
 import { router } from "expo-router"
+import { useSyncRefresh } from "@/hooks/useSyncRefresh"
 
 export default function ProdutosScreen() {
   const { remove } = useProductDatabase();
   const { products, tiposProduto, tipoProdutoId, filterByTipo, setSearch } = useProductList()
+  const { refreshing, onRefresh } = useSyncRefresh();
 
   useFocusEffect(
     useCallback(() => {
@@ -32,6 +34,7 @@ export default function ProdutosScreen() {
       <FlatList
         data={products}
         keyExtractor={(item) => String(item.id)}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={({ item }) => {
           const tipo = tiposProduto?.find((t: any) => Number(t.id) === Number(item.tipoProdutoId))?.descricao;
 
