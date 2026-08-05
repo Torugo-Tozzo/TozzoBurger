@@ -1,6 +1,13 @@
 // Fallback = produção. Para dev/homolog, defina EXPO_PUBLIC_API_URL no .env (ver .env.example).
 export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.tozzo.uk';
 
+// Túnel ngrok (dev local) mostra uma pagina de aviso HTML pro primeiro acesso de
+// qualquer client sem esse header, mesmo pra requests que nao sao de browser —
+// isso quebraria o parse de JSON das respostas. Sem efeito em tozzo.uk/dev-api.tozzo.uk.
+const NGROK_HEADERS: Record<string, string> = BASE_URL.includes('ngrok')
+  ? { 'ngrok-skip-browser-warning': 'true' }
+  : {};
+
 async function handleJsonResponse(res: Response) {
   const txt = await res.text();
   try {
@@ -15,7 +22,7 @@ export async function login(email: string, senha: string) {
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...NGROK_HEADERS },
       body: JSON.stringify({ email, senha }),
     });
 
@@ -38,7 +45,7 @@ export async function getMe(token: string) {
   try {
     const res = await fetch(url, {
       method: 'GET',
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
     });
 
     if (!res.ok) {
@@ -60,7 +67,7 @@ export async function sincronizar(token: string, payload: any) {
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
       body: JSON.stringify(payload),
     });
 
@@ -87,7 +94,7 @@ export async function getChanges(token: string, since?: string | null) {
   try {
     const res = await fetch(url, {
       method: 'GET',
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
     });
 
     if (!res.ok) {
