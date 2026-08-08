@@ -13,6 +13,8 @@ import { formatarVendaParaImpressao } from '@/hooks/formatarVendaImpressao';
 import { Produto } from '@/hooks/formatarVendaImpressao';
 import { sendMessageToDevice } from '@/useBLE';
 import { Calendar } from 'react-native-calendars';
+import Colors from '@/constants/Colors';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 export default function HistoricoScreen() {
   const [vendas, setVendas] = useState<Record<string, VendaDatabase[]>>({});
@@ -25,7 +27,8 @@ export default function HistoricoScreen() {
   const { showAdd } = useProductDatabase();
   const { getPrinter } = usePrinterDatabase();
   const router = useRouter();
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const [title, setTitle] = useState('Histórico de Vendas (Últimos 3 dias)');
   const [loadingPrint, setLoadingPrint] = useState<string | null>(null);
 
@@ -53,7 +56,7 @@ export default function HistoricoScreen() {
       borderRadius: 8,
       width: '100%',
       borderWidth: 1,
-      borderColor: '#999',
+      borderColor: colors.border,
     },
     dateText: {
       fontSize: 16,
@@ -93,7 +96,7 @@ export default function HistoricoScreen() {
     },
     button: {
       padding: 10,
-      backgroundColor: '#007bff',
+      backgroundColor: colors.primary,
       borderRadius: 5,
       justifyContent: 'center',
       alignItems: 'center',
@@ -101,7 +104,7 @@ export default function HistoricoScreen() {
       width: 60,
     },
     searchButton: {
-      backgroundColor: '#2196F3',
+      backgroundColor: colors.primary,
       padding: 10,
       borderRadius: 8,
       width: '100%',
@@ -114,7 +117,7 @@ export default function HistoricoScreen() {
     },
     Greenbutton: {
       padding: 10,
-      backgroundColor: 'green',
+      backgroundColor: colors.primary,
       borderRadius: 5,
       justifyContent: 'center',
       alignItems: 'center',
@@ -123,7 +126,7 @@ export default function HistoricoScreen() {
     },
     Redbutton: {
       padding: 10,
-      backgroundColor: 'red',
+      backgroundColor: Colors.status.danger,
       borderRadius: 5,
       justifyContent: 'center',
       alignItems: 'center',
@@ -161,7 +164,7 @@ export default function HistoricoScreen() {
       textAlign: 'center',
     },
     closeButton: {
-      backgroundColor: '#2196F3',
+      backgroundColor: colors.primary,
       padding: 12,
       borderRadius: 8,
       alignItems: 'center',
@@ -173,10 +176,10 @@ export default function HistoricoScreen() {
       fontWeight: 'bold',
     },
     disabledColor: {
-      color: colorScheme === "dark" ? "black" : "grey",
+      color: colors.textMuted,
     },
     disabledBackground: {
-      backgroundColor: colorScheme === "dark" ? "#2F4F5F" : "grey",
+      backgroundColor: colors.surface,
     },
   });
 
@@ -290,7 +293,7 @@ export default function HistoricoScreen() {
   };
 
   const renderVendaItem = ({ item, index }: { item: VendaDatabase & { produtos: string[] }; index: number }) => (
-    <View style={styles.item} lightColor="whitesmoke" darkColor="grey">
+    <View style={styles.item} lightColor={Colors.light.surface} darkColor={Colors.dark.surface}>
       <Text
         style={[
           styles.itemTextTitle,
@@ -323,7 +326,7 @@ export default function HistoricoScreen() {
       >
         Itens: {item.produtos.join(', ')}
       </Text>
-      <View style={styles.buttonContainer} lightColor="whitesmoke" darkColor="grey">
+      <View style={styles.buttonContainer} lightColor={Colors.light.surface} darkColor={Colors.dark.surface}>
         <TouchableOpacity
           onPress={() => router.push(`/modais/contaHistoricoModal?vendaId=${item.id}`)}
           style={[styles.button, item.excluida == true && { backgroundColor: styles.disabledBackground.backgroundColor }]}
@@ -427,22 +430,22 @@ export default function HistoricoScreen() {
                 markedDates={{
                   [formatCalendarDate(searchDate)]: {
                     selected: true,
-                    selectedColor: '#2196F3',
+                    selectedColor: colors.primary,
                   }
                 }}
                 theme={{
-                  calendarBackground: colorScheme === 'dark' ? '#333' : '#fff',
-                  textSectionTitleColor: '#b6c1cd',
-                  selectedDayBackgroundColor: '#2196F3',
-                  selectedDayTextColor: '#ffffff',
-                  todayTextColor: '#2196F3',
-                  dayTextColor: colorScheme === 'dark' ? '#fff' : '#2d4150',
-                  textDisabledColor: '#d9e1e8',
-                  dotColor: '#2196F3',
-                  selectedDotColor: '#ffffff',
-                  arrowColor: '#2196F3',
-                  monthTextColor: colorScheme === 'dark' ? '#fff' : '#2d4150',
-                  indicatorColor: '#2196F3',
+                  calendarBackground: colors.surface,
+                  textSectionTitleColor: colors.textMuted,
+                  selectedDayBackgroundColor: colors.primary,
+                  selectedDayTextColor: colors.background,
+                  todayTextColor: colors.primary,
+                  dayTextColor: colors.text,
+                  textDisabledColor: colors.textMuted,
+                  dotColor: colors.primary,
+                  selectedDotColor: colors.background,
+                  arrowColor: colors.primary,
+                  monthTextColor: colors.text,
+                  indicatorColor: colors.primary,
                 }}
                 firstDay={0}
               />
@@ -469,7 +472,7 @@ export default function HistoricoScreen() {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007bff" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -482,6 +485,7 @@ export default function HistoricoScreen() {
           showsVerticalScrollIndicator={true}
           style={{ flex: 1 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          ListEmptyComponent={<EmptyState icon="clock-o" title="Nenhuma venda no período" message="Busque outra data ou aguarde novas vendas." />}
         />
       )}
     </View>
