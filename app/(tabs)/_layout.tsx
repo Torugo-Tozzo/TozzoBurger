@@ -25,7 +25,8 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].primary,
+        tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
         headerShown: useClientOnlyValue(false, true),
         headerRight: () => <SyncIndicator />,
       }}>
@@ -42,7 +43,7 @@ export default function TabLayout() {
                   <FontAwesome
                     name="flash"
                     size={30}
-                    color={Colors[colorScheme ?? 'light'].tint}
+                    color={Colors[colorScheme ?? 'light'].primary}
                     style={{ marginLeft: 20, opacity: pressed ? 0.5 : 1 }}
                   />
                 )}
@@ -80,7 +81,7 @@ export default function TabLayout() {
                     <FontAwesome
                       name="plus-circle"
                       size={30}
-                      color={Colors[colorScheme ?? 'light'].tint}
+                      color={Colors[colorScheme ?? 'light'].primary}
                       style={{ marginRight: 8, opacity: pressed ? 0.5 : 1 }}
                     />
                   )}
