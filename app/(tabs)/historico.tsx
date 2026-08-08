@@ -111,7 +111,7 @@ export default function HistoricoScreen() {
       alignItems: 'center',
     },
     searchButtonText: {
-      color: 'white',
+      color: colors.background,
       fontSize: 16,
       fontWeight: 'bold',
     },
@@ -171,7 +171,7 @@ export default function HistoricoScreen() {
       marginTop: 15,
     },
     closeButtonText: {
-      color: 'white',
+      color: colors.background,
       fontSize: 16,
       fontWeight: 'bold',
     },
@@ -332,7 +332,7 @@ export default function HistoricoScreen() {
           style={[styles.button, item.excluida == true && { backgroundColor: styles.disabledBackground.backgroundColor }]}
           disabled={item.excluida == true}
         >
-          <FontAwesome name="eye" size={20} color="#fff" />
+          <FontAwesome name="eye" size={20} color={colors.background} />
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => handlePrint(item.id)}
@@ -340,9 +340,9 @@ export default function HistoricoScreen() {
           disabled={loadingPrint === item.id || item.excluida == true}
         >
           {loadingPrint === item.id ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={colors.background} />
           ) : (
-            <FontAwesome name="print" size={20} color="#fff" />
+            <FontAwesome name="print" size={20} color={colors.background} />
           )}
         </TouchableOpacity>
 
