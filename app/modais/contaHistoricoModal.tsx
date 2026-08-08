@@ -11,8 +11,13 @@ import { formatarVendaParaImpressao } from '@/hooks/formatarVendaImpressao';
 import { Ionicons } from '@expo/vector-icons'; // Importando o ícone de share
 import { captureScreen } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import { useColorScheme } from '@/components/useColorScheme';
+import Colors from '@/constants/Colors';
+import { ListItem } from '@/components/ui/ListItem';
 
 export default function ContaHistoricoModal() {
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const { vendaId } = useLocalSearchParams();
   const { getVendaById } = useVendasDatabase();
   const { showAdd: getProductById } = useProductDatabase();
@@ -113,20 +118,17 @@ export default function ContaHistoricoModal() {
   };
 
   const renderItem = ({ item }: { item: { nome: string; quantidade: number; preco: number } }) => (
-    <View style={styles.item} darkColor="grey" lightColor="whitesmoke">
-      <View style={styles.itemRow} darkColor="grey" lightColor="whitesmoke">
-        <Text style={styles.itemTextLeft}>
-          ({item.quantidade}x) {item.nome}
-        </Text>
-        <Text style={styles.itemTextRight}>R$ {item.preco.toFixed(2)}</Text>
-      </View>
-    </View>
+    <ListItem
+      title={item.nome}
+      subtitle={`${item.quantidade}x`}
+      trailing={<Text style={styles.itemTextRight}>R$ {item.preco.toFixed(2)}</Text>}
+    />
   );
 
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text>Carregando...</Text>
       </View>
     );
@@ -143,7 +145,7 @@ export default function ContaHistoricoModal() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Detalhes da Venda {venda.id}</Text>
-      <View style={styles.separator} />
+      <View style={[styles.separator, { backgroundColor: colors.border }]} />
 
       <Text style={styles.detailText}>
         Data: {new Date(venda.horario).toLocaleDateString()}
@@ -152,7 +154,7 @@ export default function ContaHistoricoModal() {
         Horário: {new Date(venda.horario).toLocaleTimeString()}
       </Text>
       <Text style={styles.detailText}>Cliente: {venda.cliente}</Text>
-      <View style={styles.separator} />
+      <View style={[styles.separator, { backgroundColor: colors.border }]} />
       <Text style={styles.subtitle}>Produtos</Text>
 
       <FlatList
@@ -161,20 +163,21 @@ export default function ContaHistoricoModal() {
         keyExtractor={(item, index) => String(index)}
       />
       <Text style={styles.title}>Total: R$ {venda.total.toFixed(2)}</Text>
-      <View style={styles.separator} />
+      <View style={[styles.separator, { backgroundColor: colors.border }]} />
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={styles.shareButton}
+          style={[styles.shareButton, { backgroundColor: colors.primary }]}
           onPress={handleShare}
         >
-          <Ionicons name="share-social" size={24} color="white" />
+          <Ionicons name="share-social" size={24} color={colors.background} />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
             styles.button,
-            (!isPrinterConnected) && styles.buttonDisabled,
+            { backgroundColor: colors.primary },
+            (!isPrinterConnected) && { backgroundColor: colors.textMuted },
           ]}
           onPress={handlePrint}
         >
@@ -214,20 +217,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 5,
   },
-  item: {
-    marginBottom: 15,
-    padding: 10,
-    borderRadius: 5,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  itemTextLeft: {
-    fontSize: 16,
-    flex: 1,
-  },
   itemTextRight: {
     fontSize: 16,
     textAlign: 'right',
@@ -238,22 +227,18 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   button: {
-    backgroundColor: '#007AFF',
     padding: 12,
     borderRadius: 5,
     flex: 1,
     alignItems: 'center',
   },
-  buttonDisabled: {
-    backgroundColor: '#a1a1a1',
-  },
+  buttonDisabled: {},
   buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
   shareButton: {
-    backgroundColor: '#007AFF',
     padding: 12,
     borderRadius: 5,
     flex: 0.2, // Proporção de 20%
