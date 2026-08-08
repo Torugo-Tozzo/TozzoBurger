@@ -182,9 +182,9 @@ export default function ContaHistoricoModal() {
           onPress={handlePrint}
         >
           {loadingPrint ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={colors.background} />
           ) : (
-            <Text style={styles.buttonText}>Imprimir Conta</Text>
+            <Text style={[styles.buttonText, { color: colors.background }]}>Imprimir Conta</Text>
           )}
         </TouchableOpacity>
       </View>
