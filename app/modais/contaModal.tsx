@@ -13,6 +13,9 @@ import { usePedidosDatabase } from '@/database/usePedidoDatabase';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { useAuth } from '@/context/AuthContext';
 import { useAutoSync } from '@/context/AutoSyncContext';
+import { Button } from '@/components/ui/Button';
+import Colors from '@/constants/Colors';
+import { spacing, radius } from '@/constants/theme';
 
 export default function ContaModalScreen() {
   const { cart, clearCart, updateCartItem, addToCart } = useCart();
@@ -24,8 +27,9 @@ export default function ContaModalScreen() {
   const { triggerSync } = useAutoSync();
   const [cliente, setCliente] = useState(isCliente ? (user?.nome ?? '') : '');
 
-  const colorScheme = useColorScheme();
-  const placeholderColor = colorScheme === "dark" ? "#ccc" : "#666";
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
+  const placeholderColor = colors.textMuted;
 
   const total = cart.reduce((sum, item) => {
     const quantidade = item.quantidade ?? 0; // Se quantidade for null ou undefined, usamos 0
@@ -137,7 +141,7 @@ export default function ContaModalScreen() {
       marginVertical: 10,
       height: 1,
       width: "100%",
-      backgroundColor: "#ddd",
+      backgroundColor: colors.border,
     },
     cartItem: {
       flexDirection: "row",
@@ -161,50 +165,36 @@ export default function ContaModalScreen() {
       alignItems: "center",
     },
     quantityButton: {
-      backgroundColor: "#007BFF",
+      backgroundColor: colors.primary,
       padding: 5,
       borderRadius: 5,
       marginHorizontal: 10,
     },
-    quantityButtonText: {
-      color: "#fff",
-      fontSize: 18,
-      fontWeight: "bold",
-    },
-    topRow: { flexDirection: 'row', marginTop: 12, alignItems: 'center' },
-    bottomRow: { flexDirection: 'row', marginTop: 12, alignItems: 'center' },
-    smallBtn: { backgroundColor: '#007BFF', padding: 10, borderRadius: 8, flex: 3, marginRight: 8, alignItems: 'center', justifyContent: 'center' },
-    smallBtnRed: { backgroundColor: '#F44336', padding: 10, borderRadius: 8, flex: 3, marginRight: 8, alignItems: 'center', justifyContent: 'center' },
-    largeBtn: { backgroundColor: '#007BFF', padding: 10, borderRadius: 8, flex: 7, alignItems: 'center', justifyContent: 'center' },
-    largeBtnOrange: { backgroundColor: '#f59e0b', padding: 10, borderRadius: 8, flex: 7, alignItems: 'center', justifyContent: 'center' },
-    largeBtnGreen: { backgroundColor: '#10b981', padding: 10, borderRadius: 8, flex: 7, alignItems: 'center', justifyContent: 'center' },
-    buttonText: {
-      color: "#fff",
-      fontSize: 16,
-      fontWeight: "bold",
-    },
-    buttonDisabled: {
-      backgroundColor: "#A1A1A1",  // Cor de fundo para o botão desabilitado
-    },
+    topRow: { flexDirection: 'row', marginTop: spacing.md, alignItems: 'center' },
+    bottomRow: { flexDirection: 'row', marginTop: spacing.md, alignItems: 'center' },
+    iconBtn: { backgroundColor: colors.primary, padding: spacing.md, borderRadius: radius.md, flex: 3, marginRight: spacing.sm, alignItems: 'center', justifyContent: 'center' },
+    iconBtnDanger: { backgroundColor: Colors.status.danger, padding: spacing.md, borderRadius: radius.md, flex: 3, marginRight: spacing.sm, alignItems: 'center', justifyContent: 'center' },
+    ctaFlex: { flex: 7 },
+    buttonDisabled: { opacity: 0.5 },
     input: {
       width: '100%',
       padding: 10,
       marginVertical: 10,
       borderWidth: 1,
-      borderColor: '#ccc',
+      borderColor: colors.border,
       borderRadius: 5,
-      color: colorScheme === "dark" ? "#fff" : "#000"
+      color: colors.text,
     }
   });
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title} lightColor="black" darkColor="white">
+      <Text style={styles.title}>
         Carrinho de Compras
       </Text>
-      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
+      <View style={styles.separator} />
       <TextInput
-        style={[styles.input, isCliente && { backgroundColor: colorScheme === 'dark' ? '#1a1a1a' : '#e9e9e9' }]}
+        style={[styles.input, isCliente && { backgroundColor: colors.surface }]}
         placeholder="Nome do Cliente"
         value={cliente}
         onChangeText={setCliente}
@@ -224,7 +214,7 @@ export default function ContaModalScreen() {
                 onPress={() => alterarQuantidade(item.id, 'decrementar')}
                 style={styles.quantityButton}
               >
-                <FontAwesome name="minus" size={20} color="white" />
+                <FontAwesome name="minus" size={20} color={colors.background} />
               </TouchableOpacity>
 
               <Text style={styles.itemText}>{item.quantidade}</Text>
@@ -233,39 +223,33 @@ export default function ContaModalScreen() {
                 onPress={() => alterarQuantidade(item.id, 'incrementar')}
                 style={styles.quantityButton}
               >
-                <FontAwesome name="plus" size={20} color="white" />
+                <FontAwesome name="plus" size={20} color={colors.background} />
               </TouchableOpacity>
             </View>
           </View>
         )}
       />
 
-      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
+      <View style={styles.separator} />
       <Text style={styles.totalText}>Total: R$ {total.toFixed(2)}</Text>
 
       <View style={styles.topRow}>
         {!isCliente && (
           <TouchableOpacity
-            style={[styles.smallBtn, isCartEmpty && styles.buttonDisabled]}
+            style={[styles.iconBtn, isCartEmpty && styles.buttonDisabled]}
             onPress={handleShare}
             disabled={isCartEmpty}
           >
-            <Ionicons name="share-social" size={22} color="white" />
+            <Ionicons name="share-social" size={22} color={colors.background} />
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity
-          style={[isCliente ? styles.largeBtn : styles.largeBtnOrange, isCartEmpty && styles.buttonDisabled]}
-          onPress={gerarPedido}
-          disabled={isCartEmpty}
-        >
-          <Text style={styles.buttonText}>Gerar Pedido</Text>
-        </TouchableOpacity>
+        <Button title="Gerar Pedido" onPress={gerarPedido} disabled={isCartEmpty} style={styles.ctaFlex} />
       </View>
 
       <View style={styles.bottomRow}>
         <TouchableOpacity
-          style={[styles.smallBtnRed, isCartEmpty && styles.buttonDisabled]}
+          style={[styles.iconBtnDanger, isCartEmpty && styles.buttonDisabled]}
           onPress={limparConta}
           disabled={isCartEmpty}
         >
@@ -273,13 +257,7 @@ export default function ContaModalScreen() {
         </TouchableOpacity>
 
         {!isCliente && (
-          <TouchableOpacity
-            style={[styles.largeBtnGreen, isCartEmpty && styles.buttonDisabled]}
-            onPress={finalizarCompra}
-            disabled={isCartEmpty}
-          >
-            <Text style={styles.buttonText}>Vender Direto</Text>
-          </TouchableOpacity>
+          <Button title="Vender Direto" onPress={finalizarCompra} disabled={isCartEmpty} style={styles.ctaFlex} />
         )}
       </View>
 
