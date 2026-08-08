@@ -1,9 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { TouchableOpacity, View, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { TouchableOpacity, View, ActivityIndicator, StyleSheet, Alert, useColorScheme } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useAutoSync } from '@/context/AutoSyncContext';
+import Colors from '@/constants/Colors';
 
 export default function SyncIndicator() {
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const { isSyncing, triggerSync } = useAutoSync();
   const { lastSyncResult } = useAutoSync();
   const lastHandledResultRef = useRef<number | null>(null);
@@ -94,13 +97,13 @@ export default function SyncIndicator() {
     >
       <View style={styles.inner}>
         { (isSyncing || localLoading) ? (
-          <ActivityIndicator size="small" color="#007AFF" />
+          <ActivityIndicator size="small" color={colors.primary} />
         ) : result === 'success' ? (
-          <FontAwesome name="check" size={18} color="#28a745" />
+          <FontAwesome name="check" size={18} color={colors.primary} />
         ) : result === 'error' ? (
-          <FontAwesome name="times" size={18} color="#dc3545" />
+          <FontAwesome name="times" size={18} color={Colors.status.danger} />
         ) : (
-          <FontAwesome name="refresh" size={20} color="#007AFF" />
+          <FontAwesome name="refresh" size={20} color={colors.primary} />
         ) }
       </View>
     </TouchableOpacity>
