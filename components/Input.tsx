@@ -1,22 +1,27 @@
 import React from "react";
 import { TextInput, TextInputProps, useColorScheme } from "react-native";
+import Colors from '@/constants/Colors';
+import { radius, spacing } from '@/constants/theme';
 
-export function Input({ ...rest }: TextInputProps) {
-  const colorScheme = useColorScheme();
-  const placeholderColor = colorScheme === "dark" ? "#ccc" : "#666";
+export function Input({ style, ...rest }: TextInputProps) {
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   return (
     <TextInput
-      style={{
-        height: 54,
-        borderWidth: 1,
-        borderRadius: 7,
-        borderColor: "#999",
-        paddingHorizontal: 16,
-        marginBottom: 5,
-        color: colorScheme === "dark" ? "#fff" : "#000",
-      }}
-      placeholderTextColor={placeholderColor} // Cor do placeholder
+      style={[
+        {
+          height: 54,
+          borderWidth: 1,
+          borderRadius: radius.sm,
+          borderColor: colors.border,
+          paddingHorizontal: spacing.lg,
+          marginBottom: spacing.xs,
+          color: colors.text,
+        },
+        style,
+      ]}
+      placeholderTextColor={colors.textMuted}
       {...rest}
     />
   );
