@@ -1,19 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import { Platform, StyleSheet, TextInput, Alert, useColorScheme, Pressable, Text as RNText } from 'react-native';
+import { TextInput, Alert } from 'react-native';
 import { Picker } from "@react-native-picker/picker";
 import { Text, View } from '@/components/Themed';
+import { Button } from '@/components/ui/Button';
+import Colors from '@/constants/Colors';
+import { useColorScheme } from '@/components/useColorScheme';
+import { spacing, radius, type } from '@/constants/theme';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Input } from '@/components/Input';
 
-type ProdutoModalScreenProps = {
-  route?: {
-    params?: { productId?: string };
-  };
-};
-
-export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
+export default function ProdutoModalScreen() {
   const { productId } = useLocalSearchParams();
   const { show, create, update, getTipoProdutos } = useProductDatabase();
 
@@ -23,9 +19,8 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
   const [tipoProdutoId, setTipoProdutoId] = useState<number | undefined>();
   const [tiposProdutos, setTiposProdutos] = useState<{ id: number; descricao: string }[]>([]);
   const router = useRouter();
-
-  const colorScheme = useColorScheme();
-  const placeholderColor = 'grey';
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   useEffect(() => {
     async function fetchTiposProdutos() {
@@ -69,20 +64,9 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
       }
 
       if (productId) {
-        await update({
-          id: String(productId),
-          nome,
-          preco: parseFloat(preco),
-          tipoProdutoId,
-          ingredientes
-        });
+        await update({ id: String(productId), nome, preco: parseFloat(preco), tipoProdutoId, ingredientes });
       } else {
-        await create({
-          nome,
-          preco: parseFloat(preco),
-          tipoProdutoId,
-          ingredientes
-        });
+        await create({ nome, preco: parseFloat(preco), tipoProdutoId, ingredientes });
       }
       router.back();
     } catch (error) {
@@ -91,86 +75,49 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
     }
   }
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      padding: 20,
-    },
-    title: {
-      fontSize: 30,
-      fontWeight: 'bold',
-    },
-    separator: {
-      marginVertical: 20,
-      height: 1,
-      width: '80%',
-    },
-    input: {
-      width: '100%',
-      padding: 10,
-      marginVertical: 10,
-      borderWidth: 1,
-      borderColor: '#ccc',
-      borderRadius: 5,
-      color: colorScheme === "dark" ? "#fff" : "#000"
-    },
-    picker: {
-      color: 'grey',
-    },
-    buttonContainer: {
-      width: '100%',
-      marginTop: 20,
-      backgroundColor: '#007BFF',
-      paddingVertical: 12,
-      borderRadius: 5,
-      alignItems: 'center',
-    },
-    buttonText: {
-      color: '#fff',
-      fontSize: 16,
-      fontWeight: 'bold',
-    },
-  });
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.title} lightColor="black" darkColor="white">
+    <View style={{ flex: 1, padding: spacing.xl }}>
+      <Text style={{ fontSize: type.heading, fontWeight: 'bold' }}>
         {productId ? 'Editar Produto' : 'Cadastrar Produto'}
       </Text>
-      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-      <Text style={{ fontSize: 16, margin: 10, fontWeight: "bold" }}>Nome do Produto</Text>
+      <View style={{ marginVertical: spacing.xl, height: 1, backgroundColor: colors.border }} />
+
+      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>Nome do Produto</Text>
       <TextInput
-        style={styles.input}
+        style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
         placeholder="Digite o Nome..."
         value={nome}
         onChangeText={setNome}
-        placeholderTextColor={placeholderColor}
+        placeholderTextColor={colors.textMuted}
       />
-      <Text style={{ fontSize: 16, margin: 10, fontWeight: "bold" }}>Preço do Produto</Text>
+
+      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>Preço do Produto</Text>
       <TextInput
-        style={styles.input}
+        style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
         placeholder="Digite o Preço.."
         value={preco}
         keyboardType="numeric"
         onChangeText={setPreco}
-        placeholderTextColor={placeholderColor}
+        placeholderTextColor={colors.textMuted}
       />
-      <Text style={{ fontSize: 16, margin: 10, fontWeight: "bold" }}>Ingredientes do Produto </Text>
+
+      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>Ingredientes do Produto</Text>
       <TextInput
-        style={[styles.input, { height: 100, textAlignVertical: 'top' }]} // Ajuste a altura para 3-4 linhas
+        style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text, height: 100, textAlignVertical: 'top' }}
         placeholder="Digite os Ingredientes.."
         value={ingredientes}
         onChangeText={setIngredientes}
-        placeholderTextColor={placeholderColor}
-        multiline={true} // Permite múltiplas linhas
+        placeholderTextColor={colors.textMuted}
+        multiline
       />
-      <Text style={{ fontSize: 16, margin: 10, fontWeight: "bold" }}>Tipo do Produto</Text>
-      <View style={styles.input}>
+
+      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>Tipo do Produto</Text>
+      <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, marginBottom: spacing.md }}>
         <Picker
           selectedValue={tipoProdutoId}
           onValueChange={(itemValue) => setTipoProdutoId(Number(itemValue))}
-          style={styles.picker}
-          dropdownIconColor={colorScheme === "dark" ? "#fff" : "#000"}
+          style={{ color: colors.textMuted }}
+          dropdownIconColor={colors.text}
         >
           <Picker.Item label="Selecione um tipo" value={undefined} />
           {tiposProdutos.map((tipo) => (
@@ -178,9 +125,8 @@ export default function ProdutoModalScreen({ route }: ProdutoModalScreenProps) {
           ))}
         </Picker>
       </View>
-      <Pressable style={styles.buttonContainer} onPress={handleSave}>
-        <RNText style={styles.buttonText}>Salvar</RNText>
-      </Pressable>
+
+      <Button title="Salvar" onPress={handleSave} />
     </View>
   );
 }
