@@ -4,11 +4,12 @@ import { Image } from 'react-native';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useAuth } from '@/context/AuthContext';
 import { useAutoSync } from '@/context/AutoSyncContext';
+import Colors from '@/constants/Colors';
 
 export default function LoginScreen() {
   const { login } = useAuth();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
@@ -75,14 +76,14 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#fff' }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Image
         source={require('../assets/images/logo-login.png')}
-        style={[styles.logo, { backgroundColor: isDark ? 'transparent' : '#fff' }]}
+        style={styles.logo}
         resizeMode="contain"
         fadeDuration={0}
       />
-      <Text style={[styles.title, { color: isDark ? '#fff' : '#000' }]}>Tozzo.uk</Text>
+      <Text style={[styles.title, { color: colors.text }]}>Tozzo.uk</Text>
       <View style={styles.form}>
         <TextInput
           placeholder="Email"
@@ -90,25 +91,25 @@ export default function LoginScreen() {
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
-          style={[styles.input, { backgroundColor: isDark ? '#111' : '#fff', borderColor: isDark ? '#333' : '#ddd', color: isDark ? '#fff' : '#000' }]}
-          placeholderTextColor={isDark ? '#9b9b9b' : '#8a8a8a'}
+          style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+          placeholderTextColor={colors.textMuted}
         />
         <TextInput
           placeholder="Senha"
           value={senha}
           onChangeText={setSenha}
           secureTextEntry
-          style={[styles.input, { backgroundColor: isDark ? '#111' : '#fff', borderColor: isDark ? '#333' : '#ddd', color: isDark ? '#fff' : '#000' }]}
-          placeholderTextColor={isDark ? '#9b9b9b' : '#8a8a8a'}
+          style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+          placeholderTextColor={colors.textMuted}
         />
-        <Pressable style={[styles.button]} onPress={handleLogin} disabled={loading}>
+        <Pressable style={[styles.button, { backgroundColor: colors.primary }]} onPress={handleLogin} disabled={loading}>
           {(loading || waitingSync) ? (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <ActivityIndicator color="#fff" />
-              <Text style={[styles.buttonText, { marginLeft: 8 }]}>{waitingSync ? 'Sincronizando...' : 'Entrando...'}</Text>
+              <ActivityIndicator color={colors.background} />
+              <Text style={[styles.buttonText, { color: colors.background, marginLeft: 8 }]}>{waitingSync ? 'Sincronizando...' : 'Entrando...'}</Text>
             </View>
           ) : (
-            <Text style={styles.buttonText}>Entrar</Text>
+            <Text style={[styles.buttonText, { color: colors.background }]}>Entrar</Text>
           )}
         </Pressable>
       </View>
@@ -122,7 +123,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    backgroundColor: '#fff',
   },
   title: {
     fontSize: 24,
@@ -148,14 +148,12 @@ const styles = StyleSheet.create({
   },
   button: {
     height: 48,
-    backgroundColor: '#0084ffff',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
   },
   buttonText: {
-    color: '#fff',
     fontWeight: '700',
   },
 });
