@@ -7,6 +7,7 @@ import { useVendasDatabase } from '@/database/useVendaDatabse';
 import { Picker } from "@react-native-picker/picker";
 import { PieChart, ProgressChart } from 'react-native-chart-kit';
 import { Ionicons } from '@expo/vector-icons';
+import Colors from '@/constants/Colors';
 
 type RelatorioProduto = {
   id: string;
@@ -21,8 +22,9 @@ export default function RelatorioModal() {
   const params = useLocalSearchParams();
   const { getTipoProdutos } = useProductDatabase();
   const { getRelatorioPorPeriodo } = useVendasDatabase();
-  const colorScheme = useColorScheme();
-  
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
+
   const [dataInicial] = useState(() =>
     params.dataInicial ? new Date(params.dataInicial as string) : new Date()
   );
@@ -191,10 +193,10 @@ export default function RelatorioModal() {
   };
   
   const ListHeader = () => (
-    <View style={styles.listHeaderContainer}>
-      <Text style={styles.listHeaderText}>Produto</Text>
-      <Text style={styles.listHeaderText}>Nº Vendas</Text>
-      <Text style={styles.listHeaderText}>Total</Text>
+    <View style={[styles.listHeaderContainer, { backgroundColor: colors.text, borderBottomColor: colors.border }]}>
+      <Text style={[styles.listHeaderText, { color: colors.background }]}>Produto</Text>
+      <Text style={[styles.listHeaderText, { color: colors.background }]}>Nº Vendas</Text>
+      <Text style={[styles.listHeaderText, { color: colors.background }]}>Total</Text>
     </View>
   );
   
@@ -245,13 +247,13 @@ export default function RelatorioModal() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Relatório de Vendas</Text>
-        <TouchableOpacity 
+      <View style={[styles.header, { backgroundColor: colors.text, borderBottomColor: colors.border }]}>
+        <Text style={[styles.title, { color: colors.background }]}>Relatório de Vendas</Text>
+        <TouchableOpacity
           style={styles.closeButton}
           onPress={() => router.back()}
         >
-          <Text style={styles.closeButtonText}>X</Text>
+          <Text style={[styles.closeButtonText, { color: colors.background }]}>X</Text>
         </TouchableOpacity>
       </View>
       
@@ -269,8 +271,8 @@ export default function RelatorioModal() {
               <Picker
                 selectedValue={tipoGrafico}
                 onValueChange={(itemValue) => setTipoGrafico(itemValue)}
-                style={colorScheme === "dark" ? { color: "#fff" } : { color: "#000" }}
-                dropdownIconColor={colorScheme === "dark" ? "#fff" : "#000"}
+                style={{ color: colors.text }}
+                dropdownIconColor={colors.text}
               >
                 <Picker.Item label="Pizza" value="pizza" />
                 <Picker.Item label="Progresso" value="progresso" />
@@ -284,8 +286,8 @@ export default function RelatorioModal() {
               <Picker
                 selectedValue={tipoProdutoId}
                 onValueChange={(itemValue) => setTipoProdutoId(itemValue)}
-                style={colorScheme === "dark" ? { color: "#fff" } : { color: "#000" }}
-                dropdownIconColor={colorScheme === "dark" ? "#fff" : "#000"}
+                style={{ color: colors.text }}
+                dropdownIconColor={colors.text}
               >
                 <Picker.Item label="Todos os tipos" value={100} />
                 {tiposProdutos.map((tipo) => (
@@ -301,7 +303,7 @@ export default function RelatorioModal() {
           
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#2196F3" />
+              <ActivityIndicator size="large" color={colors.primary} />
               <Text style={styles.loadingText}>Carregando dados...</Text>
             </View>
           ) : relatorioData.length === 0 ? (
@@ -406,12 +408,12 @@ export default function RelatorioModal() {
                 <Text style={styles.itemTabela}>R$ {relatorioData.reduce((total, item) => total + (item.preco * item.totalVendido), 0).toFixed(2)}</Text>
               </View>
             
-            <TouchableOpacity 
-              style={styles.shareButton}
+            <TouchableOpacity
+              style={[styles.shareButton, { backgroundColor: colors.text }]}
               onPress={() => compartilharRelatorio(relatorioData, dataInicial, dataFinal)}
             >
-              <Ionicons name="share-outline" size={20} color="white" />
-              <Text style={styles.shareButtonText}>Compartilhar</Text>
+              <Ionicons name="share-outline" size={20} color={colors.background} />
+              <Text style={[styles.shareButtonText, { color: colors.background }]}>Compartilhar</Text>
             </TouchableOpacity>
           </>
         )}
@@ -430,8 +432,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    backgroundColor: '#2196F3',
   },
   title: {
     fontSize: 20,
@@ -496,14 +496,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     paddingHorizontal: 16,
-    backgroundColor: '#2196F3',
     borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
   },
   listHeaderText: {
     fontWeight: 'bold',
     fontSize: 16,
-    color: 'white',
     textAlign: 'center',
   },
   itemContainer: {
@@ -560,7 +557,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   shareButton: {
-    backgroundColor: '#2196F3',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
@@ -570,7 +566,6 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   shareButtonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
