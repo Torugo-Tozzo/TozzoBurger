@@ -4,10 +4,11 @@ import { View, Text } from '@/components/Themed';
 import { usePedidosDatabase } from '@/database/usePedidoDatabase';
 import { useAutoSync } from '@/context/AutoSyncContext';
 import PedidoItem from '@/components/PedidoItem';
-import { router } from 'expo-router';
-import { useFocusEffect } from 'expo-router';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useSyncRefresh } from '@/hooks/useSyncRefresh';
+import { spacing, type } from '@/constants/theme';
 
 export default function Pedidos() {
   const { listPedidosRecentes, listPedidosRecentesPorUsuario, removePedido } = usePedidosDatabase();
@@ -66,6 +67,7 @@ export default function Pedidos() {
         data={Object.keys(pedidosPorData)}
         keyExtractor={(d) => d}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListEmptyComponent={<EmptyState icon="list" title="Nenhum pedido recente" message="Pedidos aparecem aqui assim que forem criados." />}
         renderItem={({ item: dataKey }) => (
           <View style={styles.group}>
             <Text style={styles.date}>{dataKey}</Text>
@@ -78,19 +80,8 @@ export default function Pedidos() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 12 },
-  group: { marginBottom: 18 },
-  date: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
-  pedidoItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, borderRadius: 8, backgroundColor: '#f5f5f5', marginBottom: 8 },
-  pedidoLeft: { flexDirection: 'row', alignItems: 'center' },
-  counter: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#2196F3', color: 'white', textAlign: 'center', lineHeight: 32, fontWeight: '700', marginRight: 10 },
-  info: { maxWidth: 200 },
-  cliente: { fontWeight: '600' },
-  produtos: { color: '#666' },
-  actions: { alignItems: 'flex-end' },
-  status: { fontSize: 12, marginBottom: 8 },
-  editButton: { backgroundColor: '#4CAF50', padding: 6, borderRadius: 6, marginBottom: 6 },
-  deleteButton: { backgroundColor: '#F44336', padding: 6, borderRadius: 6 },
-  buttonText: { color: '#fff', fontWeight: '600' },
+  container: { flex: 1, padding: spacing.lg },
+  title: { fontSize: type.title, fontWeight: 'bold', marginBottom: spacing.md },
+  group: { marginBottom: spacing.xl },
+  date: { fontSize: type.body, fontWeight: '600', marginBottom: spacing.sm },
 });
