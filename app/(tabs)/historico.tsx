@@ -179,7 +179,7 @@ export default function HistoricoScreen() {
       color: colors.textMuted,
     },
     disabledBackground: {
-      backgroundColor: colors.textMuted,
+      backgroundColor: colorScheme === 'dark' ? colors.surface : colors.textMuted,
     },
   });
 
