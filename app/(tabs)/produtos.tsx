@@ -9,6 +9,7 @@ import { Input } from "@/components/Input"
 import { Product } from "@/components/Product"
 import { router } from "expo-router"
 import { useSyncRefresh } from "@/hooks/useSyncRefresh"
+import { EmptyState } from "@/components/ui/EmptyState"
 
 export default function ProdutosScreen() {
   const { remove } = useProductDatabase();
@@ -35,6 +36,7 @@ export default function ProdutosScreen() {
         data={products}
         keyExtractor={(item) => String(item.id)}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto cadastrado" message="Toque no + pra adicionar o primeiro item." />}
         renderItem={({ item }) => {
           const tipo = tiposProduto?.find((t: any) => Number(t.id) === Number(item.tipoProdutoId))?.descricao;
 
