@@ -1,8 +1,11 @@
-import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet } from 'react-native';
 import { View } from '@/components/Themed';
 import { ProductItemVenda } from '@/components/ProductItemVenda';
 import { FiltroTipos } from '@/components/FiltroTipos';
 import { Input } from '@/components/Input';
+import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { spacing } from '@/constants/theme';
 import useProductList from '@/hooks/useProductList';
 import { useProductDatabase } from "@/database/useProductDatabase";
 import { ProductDatabase } from '@/database/types/Produto';
@@ -17,9 +20,11 @@ function CartButton() {
   const total = cart.reduce((sum, item) => sum + (item.quantidade ?? 0), 0);
   if (total <= 0) return null;
   return (
-    <TouchableOpacity style={styles.button} onPress={() => router.push('/modais/contaModal')}>
-      <Text style={styles.buttonText}>Ver Conta ({total})</Text>
-    </TouchableOpacity>
+    <Button
+      title={`Ver Conta (${total})`}
+      onPress={() => router.push('/modais/contaModal')}
+      style={styles.buttonWrap}
+    />
   );
 }
 
@@ -88,6 +93,7 @@ export default function VendaScreen() {
         renderItem={renderItem}
         contentContainerStyle={listContentStyle}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto encontrado" message="Ajuste a busca ou o filtro de tipo." />}
       />
 
       <CartButton />
@@ -102,17 +108,8 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  button: {
-    backgroundColor: "#007BFF",
-    padding: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 16,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
+  buttonWrap: {
+    marginTop: spacing.lg,
   },
   title: {
     fontSize: 20,
