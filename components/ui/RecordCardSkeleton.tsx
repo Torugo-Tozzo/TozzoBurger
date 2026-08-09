@@ -11,7 +11,7 @@ export function RecordCardSkeleton() {
 
   return (
     <Card padding={0} style={styles.container}>
-      <View style={[styles.accent, { backgroundColor: colors.border }]} />
+      <View style={[styles.accent, { backgroundColor: colors.textMuted }]} />
       <View style={styles.content}>
         <View style={styles.mainRow}>
           <View style={styles.textBlock}>
