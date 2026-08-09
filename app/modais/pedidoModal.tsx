@@ -117,7 +117,7 @@ export default function PedidoModal() {
     if (!pedido) return;
     try {
       const produtos = (pedido.produtos || []).map((p: any) => ({ produtoId: p.produtoId, quantidade: p.quantidade }));
-      const { vendaId } = await createVenda(produtos, cliente ?? '', user?.id);
+      const { vendaId } = await createVenda(produtos, cliente ?? '', user?.id, user?.nome ?? null);
       await updatePedido(pedido.id, undefined, undefined, STATUS_PEDIDO.FECHADO);
       Alert.alert('Venda Gerada', `Venda ${vendaId} gerada a partir do pedido.`);
       router.back();

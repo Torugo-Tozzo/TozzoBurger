@@ -37,10 +37,11 @@ export function usePedidosDatabase() {
     produtos: PedidoProduto[],
     cliente?: string,
     status: PedidoStatus = STATUS_PEDIDO.ABERTO,
-    criadoPor?: string | number | null
+    criadoPor?: string | number | null,
+    criadoPorNome?: string | null
   ) {
     const stmt = await database.prepareAsync(
-      "INSERT INTO TB_PEDIDOS (id, total, horario, cliente, status, updated_at, sync_status, criado_por) VALUES ($id, $total, $horario, $cliente, $status, $updated_at, $sync_status, $criado_por)"
+      "INSERT INTO TB_PEDIDOS (id, total, horario, cliente, status, updated_at, sync_status, criado_por, criado_por_nome) VALUES ($id, $total, $horario, $cliente, $status, $updated_at, $sync_status, $criado_por, $criado_por_nome)"
     );
 
     try {
@@ -61,6 +62,7 @@ export function usePedidosDatabase() {
         $updated_at: updatedAt,
         $sync_status: 'pending',
         $criado_por: criadoPor != null ? String(criadoPor) : null,
+        $criado_por_nome: criadoPorNome ?? null,
       });
 
       for (const { produtoId, quantidade } of produtos) {

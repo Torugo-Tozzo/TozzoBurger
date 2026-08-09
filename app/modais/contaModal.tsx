@@ -69,7 +69,7 @@ export default function ContaModalScreen() {
         quantidade: quantidade ?? 0,
       }));
 
-      const { vendaId } = await createVenda(produtos, cliente, user?.id);
+      const { vendaId } = await createVenda(produtos, cliente, user?.id, user?.nome ?? null);
       await clearCart(); 
       router.back(); 
 
@@ -102,7 +102,7 @@ export default function ContaModalScreen() {
         quantidade: quantidade ?? 0,
       }));
 
-      const { pedidoId } = await createPedido(produtos, cliente, undefined, user?.id);
+      const { pedidoId } = await createPedido(produtos, cliente, undefined, user?.id, user?.nome ?? null);
       await clearCart();
       triggerSync().catch((e) => console.warn('[sync] trigger failed', e));
       router.back();
