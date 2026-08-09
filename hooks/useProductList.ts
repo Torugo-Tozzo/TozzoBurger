@@ -3,6 +3,8 @@ import {  useProductDatabase } from "@/database/useProductDatabase"
 import { ProductDatabase } from "@/database/types/Produto"
 import { useAutoSync } from '@/context/AutoSyncContext'
 
+const PAGE_SIZE = 20
+
 // Evita re-render de toda a lista (perde React.memo dos cards) quando o
 // refetch em foco de aba traz o mesmo conteudo de antes - so muda o estado
 // se algo de fato mudou.
@@ -20,15 +22,20 @@ export function useProductList() {
   const [tiposProduto, setTiposProduto] = useState<{ id: number; descricao: string }[]>([])
   const [tipoProdutoId, setTipoProdutoId] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
 
   const productDatabase = useProductDatabase()
 
-  // Função para listar os produtos
+  // Função para listar os produtos (página 1)
   const list = async () => {
     setIsLoading(true)
     try {
-      const response = await productDatabase.searchByName(search)
+      const response = await productDatabase.searchByName(search, PAGE_SIZE, 0)
       setProducts((prev) => (isProductsEqual(prev, response) ? prev : response))
+      setPage(1)
+      setHasMore(response.length === PAGE_SIZE)
     } catch (error) {
       console.log(error)
     } finally {
@@ -46,14 +53,16 @@ export function useProductList() {
     }
   }
 
-  // Função para filtrar produtos por tipo
+  // Função para filtrar produtos por tipo (página 1)
   const filterByTipo = async (tipoId: number | null) => {
     if (tipoId) {
       setTipoProdutoId(String(tipoId))
       setIsLoading(true)
       try {
-        const filtered = await productDatabase.filterByTipo(tipoId)
+        const filtered = await productDatabase.filterByTipo(tipoId, PAGE_SIZE, 0)
         setProducts((prev) => (isProductsEqual(prev, filtered) ? prev : filtered))
+        setPage(1)
+        setHasMore(filtered.length === PAGE_SIZE)
       } catch (error) {
         console.log(error)
       } finally {
@@ -62,6 +71,26 @@ export function useProductList() {
     } else {
       setTipoProdutoId("")
       await list()
+    }
+  }
+
+  // Carrega a proxima pagina e concatena ao final da lista ja exibida
+  const loadMore = async () => {
+    if (!hasMore || isLoadingMore) return
+    setIsLoadingMore(true)
+    try {
+      const nextPage = page + 1
+      const offset = (nextPage - 1) * PAGE_SIZE
+      const more = tipoProdutoId
+        ? await productDatabase.filterByTipo(Number(tipoProdutoId), PAGE_SIZE, offset)
+        : await productDatabase.searchByName(search, PAGE_SIZE, offset)
+      setProducts((prev) => [...prev, ...more])
+      setPage(nextPage)
+      setHasMore(more.length === PAGE_SIZE)
+    } catch (error) {
+      console.log(error)
+    } finally {
+      setIsLoadingMore(false)
     }
   }
 
@@ -84,6 +113,9 @@ export function useProductList() {
     setProducts,
     setTiposProduto,
     isLoading,
+    isLoadingMore,
+    hasMore,
+    loadMore,
   }
 }
 
