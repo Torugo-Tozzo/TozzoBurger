@@ -5,10 +5,15 @@ import { usePedidosDatabase } from '@/database/usePedidoDatabase';
 import { useAutoSync } from '@/context/AutoSyncContext';
 import PedidoItem from '@/components/PedidoItem';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { RecordCardSkeleton } from '@/components/ui/RecordCardSkeleton';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useSyncRefresh } from '@/hooks/useSyncRefresh';
+import { useMinLoadingDuration } from '@/hooks/useMinLoadingDuration';
 import { spacing, type } from '@/constants/theme';
+import { PedidoDatabase } from '@/database/types/Pedido';
+
+type PedidoComProdutos = PedidoDatabase & { produtos: string[] };
 
 export default function Pedidos() {
   const { listPedidosRecentes, listPedidosRecentesPorUsuario, removePedido } = usePedidosDatabase();
@@ -16,9 +21,11 @@ export default function Pedidos() {
   const { user } = useAuth();
   const { refreshing, onRefresh } = useSyncRefresh();
   const isCliente = user?.role === 'CLIENTE';
-  const [pedidosPorData, setPedidosPorData] = useState<Record<string, any[]>>({});
+  const [pedidosPorData, setPedidosPorData] = useState<Record<string, PedidoComProdutos[]>>({});
+  const [isLoading, setIsLoading] = useState(true);
 
   async function load() {
+    setIsLoading(true);
     try {
       const data = isCliente && user?.id
         ? await listPedidosRecentesPorUsuario(user.id)
@@ -26,6 +33,8 @@ export default function Pedidos() {
       setPedidosPorData(data);
     } catch (err) {
       console.error('Erro ao carregar pedidos:', err);
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -50,15 +59,31 @@ export default function Pedidos() {
     ]);
   };
 
-  const renderPedido = (pedido: any, index: number) => (
+  const renderPedido = (pedido: PedidoComProdutos) => (
     <PedidoItem
       key={pedido.id}
       data={pedido}
-      index={index}
+      produtos={pedido.produtos}
       onEdit={() => handleEdit(pedido.id)}
       onDelete={isCliente ? undefined : () => handleDelete(pedido.id)}
     />
   );
+
+  const hasData = Object.keys(pedidosPorData).length > 0;
+  const showSkeleton = useMinLoadingDuration(isLoading && !hasData);
+
+  if (showSkeleton) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Pedidos Recentes</Text>
+        <RecordCardSkeleton />
+        <RecordCardSkeleton />
+        <RecordCardSkeleton />
+        <RecordCardSkeleton />
+        <RecordCardSkeleton />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -71,7 +96,7 @@ export default function Pedidos() {
         renderItem={({ item: dataKey }) => (
           <View style={styles.group}>
             <Text style={styles.date}>{dataKey}</Text>
-            {(pedidosPorData[dataKey] || []).map((p, idx) => renderPedido(p, idx))}
+            {(pedidosPorData[dataKey] || []).map((p) => renderPedido(p))}
           </View>
         )}
       />
