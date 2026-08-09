@@ -8,13 +8,14 @@ import { VendaDatabase } from '@/database/types/Venda';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { usePrinterDatabase } from '@/database/usePrinterDatabase';
 import { useFocusEffect, useRouter } from 'expo-router';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { formatarVendaParaImpressao } from '@/hooks/formatarVendaImpressao';
 import { Produto } from '@/hooks/formatarVendaImpressao';
 import { sendMessageToDevice } from '@/useBLE';
 import { Calendar } from 'react-native-calendars';
 import Colors from '@/constants/Colors';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { VendaItem } from '@/components/VendaItem';
+import { spacing, type } from '@/constants/theme';
 
 export default function HistoricoScreen() {
   const [vendas, setVendas] = useState<Record<string, VendaDatabase[]>>({});
@@ -35,103 +36,52 @@ export default function HistoricoScreen() {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      padding: 20,
+      padding: spacing.xl,
     },
     title: {
-      fontSize: 24,
+      fontSize: type.heading,
       fontWeight: 'bold',
-      marginBottom: 20,
+      marginBottom: spacing.xl,
     },
     dateContainer: {
       width: '100%',
-      marginBottom: 20,
+      marginBottom: spacing.xl,
     },
     label: {
-      fontSize: 16,
-      marginBottom: 8,
+      fontSize: type.body,
+      marginBottom: spacing.sm,
       fontWeight: '500',
     },
     dateButton: {
-      padding: 12,
+      padding: spacing.md,
       borderRadius: 8,
       width: '100%',
       borderWidth: 1,
       borderColor: colors.border,
     },
     dateText: {
-      fontSize: 16,
+      fontSize: type.body,
     },
     separator: {
-      marginVertical: 10,
+      marginVertical: spacing.sm,
       height: 1,
     },
-    item: {
-      marginBottom: 15,
-      padding: 10,
-      borderRadius: 5,
-    },
-    itemText: {
-      fontSize: 16,
-      fontWeight: "bold",
-      marginBottom: 5,
-      textAlign: 'center',
-    },
-    itemTextTitle: {
-      fontSize: 18,
-      fontWeight: "bold",
-      margin: 10,
-      textAlign: 'center',
-    },
     dateHeader: {
-      fontSize: 18,
+      fontSize: type.subtitle,
       fontWeight: 'bold',
-      marginVertical: 10,
-    },
-    buttonContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginTop: 10,
-      paddingHorizontal: 20,
-    },
-    button: {
-      padding: 10,
-      backgroundColor: colors.primary,
-      borderRadius: 5,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginHorizontal: 5,
-      width: 60,
+      marginVertical: spacing.sm,
     },
     searchButton: {
       backgroundColor: colors.primary,
-      padding: 10,
+      padding: spacing.md,
       borderRadius: 8,
       width: '100%',
       alignItems: 'center',
     },
     searchButtonText: {
       color: colors.background,
-      fontSize: 16,
+      fontSize: type.body,
       fontWeight: 'bold',
-    },
-    Greenbutton: {
-      padding: 10,
-      backgroundColor: colors.primary,
-      borderRadius: 5,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginHorizontal: 5,
-      width: 60,
-    },
-    Redbutton: {
-      padding: 10,
-      backgroundColor: Colors.status.danger,
-      borderRadius: 5,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginHorizontal: 5,
-      width: 60,
     },
     loadingContainer: {
       flex: 1,
@@ -146,40 +96,31 @@ export default function HistoricoScreen() {
     },
     calendarContainer: {
       width: '90%',
-      padding: 20,
+      padding: spacing.xl,
       borderRadius: 10,
-      shadowColor: "#000",
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.25,
       shadowRadius: 3.84,
       elevation: 5,
     },
     modalTitle: {
-      fontSize: 18,
+      fontSize: type.subtitle,
       fontWeight: 'bold',
-      marginBottom: 15,
+      marginBottom: spacing.lg,
       textAlign: 'center',
     },
     closeButton: {
       backgroundColor: colors.primary,
-      padding: 12,
+      padding: spacing.md,
       borderRadius: 8,
       alignItems: 'center',
-      marginTop: 15,
+      marginTop: spacing.lg,
     },
     closeButtonText: {
       color: colors.background,
-      fontSize: 16,
+      fontSize: type.body,
       fontWeight: 'bold',
-    },
-    disabledColor: {
-      color: colors.textMuted,
-    },
-    disabledBackground: {
-      backgroundColor: colorScheme === 'dark' ? colors.surface : colors.textMuted,
     },
   });
 
@@ -221,7 +162,7 @@ export default function HistoricoScreen() {
 
     try {
       const vendasData = await listVendasPorDia(formattedDate);
-      setVendas({ [searchDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '/')]: vendasData });
+      setVendas({ [searchDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })]: vendasData });
     } catch (error) {
       console.error(error);
       Alert.alert('Erro', 'Não foi possível buscar as vendas para a data especificada.');
@@ -242,7 +183,7 @@ export default function HistoricoScreen() {
       venda.produtos.map(async (produto) => {
         let prodInfos = await showAdd(produto.produtoId);
         return {
-          nome: prodInfos?.nome ?? "Produto desconhecido",
+          nome: prodInfos?.nome ?? 'Produto desconhecido',
           quantidade: produto.quantidade,
           preco: prodInfos?.preco ?? 0,
         };
@@ -253,9 +194,9 @@ export default function HistoricoScreen() {
 
     try {
       await sendMessageToDevice(printContent, await getPrinter());
-      Alert.alert("Sucesso", "Conta enviada para impressão.");
+      Alert.alert('Sucesso', 'Conta enviada para impressão.');
     } catch (error) {
-      Alert.alert("Erro", `${error}`);
+      Alert.alert('Erro', `${error}`);
     } finally {
       setLoadingPrint(null);
     }
@@ -293,72 +234,18 @@ export default function HistoricoScreen() {
   };
 
   const renderVendaItem = ({ item, index }: { item: VendaDatabase & { produtos: string[] }; index: number }) => (
-    <View style={styles.item} lightColor={Colors.light.surface} darkColor={Colors.dark.surface}>
-      <Text
-        style={[
-          styles.itemTextTitle,
-          item.excluida == true && { textDecorationLine: 'line-through', color: styles.disabledColor.color },
-        ]}
-      >
-        Venda #{index + 1}
-      </Text>
-      <Text
-        style={[
-          styles.itemText,
-          item.excluida == true && { textDecorationLine: 'line-through', color: styles.disabledColor.color },
-        ]}
-      >
-        Cliente: {item.cliente} | Horário: {new Date(item.horario).toLocaleTimeString()}
-      </Text>
-      <Text
-        style={[
-          styles.itemTextTitle,
-          item.excluida == true && { textDecorationLine: 'line-through', color: styles.disabledColor.color },
-        ]}
-      >
-        Total: R$ {item.total.toFixed(2)}
-      </Text>
-      <Text
-        style={[
-          { fontWeight: 'bold' },
-          item.excluida == true && { textDecorationLine: 'line-through', color: styles.disabledColor.color },
-        ]}
-      >
-        Itens: {item.produtos.join(', ')}
-      </Text>
-      <View style={styles.buttonContainer} lightColor={Colors.light.surface} darkColor={Colors.dark.surface}>
-        <TouchableOpacity
-          onPress={() => router.push(`/modais/contaHistoricoModal?vendaId=${item.id}`)}
-          style={[styles.button, item.excluida == true && { backgroundColor: styles.disabledBackground.backgroundColor }]}
-          disabled={item.excluida == true}
-        >
-          <FontAwesome name="eye" size={20} color={colors.background} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => handlePrint(item.id)}
-          style={[styles.Greenbutton, item.excluida == true && { backgroundColor: styles.disabledBackground.backgroundColor }]}
-          disabled={loadingPrint === item.id || item.excluida == true}
-        >
-          {loadingPrint === item.id ? (
-            <ActivityIndicator size="small" color={colors.background} />
-          ) : (
-            <FontAwesome name="print" size={20} color={colors.background} />
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => handleExcluir(item.id)}
-          style={[styles.Redbutton, item.excluida == true && { backgroundColor: styles.disabledBackground.backgroundColor }]}
-          disabled={item.excluida == true}
-        >
-          <FontAwesome name="trash" size={20} color="#fff" />
-        </TouchableOpacity>
-      </View>
-    </View>
+    <VendaItem
+      data={item}
+      index={index}
+      onView={() => router.push(`/modais/contaHistoricoModal?vendaId=${item.id}`)}
+      onPrint={() => handlePrint(item.id)}
+      onDelete={() => handleExcluir(item.id)}
+      printing={loadingPrint === item.id}
+    />
   );
 
-  const renderVendasPorData = (data: string, vendas: (VendaDatabase & { produtos: string[] })[]) => {
-    const totalVendas = vendas
+  const renderVendasPorData = (data: string, vendasDoDia: (VendaDatabase & { produtos: string[] })[]) => {
+    const totalVendas = vendasDoDia
       .filter((venda) => venda.excluida != true)
       .reduce((acc, venda) => acc + venda.total, 0)
       .toFixed(2);
@@ -371,10 +258,10 @@ export default function HistoricoScreen() {
     const dataFormatada = `${ano}-${mes}-${dia}`;
 
     const dataRenderizada =
-      dataFormatada === hoje.toISOString().split("T")[0]
-        ? "Hoje"
-        : dataFormatada === ontem.toISOString().split("T")[0]
-          ? "Ontem"
+      dataFormatada === hoje.toISOString().split('T')[0]
+        ? 'Hoje'
+        : dataFormatada === ontem.toISOString().split('T')[0]
+          ? 'Ontem'
           : data;
 
     return (
@@ -382,11 +269,7 @@ export default function HistoricoScreen() {
         <Text style={styles.dateHeader}>
           {dataRenderizada} - Total: R$ {totalVendas}
         </Text>
-        <FlatList
-          data={vendas}
-          renderItem={renderVendaItem}
-          keyExtractor={(item) => String(item.id)}
-        />
+        <FlatList data={vendasDoDia} renderItem={renderVendaItem} keyExtractor={(item) => String(item.id)} />
       </View>
     );
   };
@@ -397,41 +280,31 @@ export default function HistoricoScreen() {
 
       <View style={styles.dateContainer}>
         <Text style={styles.label}>Selecione uma data:</Text>
-        <TouchableOpacity 
-          style={styles.dateButton} 
-          onPress={() => setShowCalendar(true)}
-        >
+        <TouchableOpacity style={styles.dateButton} onPress={() => setShowCalendar(true)}>
           <Text style={styles.dateText}>
-            {searchDate.toLocaleDateString('pt-BR', { 
-              weekday: 'short', 
-              day: '2-digit', 
-              month: '2-digit', 
-              year: 'numeric' 
+            {searchDate.toLocaleDateString('pt-BR', {
+              weekday: 'short',
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
             })}
           </Text>
         </TouchableOpacity>
-        
-        <Modal
-          visible={showCalendar}
-          transparent={true}
-          animationType="slide"
-        >
+
+        <Modal visible={showCalendar} transparent animationType="slide">
           <View style={styles.modalContainer}>
-            <View style={styles.calendarContainer}>
+            <View style={styles.calendarContainer} lightColor={Colors.light.surface} darkColor={Colors.dark.surface}>
               <Text style={styles.modalTitle}>Selecione a Data</Text>
-              
+
               <Calendar
                 current={formatCalendarDate(searchDate)}
-                onDayPress={(day: {timestamp: number; dateString: string; day: number; month: number; year: number}) => {
+                onDayPress={(day: { timestamp: number; dateString: string; day: number; month: number; year: number }) => {
                   const selectedDate = new Date(day.year, day.month - 1, day.day, 12, 0, 0);
                   setSearchDate(selectedDate);
                   setShowCalendar(false);
                 }}
                 markedDates={{
-                  [formatCalendarDate(searchDate)]: {
-                    selected: true,
-                    selectedColor: colors.primary,
-                  }
+                  [formatCalendarDate(searchDate)]: { selected: true, selectedColor: colors.primary },
                 }}
                 theme={{
                   calendarBackground: colors.surface,
@@ -449,11 +322,8 @@ export default function HistoricoScreen() {
                 }}
                 firstDay={0}
               />
-              
-              <TouchableOpacity 
-                style={styles.closeButton}
-                onPress={() => setShowCalendar(false)}
-              >
+
+              <TouchableOpacity style={styles.closeButton} onPress={() => setShowCalendar(false)}>
                 <Text style={styles.closeButtonText}>Fechar</Text>
               </TouchableOpacity>
             </View>
@@ -461,10 +331,7 @@ export default function HistoricoScreen() {
         </Modal>
       </View>
 
-      <TouchableOpacity 
-        style={styles.searchButton}
-        onPress={handleSearch}
-      >
+      <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
         <Text style={styles.searchButtonText}>Buscar</Text>
       </TouchableOpacity>
 
@@ -482,7 +349,7 @@ export default function HistoricoScreen() {
             return renderVendasPorData(data, vendasDoDia);
           }}
           keyExtractor={(item) => item[0]}
-          showsVerticalScrollIndicator={true}
+          showsVerticalScrollIndicator
           style={{ flex: 1 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListEmptyComponent={<EmptyState icon="clock-o" title="Nenhuma venda no período" message="Busque outra data ou aguarde novas vendas." />}
