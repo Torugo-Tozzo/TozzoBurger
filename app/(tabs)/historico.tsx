@@ -18,6 +18,27 @@ import { RecordCardSkeleton } from '@/components/ui/RecordCardSkeleton';
 import { VendaItem } from '@/components/VendaItem';
 import { spacing, type } from '@/constants/theme';
 
+// Evita re-render de toda a lista (perde React.memo dos cards) quando o
+// refetch em foco de aba traz o mesmo conteudo de antes - so muda o estado
+// se algo de fato mudou.
+function isVendasPorDataEqual(
+  a: Record<string, VendaDatabase[]>,
+  b: Record<string, VendaDatabase[]>
+): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    const aList = a[key];
+    const bList = b[key];
+    if (!bList || aList.length !== bList.length) return false;
+    for (let i = 0; i < aList.length; i++) {
+      if (aList[i].id !== bList[i].id || aList[i].updated_at !== bList[i].updated_at) return false;
+    }
+  }
+  return true;
+}
+
 export default function HistoricoScreen() {
   const [vendas, setVendas] = useState<Record<string, VendaDatabase[]>>({});
   const [searchDate, setSearchDate] = useState(new Date());
@@ -124,7 +145,7 @@ export default function HistoricoScreen() {
     try {
       setTitle('Histórico de Vendas (Últimos 3 dias)');
       const vendasData = await listVendasRecentes();
-      setVendas(vendasData);
+      setVendas((prev) => (isVendasPorDataEqual(prev, vendasData) ? prev : vendasData));
       setLoading(false);
     } catch (error) {
       console.error(error);

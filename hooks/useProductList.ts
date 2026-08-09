@@ -3,6 +3,17 @@ import {  useProductDatabase } from "@/database/useProductDatabase"
 import { ProductDatabase } from "@/database/types/Produto"
 import { useAutoSync } from '@/context/AutoSyncContext'
 
+// Evita re-render de toda a lista (perde React.memo dos cards) quando o
+// refetch em foco de aba traz o mesmo conteudo de antes - so muda o estado
+// se algo de fato mudou.
+function isProductsEqual(a: ProductDatabase[], b: ProductDatabase[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].id !== b[i].id || a[i].updated_at !== b[i].updated_at) return false
+  }
+  return true
+}
+
 export function useProductList() {
   const [search, setSearch] = useState("")
   const [products, setProducts] = useState<ProductDatabase[]>([])
@@ -17,7 +28,7 @@ export function useProductList() {
     setIsLoading(true)
     try {
       const response = await productDatabase.searchByName(search)
-      setProducts(response)
+      setProducts((prev) => (isProductsEqual(prev, response) ? prev : response))
     } catch (error) {
       console.log(error)
     } finally {
@@ -42,7 +53,7 @@ export function useProductList() {
       setIsLoading(true)
       try {
         const filtered = await productDatabase.filterByTipo(tipoId)
-        setProducts(filtered)
+        setProducts((prev) => (isProductsEqual(prev, filtered) ? prev : filtered))
       } catch (error) {
         console.log(error)
       } finally {

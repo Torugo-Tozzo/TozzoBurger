@@ -15,6 +15,27 @@ import { PedidoDatabase } from '@/database/types/Pedido';
 
 type PedidoComProdutos = PedidoDatabase & { produtos: string[] };
 
+// Evita re-render de toda a lista (perde React.memo dos cards) quando o
+// refetch em foco de aba traz o mesmo conteudo de antes - so muda o estado
+// se algo de fato mudou.
+function isPedidosPorDataEqual(
+  a: Record<string, PedidoComProdutos[]>,
+  b: Record<string, PedidoComProdutos[]>
+): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    const aList = a[key];
+    const bList = b[key];
+    if (!bList || aList.length !== bList.length) return false;
+    for (let i = 0; i < aList.length; i++) {
+      if (aList[i].id !== bList[i].id || aList[i].updated_at !== bList[i].updated_at) return false;
+    }
+  }
+  return true;
+}
+
 export default function Pedidos() {
   const { listPedidosRecentes, listPedidosRecentesPorUsuario, removePedido } = usePedidosDatabase();
   const { lastSync } = useAutoSync();
@@ -30,7 +51,7 @@ export default function Pedidos() {
       const data = isCliente && user?.id
         ? await listPedidosRecentesPorUsuario(user.id)
         : await listPedidosRecentes();
-      setPedidosPorData(data);
+      setPedidosPorData((prev) => (isPedidosPorDataEqual(prev, data) ? prev : data));
     } catch (err) {
       console.error('Erro ao carregar pedidos:', err);
     } finally {
