@@ -58,8 +58,16 @@ export function useProductDatabase() {
     }
   }
 
-  async function searchByName(name: string) {
+  async function searchByName(name: string, limit?: number, offset?: number) {
     try {
+      if (limit !== undefined) {
+        const query = `SELECT P.* FROM TB_PRODUTOS P JOIN TB_TP_PRODUTO T ON P.tipoProdutoId = T.id WHERE P.deleted_at IS NULL AND T.ativo = 1 AND P.nome LIKE ? ORDER BY P.nome ASC LIMIT ? OFFSET ?`
+
+        const response = await database.getAllAsync<ProductDatabase>(query, [`%${name}%`, limit, offset ?? 0])
+
+        return response
+      }
+
       const query = `SELECT P.* FROM TB_PRODUTOS P JOIN TB_TP_PRODUTO T ON P.tipoProdutoId = T.id WHERE P.deleted_at IS NULL AND T.ativo = 1 AND P.nome LIKE ?`
 
       const response = await database.getAllAsync<ProductDatabase>(query, `%${name}%`)
@@ -146,11 +154,11 @@ export function useProductDatabase() {
     }
   }
 
-  async function filterByTipo(tipoProdutoId: number): Promise<ProductDatabase[]> {
+  async function filterByTipo(tipoProdutoId: number, limit: number, offset: number): Promise<ProductDatabase[]> {
     try {
-      const query = `SELECT P.* FROM TB_PRODUTOS P JOIN TB_TP_PRODUTO T ON P.tipoProdutoId = T.id WHERE P.deleted_at IS NULL AND T.ativo = 1 AND P.tipoProdutoId = ?`
+      const query = `SELECT P.* FROM TB_PRODUTOS P JOIN TB_TP_PRODUTO T ON P.tipoProdutoId = T.id WHERE P.deleted_at IS NULL AND T.ativo = 1 AND P.tipoProdutoId = ? ORDER BY P.nome ASC LIMIT ? OFFSET ?`
 
-      const response = await database.getAllAsync<ProductDatabase>(query, [tipoProdutoId])
+      const response = await database.getAllAsync<ProductDatabase>(query, [tipoProdutoId, limit, offset])
 
       return response
     } catch (error) {
