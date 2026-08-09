@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import { StyleSheet, FlatList, Alert, RefreshControl } from "react-native";
+import { ActivityIndicator, StyleSheet, FlatList, Alert, RefreshControl } from "react-native";
 import { Text, View } from "@/components/Themed";
 import { useProductDatabase } from "@/database/useProductDatabase";
 import { useFocusEffect } from "@react-navigation/native";
@@ -15,7 +15,7 @@ import { useMinLoadingDuration } from "@/hooks/useMinLoadingDuration";
 
 export default function ProdutosScreen() {
   const { remove } = useProductDatabase();
-  const { products, tiposProduto, tipoProdutoId, filterByTipo, setSearch, isLoading } = useProductList()
+  const { products, tiposProduto, tipoProdutoId, filterByTipo, setSearch, isLoading, isLoadingMore, loadMore } = useProductList()
   const { refreshing, onRefresh } = useSyncRefresh();
 
   useFocusEffect(
@@ -50,6 +50,9 @@ export default function ProdutosScreen() {
           keyExtractor={(item) => String(item.id)}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto cadastrado" message="Toque no + pra adicionar o primeiro item." />}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
           renderItem={({ item }) => {
             const tipo = tiposProduto?.find((t: any) => Number(t.id) === Number(item.tipoProdutoId))?.descricao;
 
@@ -95,5 +98,8 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 16,
+  },
+  footerLoader: {
+    paddingVertical: 16,
   },
 });
