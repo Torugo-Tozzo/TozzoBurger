@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {  useProductDatabase } from "@/database/useProductDatabase"
 import { ProductDatabase } from "@/database/types/Produto"
 import { useAutoSync } from '@/context/AutoSyncContext'
@@ -25,11 +25,13 @@ export function useProductList() {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
+  const requestIdRef = useRef(0)
 
   const productDatabase = useProductDatabase()
 
   // Função para listar os produtos (página 1)
   const list = async () => {
+    requestIdRef.current += 1
     setIsLoading(true)
     try {
       const response = await productDatabase.searchByName(search, PAGE_SIZE, 0)
@@ -56,6 +58,7 @@ export function useProductList() {
   // Função para filtrar produtos por tipo (página 1)
   const filterByTipo = async (tipoId: number | null) => {
     if (tipoId) {
+      requestIdRef.current += 1
       setTipoProdutoId(String(tipoId))
       setIsLoading(true)
       try {
@@ -77,6 +80,7 @@ export function useProductList() {
   // Carrega a proxima pagina e concatena ao final da lista ja exibida
   const loadMore = async () => {
     if (!hasMore || isLoadingMore) return
+    const requestId = requestIdRef.current
     setIsLoadingMore(true)
     try {
       const nextPage = page + 1
@@ -84,6 +88,7 @@ export function useProductList() {
       const more = tipoProdutoId
         ? await productDatabase.filterByTipo(Number(tipoProdutoId), PAGE_SIZE, offset)
         : await productDatabase.searchByName(search, PAGE_SIZE, offset)
+      if (requestId !== requestIdRef.current) return
       setProducts((prev) => [...prev, ...more])
       setPage(nextPage)
       setHasMore(more.length === PAGE_SIZE)
