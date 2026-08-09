@@ -90,8 +90,10 @@ export default function Pedidos() {
     />
   );
 
-  const hasData = Object.keys(pedidosPorData).length > 0;
-  const showSkeleton = useMinLoadingDuration(isLoading && !hasData);
+  // Skeleton sempre que tiver fetch rolando (nao so no primeiro load) - troca
+  // de aba sem feedback visual nenhum parecia travada, pedido explicito do
+  // usuario apos testar ao vivo.
+  const showSkeleton = useMinLoadingDuration(isLoading);
 
   if (showSkeleton) {
     return (

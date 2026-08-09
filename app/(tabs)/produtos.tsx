@@ -25,7 +25,10 @@ export default function ProdutosScreen() {
     }, [])
   );
 
-  const showSkeleton = useMinLoadingDuration(isLoading && products.length === 0);
+  // Skeleton sempre que tiver fetch rolando (nao so no primeiro load) - troca
+  // de aba sem feedback visual nenhum parecia travada, pedido explicito do
+  // usuario apos testar ao vivo.
+  const showSkeleton = useMinLoadingDuration(isLoading);
 
   return (
     <View style={styles.container}>
