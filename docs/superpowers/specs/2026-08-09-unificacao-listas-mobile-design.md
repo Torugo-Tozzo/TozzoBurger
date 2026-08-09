@@ -10,6 +10,7 @@ Auditoria feita nesta sessão (read-only, 3 telas mobile + componentes do site):
 
 - **`pedidos.tsx`** → `PedidoItem.tsx`: já usa `Card`/`Badge` (Fase 5), mas achado um bug — recebe prop `onDelete` desde sempre e nunca renderiza nenhum botão de excluir no JSX. Hoje não existe forma de excluir pedido pela lista.
 - **`index.tsx`** (produtos/venda) → `ProductItemVenda.tsx`: já usa `Card`/`Badge`, mas é conceitualmente diferente — card de catálogo pra adicionar à conta (nome+preço+badge tipo+quick-add+botão redondo), não registro com status/ações de editar/excluir.
+- **`produtos.tsx`** (gerenciamento/CRUD, tela separada de `index.tsx`) → `Product.tsx`: **achado durante o planejamento**, não coberto no brainstorm original. Usa `Card`/`Badge` mas as ações de editar/excluir são `TouchableOpacity`+`FontAwesome` cru (`Product.tsx:38-46`), sem o `IconButton` novo — mesmo problema de inconsistência da leva. Entra no mesmo tratamento de polish do `ProductItemVenda.tsx` (mesma categoria de fix já aprovada, não é decisão de design nova).
 - **`historico.tsx`**: **não** usa nenhum componente da Fase 5 — `StyleSheet` cru próprio, 3 `TouchableOpacity` quadrados coloridos (ver/imprimir/excluir), tipografia e cores hardcoded ignorando `spacing`/`type`/`radius`/tokens.
 - **Site** (`PedidosTab.tsx`/`VendasTab.tsx`): `Card > Table > TableRow` com barra de cor à esquerda via `box-shadow` inset (`accentColor`, status do pedido; fixo cinza — `getStatusColor('FECHADO')` — pras vendas, que não têm status), divisor tracejado entre linhas, coluna de ações à direita com `IconButton` ghost (`Printer`/`Pencil`/`Trash2` pedidos; `Printer`/`Eye` vendas — vermelho no destructive).
 - **Dado disponível não usado**: `PedidoDatabase`/`VendaDatabase` (SQLite local) já têm `criado_por`, nunca renderizado em nenhuma tela.
@@ -69,11 +70,13 @@ Estrutura: `Card` com `padding={0}`, barra de cor via `View` posicionada absolut
 - `strikethrough` quando `item.excluida`.
 - `historico.tsx` fica só como orquestrador (busca por data, calendário, agrupamento) — sem JSX de linha embutido. `StyleSheet` interno reduz drasticamente (só o que sobra: calendário/modal de data/botão buscar).
 
-### `ProductItemVenda.tsx` — só polish, sem trocar estrutura
+### `ProductItemVenda.tsx` e `Product.tsx` — só polish, sem trocar estrutura
 
-- Mantém layout de card de catálogo (nome+preço, badge tipo, flash quick-add, botão + redondo).
-- Ajusta borda do `Card` pra bater espessura/cor com o `RecordCard` novo.
-- Botão + redondo passa a usar o `IconButton` novo (variante circular) em vez do estilo `addButton` duplicado hoje em `ProductItemVenda.tsx:80`.
+Nenhum dos dois vira `RecordCard` (catálogo de produto, não registro com status). Só ganham a mesma linguagem de botão/borda:
+
+- **`ProductItemVenda.tsx`**: mantém layout (nome+preço, badge tipo, flash quick-add, botão + redondo). Botão + redondo passa a usar o `IconButton` novo (variante circular) em vez do estilo `addButton` duplicado hoje (`ProductItemVenda.tsx:80`).
+- **`Product.tsx`**: mantém layout (nome+preço, badge tipo, editar+excluir). Os 2 `TouchableOpacity`+`FontAwesome` crus (`Product.tsx:38-46`) viram 2 `IconButton` (editar = ghost normal, excluir = `destructive`) — mesmo componente usado nas ações do `RecordCard`, garantindo que o botão de excluir tenha a cara idêntica em pedidos/histórico/produtos.
+- Ambos ajustam borda do `Card` pra bater espessura/cor com o `RecordCard` novo.
 
 ## Fora do escopo
 
