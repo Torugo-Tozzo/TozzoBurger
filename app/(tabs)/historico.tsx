@@ -293,7 +293,7 @@ export default function HistoricoScreen() {
 
         <Modal visible={showCalendar} transparent animationType="slide">
           <View style={styles.modalContainer}>
-            <View style={styles.calendarContainer} lightColor={Colors.light.surface} darkColor={Colors.dark.surface}>
+            <View style={styles.calendarContainer}>
               <Text style={styles.modalTitle}>Selecione a Data</Text>
 
               <Calendar
