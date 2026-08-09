@@ -1,4 +1,4 @@
-import { FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet } from 'react-native';
 import { View } from '@/components/Themed';
 import { ProductItemVenda } from '@/components/ProductItemVenda';
 import { FiltroTipos } from '@/components/FiltroTipos';
@@ -31,7 +31,7 @@ function CartButton() {
 }
 
 export default function VendaScreen() {
-  const { products, tiposProduto, tipoProdutoId, filterByTipo, setSearch, search, isLoading } = useProductList();
+  const { products, tiposProduto, tipoProdutoId, filterByTipo, setSearch, search, isLoading, isLoadingMore, loadMore } = useProductList();
   const { searchOrigemProdutoId, create, showAdd } = useProductDatabase();
   // Apenas funções estáveis — NÃO lê `cart`, então não re-renderiza quando cart muda
   const { addToCart, addIfNotInCart } = useCartActions();
@@ -107,6 +107,9 @@ export default function VendaScreen() {
           contentContainerStyle={listContentStyle}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto encontrado" message="Ajuste a busca ou o filtro de tipo." />}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
         />
       )}
 
@@ -133,5 +136,8 @@ const styles = StyleSheet.create({
     marginVertical: 30,
     height: 1,
     width: '80%',
+  },
+  footerLoader: {
+    paddingVertical: 16,
   },
 });
