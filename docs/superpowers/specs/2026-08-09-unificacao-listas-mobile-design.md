@@ -37,6 +37,11 @@ title: string               // cliente
 subtitle?: string           // resumo de itens (cinza, trunca)
 meta?: string                // "Criado por X · HH:mm"
 total: number                 // formatado em negrito, alinhado à direita
+badge?: { label: string; color: string }  // reaproveita o Badge existente — pedidos mantém o
+                                            // label textual do status (a barra de cor sozinha
+                                            // perde legibilidade — cor não substitui texto).
+                                            // Histórico não usa (venda não tem status, site
+                                            // também não mostra pill pra venda).
 strikethrough?: boolean         // venda excluída — reaproveita o line-through já existente
 actions: Array<{
   icon: ReactNode
