@@ -55,13 +55,25 @@ actions: Array<{
 
 Estrutura: `Card` com `padding={0}`, barra de cor via `View` posicionada absoluta à esquerda (não `borderLeftWidth` — mesmo motivo do site: evita disputa visual com a borda de 1px do `Card` via colisão de espessura), divisor tracejado embaixo (`borderStyle: 'dashed'`).
 
+## "Criado por" — escopo expandido (achado no planejamento)
+
+`criado_por` (SQLite local) guarda só o **ID** do vendedor (`usuarioVendedorId`), nunca o nome — não dá pra exibir direto. Investigado durante o planejamento: o nome existe no servidor (`Usuario.nome`, relação `vendedor` em `Pedido`/`Venda`, `prisma/schema.prisma:124`/`186`), mas **o endpoint de pull não inclui essa relação** (`obterAlteracoes` em `sincronizacao.controller.ts` só faz `include: { itens: true }`) — então o app nunca recebeu o nome, só o ID.
+
+Decisão (usuário, 2026-08-09): expandir escopo pra resolver de verdade, em vez de mostrar só quando for o próprio usuário ou remover o campo. Isso passa a tocar API + schema local + sync pull-apply, **amplia o limite original da spec** ("não mexe em sync/dados") especificamente pra esse dado:
+
+- **API** (`modules/sincronizacao/sincronizacao.controller.ts`, `obterAlteracoes`): as 4 queries de `pedidos`/`vendas` (2 branches cada, `sinceDate` e fallback) ganham `include: { vendedor: { select: { id: true, nome: true } } }` junto do `itens: true` já existente.
+- **Schema local** (`database/initializeDatabase.ts`): coluna nova `criado_por_nome TEXT NULL` em `TB_PEDIDOS` e `TB_VENDAS` — `SCHEMA_VERSION` sobe de `1004` pra `1005`, `ALTER TABLE` novo no bloco de migração (mesmo padrão do `criado_por` que já existe ali).
+- **Sync pull-apply** (`database/useSyncDatabase.ts`): ao aplicar pedidos/vendas vindos do pull, captura `ped.vendedor?.nome`/`ven.vendedor?.nome` e grava em `criado_por_nome` (junto do `criado_por` que já é gravado hoje).
+- **Criação local** (`database/usePedidoDatabase.ts`/`database/useVendaDatabse.ts`): ao criar pedido/venda localmente (antes de sincronizar), grava `criado_por_nome` já com o nome do usuário logado (`useAuth()` já tem isso em memória) — não espera um round-trip de sync pra mostrar o nome de quem acabou de criar.
+- Isso é aditivo (coluna nova, nenhuma coluna/comportamento existente muda) — não mexe em `syncGuard`/`AutoSyncContext`/ordem push-then-pull, só amplia o payload de pull e o schema local.
+
 ## Migração por tela
 
 ### `PedidoItem.tsx` → usa `RecordCard`
 
 - `accentColor = getStatusColor(status)` (dinâmico, 4 estados — já existe).
 - `title` = cliente, `subtitle` = resumo de produtos (já existia, só muda de lugar).
-- `meta` = `Criado por ${criado_por} · ${hora}` — campo novo exibido, dado já existe no banco local.
+- `meta` = `Criado por ${criado_por_nome} · ${hora}` (omite o segmento "Criado por" se `criado_por_nome` for nulo — registro antigo, pré-migração) — campo novo, ver seção "Criado por" acima.
 - `actions`: editar (`pencil`, sempre habilitado) + excluir (`trash`, `destructive`) — **corrige o bug do `onDelete` morto**: agora o array de ações renderiza de verdade, `handleDelete` (já existe em `pedidos.tsx`) passa a ter efeito.
 - Sem ícone de impressão — mobile não imprime pedido (só conta/venda via `contaModal`/`contaHistoricoModal`). Diferente do site, que mostra o ícone desabilitado como aviso de feature futura; não replico um botão sem função nenhuma no app.
 
@@ -70,7 +82,7 @@ Estrutura: `Card` com `padding={0}`, barra de cor via `View` posicionada absolut
 - Novo arquivo `components/VendaItem.tsx` recebe a `venda` + callbacks (`onView`, `onPrint`, `onDelete`) e monta o `RecordCard`.
 - `accentColor` fixo (`getStatusColor('FECHADO')` — mesmo valor usado pelo site em `VendasTab`, já que venda não tem status próprio como pedido).
 - `subtitle` = resumo de itens vendidos (`item.produtos.join(', ')` — já existe hoje como linha "Itens: ...", só migra de lugar, mesmo tratamento de truncar que `PedidoItem` já tem).
-- `meta` = `Criado por ${criado_por} · ${hora}` (mesmo padrão do pedido — campo também nunca exibido em histórico hoje).
+- `meta` = `Criado por ${criado_por_nome} · ${hora}` (mesmo padrão do pedido, mesmo fallback pra nulo).
 - `actions`: ver (`eye`) → imprimir (`print`, **funcional** — mobile tem impressora térmica BLE que o site ainda não tem, `loading` durante `handlePrint`) → excluir (`trash`, `destructive`) — mantém as 3 ações que já existem, só troca a casca visual.
 - `strikethrough` quando `item.excluida`.
 - `historico.tsx` fica só como orquestrador (busca por data, calendário, agrupamento) — sem JSX de linha embutido. `StyleSheet` interno reduz drasticamente (só o que sobra: calendário/modal de data/botão buscar).
@@ -86,7 +98,7 @@ Nenhum dos dois vira `RecordCard` (catálogo de produto, não registro com statu
 ## Fora do escopo
 
 - **Realtime via WebSocket** (sinal instantâneo de mudança substituindo o gatilho atual de foreground/reconexão/refresh manual) — decidido nesta mesma sessão, mas é mudança de arquitetura (API + app), spec própria depois desta.
-- Qualquer mudança de comportamento de sync/dados — é reforma visual + 1 bug fix (delete morto em pedidos) + 1 exposição de dado já existente (`criado_por`). Não mexe em `syncGuard`/`AutoSyncContext`/payload de sync.
+- Mudança de comportamento de sync além do necessário pra `criado_por_nome` (seção acima) — é reforma visual + 1 bug fix (delete morto em pedidos) + esse campo. Não mexe em `syncGuard`/`AutoSyncContext`/ordem push-then-pull.
 - Coluna "criado por" no site não é tocada (já existe lá).
 
 ## Testes
