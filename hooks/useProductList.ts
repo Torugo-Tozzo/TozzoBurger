@@ -1,4 +1,3 @@
-// hooks/useProductList.ts
 import { useState, useEffect } from "react"
 import {  useProductDatabase } from "@/database/useProductDatabase"
 import { ProductDatabase } from "@/database/types/Produto"
@@ -9,16 +8,20 @@ export function useProductList() {
   const [products, setProducts] = useState<ProductDatabase[]>([])
   const [tiposProduto, setTiposProduto] = useState<{ id: number; descricao: string }[]>([])
   const [tipoProdutoId, setTipoProdutoId] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
 
   const productDatabase = useProductDatabase()
 
   // Função para listar os produtos
   const list = async () => {
+    setIsLoading(true)
     try {
       const response = await productDatabase.searchByName(search)
       setProducts(response)
     } catch (error) {
       console.log(error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -34,17 +37,20 @@ export function useProductList() {
 
   // Função para filtrar produtos por tipo
   const filterByTipo = async (tipoId: number | null) => {
-    try {
-      if (tipoId) {
-        setTipoProdutoId(String(tipoId))
+    if (tipoId) {
+      setTipoProdutoId(String(tipoId))
+      setIsLoading(true)
+      try {
         const filtered = await productDatabase.filterByTipo(tipoId)
         setProducts(filtered)
-      } else {
-        setTipoProdutoId("")
-        await list()
+      } catch (error) {
+        console.log(error)
+      } finally {
+        setIsLoading(false)
       }
-    } catch (error) {
-      console.log(error)
+    } else {
+      setTipoProdutoId("")
+      await list()
     }
   }
 
@@ -65,7 +71,8 @@ export function useProductList() {
     setTipoProdutoId,
     filterByTipo,
     setProducts,
-    setTiposProduto
+    setTiposProduto,
+    isLoading,
   }
 }
 
