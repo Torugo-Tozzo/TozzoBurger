@@ -5,6 +5,8 @@ import { FiltroTipos } from '@/components/FiltroTipos';
 import { Input } from '@/components/Input';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ProductCardSkeleton } from '@/components/ui/ProductCardSkeleton';
+import { useMinLoadingDuration } from '@/hooks/useMinLoadingDuration';
 import { spacing } from '@/constants/theme';
 import useProductList from '@/hooks/useProductList';
 import { useProductDatabase } from "@/database/useProductDatabase";
@@ -29,7 +31,7 @@ function CartButton() {
 }
 
 export default function VendaScreen() {
-  const { products, tiposProduto, tipoProdutoId, filterByTipo, setSearch, search } = useProductList();
+  const { products, tiposProduto, tipoProdutoId, filterByTipo, setSearch, search, isLoading } = useProductList();
   const { searchOrigemProdutoId, create, showAdd } = useProductDatabase();
   // Apenas funções estáveis — NÃO lê `cart`, então não re-renderiza quando cart muda
   const { addToCart, addIfNotInCart } = useCartActions();
@@ -77,6 +79,8 @@ export default function VendaScreen() {
 
   const keyExtractor = useCallback((item: ProductDatabase) => String(item.id), []);
 
+  const showSkeleton = useMinLoadingDuration(isLoading && products.length === 0);
+
   return (
     <View style={styles.container}>
       <Input placeholder="Pesquisar" onChangeText={setSearch} value={search} />
@@ -87,14 +91,24 @@ export default function VendaScreen() {
         onSelect={filterByTipo}
       />
 
-      <FlatList
-        data={products}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        contentContainerStyle={listContentStyle}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto encontrado" message="Ajuste a busca ou o filtro de tipo." />}
-      />
+      {showSkeleton ? (
+        <>
+          <ProductCardSkeleton />
+          <ProductCardSkeleton />
+          <ProductCardSkeleton />
+          <ProductCardSkeleton />
+          <ProductCardSkeleton />
+        </>
+      ) : (
+        <FlatList
+          data={products}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          contentContainerStyle={listContentStyle}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto encontrado" message="Ajuste a busca ou o filtro de tipo." />}
+        />
+      )}
 
       <CartButton />
     </View>
