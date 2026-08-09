@@ -300,11 +300,12 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_PEDIDOS WHERE id = ?`, [id]).catch(() => null);
 
           const criadoPor = ped.usuarioVendedorId ? String(ped.usuarioVendedorId) : (ped.vendedor?.id ? String(ped.vendedor.id) : null);
+          const criadoPorNome = ped.vendedor?.nome ? String(ped.vendedor.nome) : null;
 
           if (!local) {
             await database.runAsync(
-              'INSERT INTO TB_PEDIDOS (id, total, horario, cliente, status, updated_at, deleted_at, criado_por) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-              [id, Number(ped.total ?? 0), horario, cliente, status, updatedAt, deletedAt, criadoPor]
+              'INSERT INTO TB_PEDIDOS (id, total, horario, cliente, status, updated_at, deleted_at, criado_por, criado_por_nome) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              [id, Number(ped.total ?? 0), horario, cliente, status, updatedAt, deletedAt, criadoPor, criadoPorNome]
             ).catch((e) => console.warn('[sync] db op failed', e));
             for (const it of itensArray) {
               const produtoId = String(it.produtoId);
@@ -318,8 +319,8 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
             const localUpdated = Number(local.updated_at || 0);
             if (updatedAt >= localUpdated) {
               await database.runAsync(
-                'UPDATE TB_PEDIDOS SET total = ?, horario = ?, cliente = ?, status = ?, updated_at = ?, deleted_at = ?, criado_por = ?, sync_status = ? WHERE id = ?',
-                [Number(ped.total ?? 0), horario, cliente, status, updatedAt, deletedAt, criadoPor, 'synced', id]
+                'UPDATE TB_PEDIDOS SET total = ?, horario = ?, cliente = ?, status = ?, updated_at = ?, deleted_at = ?, criado_por = ?, criado_por_nome = ?, sync_status = ? WHERE id = ?',
+                [Number(ped.total ?? 0), horario, cliente, status, updatedAt, deletedAt, criadoPor, criadoPorNome, 'synced', id]
               ).catch((e) => console.warn('[sync] db op failed', e));
               await database.runAsync('DELETE FROM RL_PEDIDO_PRODUTO WHERE pedidoId = ?', [id]).catch((e) => console.warn('[sync] db op failed', e));
               for (const it of itensArray) {
@@ -368,13 +369,14 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           console.log('[sync] venda itens', { id, itensArray });
 
           const venCriadoPor = ven.usuarioVendedorId ? String(ven.usuarioVendedorId) : (ven.vendedor?.id ? String(ven.vendedor.id) : null);
+          const venCriadoPorNome = ven.vendedor?.nome ? String(ven.vendedor.nome) : null;
 
           const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_VENDAS WHERE id = ?`, [id]).catch(() => null);
 
           if (!local) {
             await database.runAsync(
-              'INSERT INTO TB_VENDAS (id, total, horario, cliente, excluida, updated_at, deleted_at, criado_por) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-              [id, Number(ven.total ?? 0), horario, cliente, excluida, updatedAt, deletedAt, venCriadoPor]
+              'INSERT INTO TB_VENDAS (id, total, horario, cliente, excluida, updated_at, deleted_at, criado_por, criado_por_nome) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              [id, Number(ven.total ?? 0), horario, cliente, excluida, updatedAt, deletedAt, venCriadoPor, venCriadoPorNome]
             ).catch((e) => console.warn('[sync] db op failed', e));
             for (const it of itensArray) {
               const produtoId = String(it.produtoId);
@@ -388,8 +390,8 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
             const localUpdated = Number(local.updated_at || 0);
             if (updatedAt >= localUpdated) {
               await database.runAsync(
-                'UPDATE TB_VENDAS SET total = ?, horario = ?, cliente = ?, excluida = ?, updated_at = ?, deleted_at = ?, criado_por = ?, sync_status = ? WHERE id = ?',
-                [Number(ven.total ?? 0), horario, cliente, excluida, updatedAt, deletedAt, venCriadoPor, 'synced', id]
+                'UPDATE TB_VENDAS SET total = ?, horario = ?, cliente = ?, excluida = ?, updated_at = ?, deleted_at = ?, criado_por = ?, criado_por_nome = ?, sync_status = ? WHERE id = ?',
+                [Number(ven.total ?? 0), horario, cliente, excluida, updatedAt, deletedAt, venCriadoPor, venCriadoPorNome, 'synced', id]
               ).catch((e) => console.warn('[sync] db op failed', e));
               await database.runAsync('DELETE FROM RL_VENDA_PRODUTO WHERE vendaId = ?', [id]).catch((e) => console.warn('[sync] db op failed', e));
               for (const it of itensArray) {
