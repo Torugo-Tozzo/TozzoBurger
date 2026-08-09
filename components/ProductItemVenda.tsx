@@ -3,6 +3,7 @@ import { Animated, Pressable, useColorScheme, Easing, View, StyleSheet } from "r
 import { Text } from "@/components/Themed";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { IconButton } from "@/components/ui/IconButton";
 import { IngredientesModal } from "@/components/ui/IngredientesModal";
 import { ProductDatabase } from "@/database/types/Produto";
 import { FontAwesome } from "@expo/vector-icons";
@@ -54,12 +55,15 @@ function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome 
       </Animated.View>
 
       <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
-        <Pressable
-          onPress={() => { triggerAnimation(buttonScaleAnim); onAddToCart(data); }}
-          style={[styles.addButton, { backgroundColor: colors.primary }]}
-        >
-          <Text style={[styles.addButtonText, { color: colors.background }]}>+</Text>
-        </Pressable>
+        <View style={[styles.addButton, { backgroundColor: colors.primary }]}>
+          <IconButton
+            icon="plus"
+            label="Adicionar à conta"
+            onPress={() => { triggerAnimation(buttonScaleAnim); onAddToCart(data); }}
+            size={20}
+            color={colors.background}
+          />
+        </View>
       </Animated.View>
 
       <IngredientesModal
@@ -78,7 +82,6 @@ const styles = StyleSheet.create({
   nome: { fontSize: type.body, fontWeight: "bold" },
   preco: { fontSize: type.bodySm },
   addButton: { width: 44, height: 44, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', marginLeft: spacing.sm },
-  addButtonText: { fontSize: type.title, fontWeight: '700' },
 });
 
 export const ProductItemVenda = React.memo(ProductItemVendaInner);
