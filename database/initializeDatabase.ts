@@ -1,7 +1,7 @@
 import { type SQLiteDatabase } from "expo-sqlite"
 
 export async function initializeDatabase(database: SQLiteDatabase) {
-  const SCHEMA_VERSION = 1004; //when update the DB schema, increment this value
+  const SCHEMA_VERSION = 1005; //when update the DB schema, increment this value
   let dbVersion = 0;
 
   try {
@@ -58,7 +58,8 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       updated_at INTEGER NOT NULL,
       deleted_at INTEGER NULL,
       sync_status TEXT DEFAULT 'synced',
-      criado_por TEXT NULL
+      criado_por TEXT NULL,
+      criado_por_nome TEXT NULL
     );
   `);
 
@@ -73,7 +74,8 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       updated_at INTEGER NOT NULL,
       deleted_at INTEGER NULL,
       sync_status TEXT DEFAULT 'synced',
-      criado_por TEXT NULL
+      criado_por TEXT NULL,
+      criado_por_nome TEXT NULL
     );
   `);
 
@@ -163,6 +165,16 @@ export async function initializeDatabase(database: SQLiteDatabase) {
       }
       try {
         await database.execAsync(`ALTER TABLE TB_VENDAS ADD COLUMN criado_por TEXT NULL;`);
+      } catch (err) {
+        // ignore if column already exists
+      }
+      try {
+        await database.execAsync(`ALTER TABLE TB_PEDIDOS ADD COLUMN criado_por_nome TEXT NULL;`);
+      } catch (err) {
+        // ignore if column already exists
+      }
+      try {
+        await database.execAsync(`ALTER TABLE TB_VENDAS ADD COLUMN criado_por_nome TEXT NULL;`);
       } catch (err) {
         // ignore if column already exists
       }
