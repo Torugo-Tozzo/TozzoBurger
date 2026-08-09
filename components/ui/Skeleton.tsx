@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, DimensionValue, StyleSheet, ViewStyle, useColorScheme } from 'react-native';
+import { Animated, DimensionValue, ViewStyle, useColorScheme } from 'react-native';
 import Colors from '@/constants/Colors';
 import { radius } from '@/constants/theme';
 
