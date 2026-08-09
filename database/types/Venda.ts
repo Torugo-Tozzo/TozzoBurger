@@ -8,6 +8,7 @@ export type VendaDatabase = {
     deleted_at?: number | null;
     sync_status?: string | null;
     criado_por?: string | null;
+    criado_por_nome?: string | null;
 };
 
 export type VendaProduto = {

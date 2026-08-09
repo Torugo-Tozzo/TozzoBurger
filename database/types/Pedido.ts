@@ -10,6 +10,7 @@ export type PedidoDatabase = {
   deleted_at?: number | null;
   sync_status?: string | null;
   criado_por?: string | null;
+  criado_por_nome?: string | null;
 };
 
 export const STATUS_PEDIDO = {
