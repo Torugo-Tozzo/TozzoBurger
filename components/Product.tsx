@@ -1,10 +1,9 @@
-import { Pressable, PressableProps, TouchableOpacity, StyleSheet, useColorScheme, View } from "react-native";
-import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { Pressable, PressableProps, StyleSheet, View } from "react-native";
 import { Text } from "@/components/Themed";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { IconButton } from "@/components/ui/IconButton";
 import { IngredientesModal } from "@/components/ui/IngredientesModal";
-import Colors from '@/constants/Colors';
 import { tipoColors, spacing, type } from '@/constants/theme';
 import { useState } from "react";
 import { ProductDatabase } from "@/database/types/Produto";
@@ -17,8 +16,6 @@ type Props = PressableProps & {
 };
 
 export function Product({ data, onDelete, onOpen, tipoNome, ...rest }: Props) {
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
   const [modalVisible, setModalVisible] = useState(false);
 
   const tipoLabel = tipoNome ?? (data as any).tipoNome ?? `Tipo ${data.tipoProdutoId}`;
@@ -36,13 +33,8 @@ export function Product({ data, onDelete, onOpen, tipoNome, ...rest }: Props) {
         </Pressable>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity onPress={onOpen}>
-            <FontAwesome name="edit" size={28} color={colors.primary} style={{ marginLeft: spacing.lg }} />
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={onDelete}>
-            <FontAwesome name="trash" size={24} color={Colors.status.danger} style={{ marginLeft: spacing.lg }} />
-          </TouchableOpacity>
+          <IconButton icon="pencil" label="Editar produto" onPress={onOpen} />
+          <IconButton icon="trash" label="Excluir produto" onPress={onDelete} destructive />
         </View>
 
         <IngredientesModal
