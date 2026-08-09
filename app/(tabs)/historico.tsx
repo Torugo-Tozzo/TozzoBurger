@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, FlatList, Alert, TouchableOpacity, useColorScheme, ActivityIndicator, Modal, RefreshControl } from 'react-native';
+import { StyleSheet, FlatList, Alert, TouchableOpacity, useColorScheme, Modal, RefreshControl } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useVendasDatabase } from '@/database/useVendaDatabse';
 import { useAutoSync } from '@/context/AutoSyncContext';
@@ -14,6 +14,7 @@ import { sendMessageToDevice } from '@/useBLE';
 import { Calendar } from 'react-native-calendars';
 import Colors from '@/constants/Colors';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { RecordCardSkeleton } from '@/components/ui/RecordCardSkeleton';
 import { VendaItem } from '@/components/VendaItem';
 import { spacing, type } from '@/constants/theme';
 
@@ -82,11 +83,6 @@ export default function HistoricoScreen() {
       color: colors.background,
       fontSize: type.body,
       fontWeight: 'bold',
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
     },
     modalContainer: {
       flex: 1,
@@ -338,9 +334,12 @@ export default function HistoricoScreen() {
       <View style={styles.separator} />
 
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <>
+          <RecordCardSkeleton />
+          <RecordCardSkeleton />
+          <RecordCardSkeleton />
+          <RecordCardSkeleton />
+        </>
       ) : (
         <FlatList
           data={Object.entries(vendas)}
