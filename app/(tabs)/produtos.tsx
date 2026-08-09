@@ -8,12 +8,14 @@ import { useProductList } from "@/hooks/useProductList"
 import { Input } from "@/components/Input"
 import { Product } from "@/components/Product"
 import { router } from "expo-router"
-import { useSyncRefresh } from "@/hooks/useSyncRefresh"
-import { EmptyState } from "@/components/ui/EmptyState"
+import { useSyncRefresh } from "@/hooks/useSyncRefresh";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ProductCardSkeleton } from "@/components/ui/ProductCardSkeleton";
+import { useMinLoadingDuration } from "@/hooks/useMinLoadingDuration";
 
 export default function ProdutosScreen() {
   const { remove } = useProductDatabase();
-  const { products, tiposProduto, tipoProdutoId, filterByTipo, setSearch } = useProductList()
+  const { products, tiposProduto, tipoProdutoId, filterByTipo, setSearch, isLoading } = useProductList()
   const { refreshing, onRefresh } = useSyncRefresh();
 
   useFocusEffect(
@@ -22,6 +24,8 @@ export default function ProdutosScreen() {
       return;
     }, [])
   );
+
+  const showSkeleton = useMinLoadingDuration(isLoading && products.length === 0);
 
   return (
     <View style={styles.container}>
@@ -32,41 +36,51 @@ export default function ProdutosScreen() {
         selectedId={Number(tipoProdutoId)}
         onSelect={filterByTipo}
       />
-      <FlatList
-        data={products}
-        keyExtractor={(item) => String(item.id)}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto cadastrado" message="Toque no + pra adicionar o primeiro item." />}
-        renderItem={({ item }) => {
-          const tipo = tiposProduto?.find((t: any) => Number(t.id) === Number(item.tipoProdutoId))?.descricao;
+      {showSkeleton ? (
+        <>
+          <ProductCardSkeleton />
+          <ProductCardSkeleton />
+          <ProductCardSkeleton />
+          <ProductCardSkeleton />
+          <ProductCardSkeleton />
+        </>
+      ) : (
+        <FlatList
+          data={products}
+          keyExtractor={(item) => String(item.id)}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto cadastrado" message="Toque no + pra adicionar o primeiro item." />}
+          renderItem={({ item }) => {
+            const tipo = tiposProduto?.find((t: any) => Number(t.id) === Number(item.tipoProdutoId))?.descricao;
 
-          return (
-            <Product
-              data={item}
-              tipoNome={tipo}
-              onDelete={() => {
-                Alert.alert(
-                  'Confirmar Remoção',
-                  'Tem certeza que deseja remover este produto?',
-                  [
-                    { text: 'Cancelar', style: 'cancel' },
-                    {
-                      text: 'Remover',
-                      onPress: () => {
-                        remove(item.id);
-                        filterByTipo(Number(tipoProdutoId));
+            return (
+              <Product
+                data={item}
+                tipoNome={tipo}
+                onDelete={() => {
+                  Alert.alert(
+                    'Confirmar Remoção',
+                    'Tem certeza que deseja remover este produto?',
+                    [
+                      { text: 'Cancelar', style: 'cancel' },
+                      {
+                        text: 'Remover',
+                        onPress: () => {
+                          remove(item.id);
+                          filterByTipo(Number(tipoProdutoId));
+                        },
+                        style: 'destructive',
                       },
-                      style: 'destructive',
-                    },
-                  ]
-                );
-              }}
-              onOpen={() => router.push(`/modais/produtoModal?productId=${item.id}`)}
-            />
-          )
-        }}
-        contentContainerStyle={{ gap: 16 }}
-      />
+                    ]
+                  );
+                }}
+                onOpen={() => router.push(`/modais/produtoModal?productId=${item.id}`)}
+              />
+            )
+          }}
+          contentContainerStyle={{ gap: 16 }}
+        />
+      )}
     </View>
   );
 }
