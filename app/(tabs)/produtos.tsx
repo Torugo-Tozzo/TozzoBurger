@@ -78,7 +78,7 @@ export default function ProdutosScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Gerenciamento de Produtos</Text>
-      <Input placeholder="Pesquisar" onChangeText={setSearch} />
+      <Input placeholder="Pesquisar" onChangeText={setSearch} style={styles.input} />
       <FiltroTipos
         data={tiposProduto}
         selectedId={Number(tipoProdutoId)}
@@ -108,13 +108,17 @@ export default function ProdutosScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16
+    paddingTop: 16,
   },
   title: {
     fontSize: 20,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  input: {
+    marginHorizontal: 16,
   },
   footerLoader: {
     paddingVertical: 16,

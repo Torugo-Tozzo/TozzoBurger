@@ -147,8 +147,8 @@ export default function Pedidos() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: spacing.lg },
-  title: { fontSize: type.title, fontWeight: 'bold', marginBottom: spacing.md },
+  container: { flex: 1, paddingTop: spacing.lg },
+  title: { fontSize: type.title, fontWeight: 'bold', marginBottom: spacing.md, paddingHorizontal: spacing.lg },
   group: { marginBottom: spacing.xl },
-  date: { fontSize: type.body, fontWeight: '600', marginBottom: spacing.sm },
+  date: { fontSize: type.body, fontWeight: '600', marginBottom: spacing.sm, paddingHorizontal: spacing.lg },
 });

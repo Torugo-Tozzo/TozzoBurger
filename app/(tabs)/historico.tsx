@@ -61,16 +61,18 @@ export default function HistoricoScreen() {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      padding: spacing.xl,
+      paddingTop: spacing.xl,
     },
     title: {
       fontSize: type.heading,
       fontWeight: 'bold',
       marginBottom: spacing.xl,
+      paddingHorizontal: spacing.xl,
     },
     dateContainer: {
       width: '100%',
       marginBottom: spacing.xl,
+      paddingHorizontal: spacing.xl,
     },
     label: {
       fontSize: type.body,
@@ -95,13 +97,14 @@ export default function HistoricoScreen() {
       fontSize: type.subtitle,
       fontWeight: 'bold',
       marginVertical: spacing.sm,
+      paddingHorizontal: spacing.xl,
     },
     searchButton: {
       backgroundColor: colors.primary,
       padding: spacing.md,
       borderRadius: 8,
-      width: '100%',
       alignItems: 'center',
+      marginHorizontal: spacing.xl,
     },
     searchButtonText: {
       color: colors.background,
