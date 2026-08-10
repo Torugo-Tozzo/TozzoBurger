@@ -34,6 +34,47 @@ export default function ProdutosScreen() {
   const hasData = products.length > 0;
   const showSkeleton = useMinLoadingDuration(isLoading && !hasData);
 
+  const productList = (
+    <FlatList
+      data={products}
+      keyExtractor={(item) => String(item.id)}
+      refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
+      ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto cadastrado" message="Toque no + pra adicionar o primeiro item." />}
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.5}
+      ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
+      ItemSeparatorComponent={ListDivider}
+      renderItem={({ item }) => {
+        const tipo = tiposProduto?.find((t: any) => Number(t.id) === Number(item.tipoProdutoId))?.descricao;
+
+        return (
+          <Product
+            data={item}
+            tipoNome={tipo}
+            onDelete={() => {
+              Alert.alert(
+                'Confirmar Remoção',
+                'Tem certeza que deseja remover este produto?',
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  {
+                    text: 'Remover',
+                    onPress: () => {
+                      remove(item.id);
+                      filterByTipo(Number(tipoProdutoId));
+                    },
+                    style: 'destructive',
+                  },
+                ]
+              );
+            }}
+            onOpen={() => router.push(`/modais/produtoModal?productId=${item.id}`)}
+          />
+        )
+      }}
+    />
+  );
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Gerenciamento de Produtos</Text>
@@ -55,47 +96,10 @@ export default function ProdutosScreen() {
           <ListDivider />
           <ProductCardSkeleton />
         </ListFrame>
+      ) : products.length > 0 ? (
+        <ListFrame style={{ flex: 1 }}>{productList}</ListFrame>
       ) : (
-        <ListFrame style={{ flex: 1 }}>
-          <FlatList
-            data={products}
-            keyExtractor={(item) => String(item.id)}
-            refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
-            ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto cadastrado" message="Toque no + pra adicionar o primeiro item." />}
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
-            ItemSeparatorComponent={ListDivider}
-            renderItem={({ item }) => {
-              const tipo = tiposProduto?.find((t: any) => Number(t.id) === Number(item.tipoProdutoId))?.descricao;
-
-              return (
-                <Product
-                  data={item}
-                  tipoNome={tipo}
-                  onDelete={() => {
-                    Alert.alert(
-                      'Confirmar Remoção',
-                      'Tem certeza que deseja remover este produto?',
-                      [
-                        { text: 'Cancelar', style: 'cancel' },
-                        {
-                          text: 'Remover',
-                          onPress: () => {
-                            remove(item.id);
-                            filterByTipo(Number(tipoProdutoId));
-                          },
-                          style: 'destructive',
-                        },
-                      ]
-                    );
-                  }}
-                  onOpen={() => router.push(`/modais/produtoModal?productId=${item.id}`)}
-                />
-              )
-            }}
-          />
-        </ListFrame>
+        productList
       )}
     </View>
   );

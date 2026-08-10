@@ -25,8 +25,8 @@ export function RecordCardSkeleton() {
           </View>
         </View>
         <View style={[styles.actionsRow, { borderTopColor: colors.border }]}>
-          <Skeleton width={36} height={36} borderRadius={8} />
-          <Skeleton width={36} height={36} borderRadius={8} />
+          <Skeleton width={36} height={36} borderRadius={radius.md} />
+          <Skeleton width={36} height={36} borderRadius={radius.md} />
         </View>
       </View>
     </Card>

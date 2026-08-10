@@ -88,6 +88,20 @@ export default function VendaScreen() {
   const hasData = products.length > 0;
   const showSkeleton = useMinLoadingDuration(isLoading && !hasData);
 
+  const productList = (
+    <FlatList
+      data={products}
+      keyExtractor={keyExtractor}
+      renderItem={renderItem}
+      refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
+      ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto encontrado" message="Ajuste a busca ou o filtro de tipo." />}
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.5}
+      ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
+      ItemSeparatorComponent={ListDivider}
+    />
+  );
+
   return (
     <View style={styles.container}>
       <Input placeholder="Pesquisar" onChangeText={setSearch} value={search} />
@@ -110,20 +124,10 @@ export default function VendaScreen() {
           <ListDivider />
           <ProductCardSkeleton />
         </ListFrame>
+      ) : products.length > 0 ? (
+        <ListFrame style={{ flex: 1 }}>{productList}</ListFrame>
       ) : (
-        <ListFrame style={{ flex: 1 }}>
-          <FlatList
-            data={products}
-            keyExtractor={keyExtractor}
-            renderItem={renderItem}
-            refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
-            ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto encontrado" message="Ajuste a busca ou o filtro de tipo." />}
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
-            ItemSeparatorComponent={ListDivider}
-          />
-        </ListFrame>
+        productList
       )}
 
       <CartButton />

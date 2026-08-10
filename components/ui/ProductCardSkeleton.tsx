@@ -13,8 +13,8 @@ export function ProductCardSkeleton() {
       </View>
       <Skeleton width={70} height={22} borderRadius={radius.full} />
       <View style={styles.actions}>
-        <Skeleton width={36} height={36} borderRadius={8} />
-        <Skeleton width={36} height={36} borderRadius={8} />
+        <Skeleton width={36} height={36} borderRadius={radius.md} />
+        <Skeleton width={36} height={36} borderRadius={radius.md} />
       </View>
     </Card>
   );
