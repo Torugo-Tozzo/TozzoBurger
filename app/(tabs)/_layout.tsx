@@ -1,5 +1,6 @@
 import React from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Link, Tabs } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import SyncIndicator from '@/components/SyncIndicator';
@@ -25,8 +26,10 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].primary,
+        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].background,
         tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
+        tabBarActiveBackgroundColor: Colors[colorScheme ?? 'light'].text,
+        tabBarItemStyle: { borderRadius: 0 },
         headerShown: useClientOnlyValue(false, true),
         headerRight: () => <SyncIndicator />,
       }}>
@@ -35,7 +38,7 @@ export default function TabLayout() {
         options={{
           title: isCliente ? 'Cardápio' : 'Vender',
           headerTitleAlign: 'center',
-          tabBarIcon: ({ color }) => <TabBarIcon name={isCliente ? 'cutlery' : 'dollar'} color={color} />,
+          tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
           headerLeft: isCliente ? undefined : () => (
             <Link href="/modais/adicionalModal" asChild>
               <Pressable>
@@ -56,7 +59,7 @@ export default function TabLayout() {
         name='pedidos'
         options={{
           title: 'Pedidos',
-          tabBarIcon: ({ color }) => <TabBarIcon name="list" color={color} />,
+          tabBarIcon: ({ color }) => <MaterialIcons name="receipt-long" size={28} style={{ marginBottom: -3 }} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -64,7 +67,7 @@ export default function TabLayout() {
         options={{
           title: 'Vendas',
           href: isCliente ? null : '/historico',
-          tabBarIcon: ({ color }) => <TabBarIcon name="clock-o" color={color} />,
+          tabBarIcon: ({ color }) => <TabBarIcon name="dollar" color={color} />,
         }}
       />
       <Tabs.Screen
