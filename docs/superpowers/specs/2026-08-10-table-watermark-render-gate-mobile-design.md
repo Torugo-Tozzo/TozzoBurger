@@ -45,7 +45,7 @@ export function getChangedAt(table: Table): number {
 **Quem chama `useShouldReload`** (troca a chamada incondicional a `load()`/`fetchVendas()`/`list()` dentro do `useFocusEffect` e do `useEffect([lastSync])`):
 - `hooks/useProductList.ts` (compartilhado por `produtos.tsx` e `index.tsx`): observa `['produtos']`, só no efeito de `lastSync`. O efeito de `search` mudando **não é gateado** — é ação direta do usuário, sempre roda `list()`.
 - `app/(tabs)/pedidos.tsx`: observa `['pedidos', 'produtos']`, tanto no `useFocusEffect` quanto no `useEffect([lastSync])`.
-- `app/(tabs)/historico.tsx`: observa `['vendas', 'produtos']`, só em `fetchVendas` (o `handleSearch` por data é ação explícita do usuário, não é gateado).
+- `app/(tabs)/historico.tsx`: observa `['vendas', 'produtos']`, só no `useEffect([lastSync])`. O `useFocusEffect` (que chama `setSearchDate(new Date())` + `fetchVendas()`) **não é gateado** — ele existe pra resetar de propósito uma busca por data custom de volta pra "últimos 3 dias" quando o usuário volta pra aba; gatear esse call site prenderia quem buscou uma data específica nesse resultado pra sempre (sem gate ele já roda de novo mesmo sem mudança de dado, e é isso que reseta a view). Mesmo raciocínio de `useProductList.ts`, cujo `useFocusEffect` (em `produtos.tsx`/`index.tsx`, fora deste hook) também não é gateado — reseta o filtro de tipo pra "todos" de propósito. `handleSearch` por data continua ação explícita do usuário, nunca gateada.
 
 ## Erros e casos de borda
 
