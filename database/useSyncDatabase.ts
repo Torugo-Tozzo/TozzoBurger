@@ -1,6 +1,7 @@
 import { type SQLiteDatabase } from 'expo-sqlite';
 import * as api from '@/services/api';
 import { generateUUID } from './utils/uuid';
+import { markChanged } from './tableWatermark';
 
 function parseTimestamp(val: any): number | null {
   if (val === undefined || val === null) return null;
@@ -218,6 +219,7 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           }
         }
         await database.execAsync('COMMIT;');
+        markChanged('produtos');
       } catch (err) {
         await database.execAsync('ROLLBACK;').catch((e) => console.warn('[sync] db op failed', e));
       }
@@ -270,6 +272,7 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           }
         }
         await database.execAsync('COMMIT;');
+        markChanged('produtos');
       } catch (err) {
         await database.execAsync('ROLLBACK;').catch((e) => console.warn('[sync] db op failed', e));
       }
@@ -335,6 +338,7 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           }
         }
         await database.execAsync('COMMIT;');
+        markChanged('pedidos');
       } catch (err) {
         await database.execAsync('ROLLBACK;').catch((e) => console.warn('[sync] db op failed', e));
       }
@@ -406,6 +410,7 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           }
         }
         await database.execAsync('COMMIT;');
+        markChanged('vendas');
       } catch (err) {
         await database.execAsync('ROLLBACK;').catch((e) => console.warn('[sync] db op failed', e));
       }
