@@ -43,31 +43,26 @@ export function Button({ title, variant = 'primary', loading = false, disabled =
   return (
     <Pressable
       style={({ pressed }) => [
-        styles.frame,
-        { backgroundColor: colors.text, opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1 },
+        styles.content,
+        { backgroundColor: contentBg, borderColor: colors.text, opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1 },
         style as any,
       ]}
       disabled={isDisabled}
       {...rest}
     >
-      <View style={[styles.line, { backgroundColor: colors.background }]}>
-        <View style={[styles.content, { backgroundColor: contentBg }]}>
-          {loading ? (
-            <ActivityIndicator color={contentText} />
-          ) : (
-            <Text style={[styles.text, { color: contentText }]}>{title}</Text>
-          )}
-        </View>
-      </View>
+      {loading ? (
+        <ActivityIndicator color={contentText} />
+      ) : (
+        <Text style={[styles.text, { color: contentText }]}>{title}</Text>
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  frame: { borderRadius: radius.md, padding: 2 },
-  line: { borderRadius: radius.sm, padding: 2 },
   content: {
-    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderRadius: radius.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
