@@ -18,6 +18,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { RecordCardSkeleton } from '@/components/ui/RecordCardSkeleton';
 import { VendaItem } from '@/components/VendaItem';
 import { spacing, type } from '@/constants/theme';
+import { ListFrame } from '@/components/ui/ListFrame';
+import { ListDivider } from '@/components/ui/ListDivider';
 
 // Evita re-render de toda a lista (perde React.memo dos cards) quando o
 // refetch em foco de aba traz o mesmo conteudo de antes - so muda o estado
@@ -289,7 +291,14 @@ export default function HistoricoScreen() {
         <Text style={styles.dateHeader}>
           {dataRenderizada} - Total: R$ {totalVendas}
         </Text>
-        <FlatList data={vendasDoDia} renderItem={renderVendaItem} keyExtractor={(item) => String(item.id)} />
+        <ListFrame>
+          <FlatList
+            data={vendasDoDia}
+            renderItem={renderVendaItem}
+            keyExtractor={(item) => String(item.id)}
+            ItemSeparatorComponent={ListDivider}
+          />
+        </ListFrame>
       </View>
     );
   };
@@ -364,12 +373,15 @@ export default function HistoricoScreen() {
       <View style={styles.separator} />
 
       {loading && !hasData ? (
-        <>
+        <ListFrame>
           <RecordCardSkeleton />
+          <ListDivider />
           <RecordCardSkeleton />
+          <ListDivider />
           <RecordCardSkeleton />
+          <ListDivider />
           <RecordCardSkeleton />
-        </>
+        </ListFrame>
       ) : (
         <FlatList
           data={Object.entries(vendas)}
