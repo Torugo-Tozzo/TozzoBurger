@@ -10,6 +10,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useSyncRefresh } from '@/hooks/useSyncRefresh';
 import { useMinLoadingDuration } from '@/hooks/useMinLoadingDuration';
+import { useShouldReload } from '@/hooks/useShouldReload';
 import { spacing, type } from '@/constants/theme';
 import { PedidoDatabase } from '@/database/types/Pedido';
 
@@ -41,6 +42,7 @@ export default function Pedidos() {
   const { lastSync } = useAutoSync();
   const { user } = useAuth();
   const { refreshing, onRefresh } = useSyncRefresh();
+  const shouldReloadPedidos = useShouldReload(['pedidos', 'produtos']);
   const isCliente = user?.role === 'CLIENTE';
   const [pedidosPorData, setPedidosPorData] = useState<Record<string, PedidoComProdutos[]>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -61,12 +63,12 @@ export default function Pedidos() {
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      if (shouldReloadPedidos()) load();
     }, [])
   );
 
   useEffect(() => {
-    load();
+    if (shouldReloadPedidos()) load();
   }, [lastSync]);
 
   const handleEdit = (pedidoId: string) => {
@@ -90,10 +92,12 @@ export default function Pedidos() {
     />
   );
 
-  // Skeleton sempre que tiver fetch rolando (nao so no primeiro load) - troca
-  // de aba sem feedback visual nenhum parecia travada, pedido explicito do
-  // usuario apos testar ao vivo.
-  const showSkeleton = useMinLoadingDuration(isLoading);
+  // Skeleton cheio so no primeiro load (sem dado nenhum ainda) - mostrar ele
+  // toda vez que ja tem dado na tela fazia a lista "piscar" (dado -> skeleton
+  // -> dado de novo), parecendo recarregar 2x. Com dado ja carregado, o
+  // refetch em foco usa o spinner do RefreshControl (nao esconde a lista).
+  const hasData = Object.keys(pedidosPorData).length > 0;
+  const showSkeleton = useMinLoadingDuration(isLoading && !hasData);
 
   if (showSkeleton) {
     return (
@@ -114,7 +118,7 @@ export default function Pedidos() {
       <FlatList
         data={Object.keys(pedidosPorData)}
         keyExtractor={(d) => d}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
         ListEmptyComponent={<EmptyState icon="list" title="Nenhum pedido recente" message="Pedidos aparecem aqui assim que forem criados." />}
         renderItem={({ item: dataKey }) => (
           <View style={styles.group}>
