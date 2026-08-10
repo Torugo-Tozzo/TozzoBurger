@@ -29,9 +29,23 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].background,
         tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
         tabBarActiveBackgroundColor: Colors[colorScheme ?? 'light'].text,
-        tabBarItemStyle: { borderRadius: 0 },
-        tabBarStyle: { borderTopWidth: 1, borderTopColor: Colors[colorScheme ?? 'light'].border },
-        headerStyle: { borderBottomWidth: 1, borderBottomColor: Colors[colorScheme ?? 'light'].border },
+        tabBarItemStyle: {
+          borderRadius: 0,
+          borderRightWidth: 1,
+          borderRightColor: Colors[colorScheme ?? 'light'].border,
+        },
+        tabBarStyle: {
+          borderTopWidth: 1,
+          borderTopColor: Colors[colorScheme ?? 'light'].border,
+          elevation: 0,
+          shadowOpacity: 0,
+        },
+        headerStyle: {
+          borderBottomWidth: 1,
+          borderBottomColor: Colors[colorScheme ?? 'light'].border,
+          elevation: 0,
+          shadowOpacity: 0,
+        },
         headerShown: useClientOnlyValue(false, true),
         headerRight: () => <SyncIndicator />,
       }}>
