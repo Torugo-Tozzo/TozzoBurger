@@ -2,7 +2,7 @@ import { FlatList, TouchableOpacity, StyleSheet } from "react-native";
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { View, Text } from "@/components/Themed";
-import { radius, spacing, type } from '@/constants/theme';
+import { spacing, type } from '@/constants/theme';
 
 type TipoProduto = {
   id: number;
@@ -15,31 +15,34 @@ type FiltroTiposProps = {
   onSelect: (id: number | null) => void;
 };
 
+const BUTTON_HEIGHT = 45;
+
+function Divider({ color }: { color: string }) {
+  return <View style={{ height: BUTTON_HEIGHT, borderLeftWidth: 1, borderStyle: 'dashed', borderLeftColor: color }} />;
+}
+
 export function FiltroTipos({ data, selectedId, onSelect }: FiltroTiposProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
   const styles = StyleSheet.create({
-    container: { marginBottom: 0 },
+    container: {
+      marginBottom: 0,
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+      borderColor: colors.border,
+    },
     flatList: { flexGrow: 0 },
-    contentContainer: { paddingHorizontal: spacing.lg, paddingVertical: 0, gap: 1 },
     button: {
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.lg,
       backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: radius.sm,
-      marginRight: spacing.md,
-      marginBottom: spacing.md,
-      marginTop: spacing.xs,
       alignItems: "center",
       justifyContent: "center",
-      height: 45,
+      height: BUTTON_HEIGHT,
     },
     selectedButton: {
       backgroundColor: colors.primary,
-      borderColor: colors.primary,
     },
     selectedText: { color: colors.background },
   });
@@ -63,7 +66,7 @@ export function FiltroTipos({ data, selectedId, onSelect }: FiltroTiposProps) {
             </TouchableOpacity>
           );
         }}
-        contentContainerStyle={styles.contentContainer}
+        ItemSeparatorComponent={() => <Divider color={colors.border} />}
         style={styles.flatList}
       />
     </View>
