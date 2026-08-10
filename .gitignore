@@ -39,3 +39,6 @@ yarn-error.*
 
 # Android nativo gerado pelo Expo
 /android/
+
+# Superpowers scratch (SDD workspaces, brainstorm mockups)
+.superpowers/

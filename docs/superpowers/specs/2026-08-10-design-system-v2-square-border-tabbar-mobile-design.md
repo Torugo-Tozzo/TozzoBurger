@@ -13,7 +13,10 @@ Brainstorm usou o companion visual (mockups em browser) pras 2 decisões de form
 - **Peso de borda**: 1px fino (opção A do mockup) — mais próximo do que já existe hoje (`Card` já usa `borderWidth:1`), menos ruptura visual que 2px.
 - **Formato do fundo da aba ativa**: segmento cheio (opção B do mockup) — ícone + label inteiro viram um bloco só com fundo preto (light)/branco (dark), não só um chip atrás do ícone.
 - **Escopo da varredura**: tudo, sem exceção — Card, Button, ListItem, RecordCard, Badge, EmptyState (sem borda hoje, fica sem), Input, FiltroTipos, IconButton, Skeleton/RecordCardSkeleton/ProductCardSkeleton, e todos os modais (`pedidoModal`, `contaModal`, `relatorioModal`, `contaHistoricoModal`, `produtoModal`, `adicionalModal`, `IngredientesModal`), `configs.tsx`, `login.tsx`.
-- **Divisores hairline+tracejado** (`ListItem` embaixo, `RecordCard.actionsRow` em cima): normaliza pra 1px sólido também, tira o `borderStyle:'dashed'` — consistente com a linha nova em todo canto.
+- **Regra de divisor, revista em cima de feedback ao vivo**: tracejado marca divisão *entre linhas/seções* (dentro de uma lista ou dentro de um card); sólido 1px marca *perímetro* (borda externa/lateral de um bloco). Aplicado assim:
+  - **Listas de produtos/pedidos/vendas viram lista contínua, sem espaço entre os itens** — cada card hoje tem borda sólida nos 4 lados e um `gap`/`marginBottom` pro próximo; isso muda pra: 1 borda sólida 1px só, no perímetro do bloco inteiro (lista inteira, ou cada grupo de data em `pedidos.tsx`/`historico.tsx`, que são separados por cabeçalho de data), e uma linha tracejada dividindo uma linha da próxima *por dentro* do bloco — igual ao padrão de tabela do site (`front-tozzo.uk`, Fase 4: "divisor tracejado entre linhas simples").
+  - **`RecordCard.actionsRow`** (divisor interno entre o conteúdo principal do card e a fileira de ações): já é tracejado hoje — **mantém tracejado** (reverte a ideia inicial de normalizar pra sólido; com a regra revista, esse também é "divisão interna", não perímetro).
+  - **`ListItem`** (usado em `pedidoModal.tsx`/`contaHistoricoModal.tsx` pra listar produtos de um pedido/venda dentro do modal): já é só uma linha com borda embaixo (sem card próprio) — exatamente o formato final. Só troca `borderBottomWidth: StyleSheet.hairlineWidth` (fino, sólido) pra `borderBottomWidth: 1, borderStyle: 'dashed'`.
 - **`Button.tsx` variant primary**: hoje tem estrutura dupla aninhada (`frame`/`line`/`content`, 3 `View`s) pra imitar contorno grosso com canto arredondado. Simplifica pra 1 `View` só (igual `Card`) — a estrutura dupla só fazia sentido pra imitar contorno grosso, que não é mais o estilo (1px fino ganhou no mockup).
 - **Ícones das 3 abas principais**: Index (hoje `dollar`/`cutlery` dependendo do role) → `home`; Vendas/histórico (hoje `clock-o`) → `dollar` (herda o ícone que saiu do Index); Pedidos (hoje `list`) → recibo. Labels **não mudam** — Index continua "Vender"/"Cardápio" por role, só o ícone da tab bar muda.
 - **Ícone de recibo**: FontAwesome clássico (`@expo/vector-icons/FontAwesome`, usado hoje em todo o app) não tem ícone de recibo/nota fiscal. Usa `MaterialIcons` (`receipt-long`) só pra essa aba — mistura de família de ícone pontual, resto do app continua FontAwesome.
@@ -48,8 +51,22 @@ Troca só o valor de `border` (hoje `#e2e2e2`/`#333`, cinza) pro preto/branco pu
 ### `components/ui/Button.tsx`
 Simplifica a `View` tripla (`frame`/`line`/`content`) do `variant='primary'` pra 1 `View` só, com `borderWidth:1`, `borderColor: colors.text`, `backgroundColor: colors.text`, texto `colors.background` — mesmo padrão do resto (borda 1px direta). Variant `outline` já usa `borderColor: colors.text` — sem mudança de cor, só o radius zera via token.
 
-### `components/ui/ListItem.tsx` / `components/ui/RecordCard.tsx`
-Troca `borderBottomWidth: StyleSheet.hairlineWidth` (ListItem) e `borderTopWidth: StyleSheet.hairlineWidth` + `borderStyle:'dashed'` (RecordCard `actionsRow`) pra `borderWidth: 1` sólido — cor já vem de `colors.border` (token), sem mudança de referência, só o valor numérico/estilo da borda.
+### `components/ui/ListItem.tsx`
+Troca `borderBottomWidth: StyleSheet.hairlineWidth` pra `borderBottomWidth: 1, borderStyle: 'dashed'` — cor já vem de `colors.border` (token), só muda largura+estilo da linha.
+
+### Listas viram contínuas — `Card`, `RecordCard`, `Product`, `ProductItemVenda`, skeletons, 4 telas
+
+**`components/ui/Card.tsx`** ganha uma prop nova, `bordered?: boolean` (default `true`, preserva comportamento atual pra qualquer uso futuro fora de lista). Todo uso hoje em código (não em doc histórico) é dentro de uma lista — `RecordCard.tsx`, `Product.tsx`, `ProductItemVenda.tsx`, `RecordCardSkeleton.tsx`, `ProductCardSkeleton.tsx` — todos passam `bordered={false}` (perdem a borda própria de 4 lados; mantêm padding/fundo).
+
+**Novo**: componente pequeno compartilhado (`components/ui/ListDivider.tsx` ou similar) — só a linha tracejada 1px, cor `colors.border`, reaproveitado nos 2 padrões abaixo.
+
+**Novo**: wrapper de perímetro — `View` com `borderWidth:1, borderColor: colors.border` em volta do bloco de itens (lista inteira ou grupo de data), aplicado direto nas 4 telas (não precisa virar componente próprio, é 1 `View` simples por tela).
+
+**Onde aplica**:
+- `produtos.tsx`/`index.tsx` (via `useProductList`, `FlatList` plana, sem agrupamento): `FlatList` ganha `ItemSeparatorComponent={ListDivider}`, envolvida numa `View` com borda de perímetro.
+- `pedidos.tsx`/`historico.tsx` (agrupado por data, itens renderizados via `.map()` dentro do `renderItem` da `FlatList` externa, não outra `FlatList` aninhada): cada grupo de data ganha a `View` de perímetro envolvendo os itens daquele dia, e o `.map()` intercala `ListDivider` entre um item e o próximo (sem divisor antes do primeiro nem depois do último).
+
+**`RecordCard.tsx`**/`Product.tsx`/`ProductItemVenda.tsx`: só muda a prop passada pro `Card` (`bordered={false}`) — resto do componente (accent bar de status, `actionsRow` tracejado, badges, ícones) não muda.
 
 ### Tab bar (`app/(tabs)/_layout.tsx`)
 `tabBarActiveTintColor`/`tabBarInactiveTintColor` sozinhos não dão pra pintar um fundo atrás de ícone+label juntos — precisa de `tabBarButton` customizado por `Tabs.Screen` (ou um componente compartilhado usado nos 5), recebendo `focused` e envolvendo ícone+label numa `View` com `backgroundColor: focused ? colors.text : 'transparent'` e cor de conteúdo invertida quando `focused` (`colors.background` no lugar de `colors.text`). Ícones trocam: `index` → `home`, `historico` → `dollar`, `produtos` mantém (`book`), `pedidos` → `MaterialIcons`/`receipt-long` (precisa de branch de família de ícone no componente do botão da tab, já que os outros usam `FontAwesome`).
@@ -63,4 +80,4 @@ Troca `borderBottomWidth: StyleSheet.hairlineWidth` (ListItem) e `borderTopWidth
 
 ## Testes
 
-Mudança é quase inteiramente visual/estilo — sem lógica nova. `tsc --noEmit` limpo + `npx jest --watchAll=false` (suíte existente não deve quebrar, nenhum teste hoje cobre estilo/JSX de componente visual). Validação real é manual no emulador: conferir os componentes com borda visível (Card/RecordCard/Input/FiltroTipos/Badge) em light e dark, conferir a tab bar (aba ativa com fundo sólido, ícone invertido, 3 ícones novos), conferir os modais não quebraram visualmente.
+Mudança é quase inteiramente visual/estilo — sem lógica nova. `tsc --noEmit` limpo + `npx jest --watchAll=false` (suíte existente não deve quebrar, nenhum teste hoje cobre estilo/JSX de componente visual). Validação real é manual no emulador: conferir os componentes com borda visível (Card/Input/FiltroTipos/Badge) em light e dark; conferir as 4 listas (produtos/venda/pedidos/histórico) viraram contínuas — perímetro sólido, linha tracejada entre itens, sem gap; conferir grupos por data em pedidos/histórico (cada dia com seu próprio perímetro); conferir a tab bar (aba ativa com fundo sólido, ícone invertido, 3 ícones novos); conferir os modais (`pedidoModal`/`contaHistoricoModal`, listas de produto via `ListItem`) não quebraram visualmente.
