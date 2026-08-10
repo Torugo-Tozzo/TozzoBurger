@@ -1,6 +1,7 @@
 import { useSQLiteContext } from "expo-sqlite";
 import { PedidoProduto, PedidoDatabase, STATUS_PEDIDO } from "./types/Pedido";
 import { generateUUID } from "./utils/uuid";
+import { markChanged } from "./tableWatermark";
 
 type PedidoStatus = typeof STATUS_PEDIDO[keyof typeof STATUS_PEDIDO];
 
@@ -77,6 +78,8 @@ export function usePedidosDatabase() {
         }
       }
 
+      markChanged('pedidos')
+
       return { pedidoId };
     } finally {
       await stmt.finalizeAsync();
@@ -114,6 +117,8 @@ export function usePedidosDatabase() {
           }
         }
       }
+
+      markChanged('pedidos')
 
       return { pedidoId: data.id };
     } finally {
@@ -241,6 +246,8 @@ export function usePedidosDatabase() {
           await updateStatusStmt.finalizeAsync();
         }
       }
+
+      markChanged('pedidos')
     } catch (error) {
       throw error;
     }
@@ -257,6 +264,8 @@ export function usePedidosDatabase() {
       } finally {
         await stmt.finalizeAsync();
       }
+
+      markChanged('pedidos')
     } catch (error) {
       throw error;
     }
