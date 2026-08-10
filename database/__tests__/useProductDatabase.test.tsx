@@ -9,10 +9,16 @@ jest.mock('../utils/uuid', () => ({
   generateUUID: jest.fn(() => 'generated-uuid'),
 }));
 
+jest.mock('../tableWatermark', () => ({
+  markChanged: jest.fn(),
+}));
+
 import { useSQLiteContext } from 'expo-sqlite';
 import { useProductDatabase } from '../useProductDatabase';
+import { markChanged } from '../tableWatermark';
 
 const mockUseSQLiteContext = useSQLiteContext as jest.Mock;
+const mockMarkChanged = markChanged as jest.Mock;
 
 function makeStatement(executeImpl?: () => any) {
   return {
@@ -36,6 +42,7 @@ function renderProductDbHook() {
 describe('useProductDatabase', () => {
   beforeEach(() => {
     mockUseSQLiteContext.mockReset();
+    mockMarkChanged.mockReset();
   });
 
   it('create() inserts with a generated id and pending sync_status, always finalizing the statement', async () => {
@@ -102,5 +109,48 @@ describe('useProductDatabase', () => {
       expect.stringContaining('P.deleted_at IS NULL'),
       '%burger%'
     );
+  });
+
+  it('create() marks produtos changed', async () => {
+    const statement = makeStatement();
+    const db = { prepareAsync: jest.fn(async () => statement) };
+    mockUseSQLiteContext.mockReturnValue(db);
+
+    const { create } = renderProductDbHook();
+    await create({ nome: 'X-Salada', preco: 25.5, tipoProdutoId: 1 } as any);
+
+    expect(mockMarkChanged).toHaveBeenCalledWith('produtos');
+  });
+
+  it('createFromSync() marks produtos changed', async () => {
+    const statement = makeStatement();
+    const db = { prepareAsync: jest.fn(async () => statement) };
+    mockUseSQLiteContext.mockReturnValue(db);
+
+    const { createFromSync } = renderProductDbHook();
+    await createFromSync({ id: 'p1', nome: 'X-Salada', preco: 25.5, tipoProdutoId: 1 } as any);
+
+    expect(mockMarkChanged).toHaveBeenCalledWith('produtos');
+  });
+
+  it('update() marks produtos changed', async () => {
+    const statement = makeStatement();
+    const db = { prepareAsync: jest.fn(async () => statement) };
+    mockUseSQLiteContext.mockReturnValue(db);
+
+    const { update } = renderProductDbHook();
+    await update({ id: 'p1', nome: 'X-Salada', preco: 30, tipoProdutoId: 1 } as any);
+
+    expect(mockMarkChanged).toHaveBeenCalledWith('produtos');
+  });
+
+  it('remove() marks produtos changed', async () => {
+    const db = { runAsync: jest.fn(async () => ({})) };
+    mockUseSQLiteContext.mockReturnValue(db);
+
+    const { remove } = renderProductDbHook();
+    await remove('p1');
+
+    expect(mockMarkChanged).toHaveBeenCalledWith('produtos');
   });
 });

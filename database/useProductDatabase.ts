@@ -1,6 +1,7 @@
 import { useSQLiteContext } from "expo-sqlite"
 import { ProductDatabase } from "./types/Produto"
 import { generateUUID } from "./utils/uuid"
+import { markChanged } from "./tableWatermark"
 
 export function useProductDatabase() {
   const database = useSQLiteContext()
@@ -24,6 +25,8 @@ export function useProductDatabase() {
       })
 
         console.log('[db] produto criado', { id })
+
+        markChanged('produtos')
 
         return { id }
     } catch (error) {
@@ -49,6 +52,8 @@ export function useProductDatabase() {
         $updated_at: (data as any).updated_at ?? Date.now(),
         $sync_status: 'synced',
       })
+
+      markChanged('produtos')
 
       return { id: data.id }
     } catch (error) {
@@ -93,6 +98,8 @@ export function useProductDatabase() {
         $updated_at: Date.now(),
         $sync_status: 'pending',
       })
+
+      markChanged('produtos')
     } catch (error) {
       throw error
     } finally {
@@ -107,6 +114,8 @@ export function useProductDatabase() {
         'UPDATE TB_PRODUTOS SET deleted_at = ?, updated_at = ?, sync_status = ? WHERE id = ?',
         [now, now, 'pending', id]
       );
+
+      markChanged('produtos')
     } catch (error) {
       throw error
     }
