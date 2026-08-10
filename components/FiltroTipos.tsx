@@ -16,7 +16,6 @@ type FiltroTiposProps = {
 };
 
 const BUTTON_HEIGHT = 45;
-const BUTTON_TOP_RADIUS = 12;
 
 function Divider({ color }: { color: string }) {
   return <View style={{ height: BUTTON_HEIGHT, borderLeftWidth: 1, borderStyle: 'dashed', borderLeftColor: color }} />;
@@ -41,8 +40,6 @@ export function FiltroTipos({ data, selectedId, onSelect }: FiltroTiposProps) {
       alignItems: "center",
       justifyContent: "center",
       height: BUTTON_HEIGHT,
-      borderTopLeftRadius: BUTTON_TOP_RADIUS,
-      borderTopRightRadius: BUTTON_TOP_RADIUS,
     },
     selectedButton: {
       backgroundColor: colors.primary,
