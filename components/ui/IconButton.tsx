@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, useColorScheme } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import Colors from '@/constants/Colors';
+import { radius } from '@/constants/theme';
 
 type Props = {
   icon: React.ComponentProps<typeof FontAwesome>['name'];
@@ -46,7 +47,7 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    borderRadius: radius.md,
   },
   pressed: {
     opacity: 0.6,
