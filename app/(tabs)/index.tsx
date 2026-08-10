@@ -79,10 +79,12 @@ export default function VendaScreen() {
 
   const keyExtractor = useCallback((item: ProductDatabase) => String(item.id), []);
 
-  // Skeleton sempre que tiver fetch rolando (nao so no primeiro load) - troca
-  // de aba sem feedback visual nenhum parecia travada, pedido explicito do
-  // usuario apos testar ao vivo.
-  const showSkeleton = useMinLoadingDuration(isLoading);
+  // Skeleton cheio so no primeiro load (sem dado nenhum ainda) - mostrar ele
+  // toda vez que ja tem dado na tela fazia a lista "piscar" (dado -> skeleton
+  // -> dado de novo), parecendo recarregar 2x. Com dado ja carregado, o
+  // refetch em foco usa o spinner do RefreshControl (nao esconde a lista).
+  const hasData = products.length > 0;
+  const showSkeleton = useMinLoadingDuration(isLoading && !hasData);
 
   return (
     <View style={styles.container}>
@@ -108,7 +110,7 @@ export default function VendaScreen() {
           keyExtractor={keyExtractor}
           renderItem={renderItem}
           contentContainerStyle={listContentStyle}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
           ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto encontrado" message="Ajuste a busca ou o filtro de tipo." />}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
