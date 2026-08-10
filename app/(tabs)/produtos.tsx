@@ -1,6 +1,6 @@
 import React, { useCallback } from "react";
 import { ActivityIndicator, StyleSheet, FlatList, Alert, RefreshControl } from "react-native";
-import { Text, View } from "@/components/Themed";
+import { View } from "@/components/Themed";
 import { useProductDatabase } from "@/database/useProductDatabase";
 import { useFocusEffect } from "@react-navigation/native";
 import { FiltroTipos } from "@/components/FiltroTipos";
@@ -77,7 +77,6 @@ export default function ProdutosScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Gerenciamento de Produtos</Text>
       <Input placeholder="Pesquisar" onChangeText={setSearch} style={styles.input} />
       <FiltroTipos
         data={tiposProduto}
@@ -109,13 +108,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: 16,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 16,
-    paddingHorizontal: 16,
   },
   input: {
     marginHorizontal: 16,

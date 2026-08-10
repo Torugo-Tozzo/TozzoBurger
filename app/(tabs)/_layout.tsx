@@ -77,7 +77,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="produtos"
         options={{
-          title: 'Produtos',
+          title: 'Catálogo',
           href: isCliente ? null : '/produtos',
           tabBarIcon: ({ color }) => <TabBarIcon name="book" color={color} />,
           headerRight: () => (
