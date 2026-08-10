@@ -4,6 +4,7 @@ import { Text, View } from '@/components/Themed';
 import { useVendasDatabase } from '@/database/useVendaDatabse';
 import { useAutoSync } from '@/context/AutoSyncContext';
 import { useSyncRefresh } from '@/hooks/useSyncRefresh';
+import { useShouldReload } from '@/hooks/useShouldReload';
 import { VendaDatabase } from '@/database/types/Venda';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { usePrinterDatabase } from '@/database/usePrinterDatabase';
@@ -161,7 +162,9 @@ export default function HistoricoScreen() {
     }, [fetchVendas])
   );
 
+  const shouldReloadVendas = useShouldReload(['vendas', 'produtos']);
   useEffect(() => {
+    if (!shouldReloadVendas()) return;
     fetchVendas();
   }, [lastSync]);
 
@@ -291,6 +294,12 @@ export default function HistoricoScreen() {
     );
   };
 
+  // Skeleton cheio so no primeiro load (sem dado nenhum ainda) - mostrar ele
+  // toda vez que ja tem dado na tela fazia a lista "piscar" (dado -> skeleton
+  // -> dado de novo), parecendo recarregar 2x. Com dado ja carregado, o
+  // refetch usa o spinner do RefreshControl (nao esconde a lista).
+  const hasData = Object.keys(vendas).length > 0;
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
@@ -354,7 +363,7 @@ export default function HistoricoScreen() {
 
       <View style={styles.separator} />
 
-      {loading ? (
+      {loading && !hasData ? (
         <>
           <RecordCardSkeleton />
           <RecordCardSkeleton />
@@ -371,7 +380,7 @@ export default function HistoricoScreen() {
           keyExtractor={(item) => item[0]}
           showsVerticalScrollIndicator
           style={{ flex: 1 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={<RefreshControl refreshing={refreshing || loading} onRefresh={onRefresh} />}
           ListEmptyComponent={<EmptyState icon="clock-o" title="Nenhuma venda no período" message="Busque outra data ou aguarde novas vendas." />}
         />
       )}
