@@ -10,7 +10,7 @@ export function RecordCardSkeleton() {
   const colors = Colors[colorScheme];
 
   return (
-    <Card padding={0} style={styles.container}>
+    <Card padding={0} bordered={false} style={styles.container}>
       <View style={[styles.accent, { backgroundColor: colors.textMuted }]} />
       <View style={styles.content}>
         <View style={styles.mainRow}>
@@ -34,7 +34,7 @@ export function RecordCardSkeleton() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexDirection: 'row', marginBottom: spacing.md, overflow: 'hidden', padding: 0 },
+  container: { flexDirection: 'row', overflow: 'hidden', padding: 0 },
   accent: { width: 4 },
   content: { flex: 1 },
   mainRow: {

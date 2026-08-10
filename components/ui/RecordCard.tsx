@@ -33,7 +33,7 @@ export function RecordCard({ accentColor, title, subtitle, meta, total, badge, s
   const strike = strikethrough ? { textDecorationLine: 'line-through' as const, color: colors.textMuted } : null;
 
   return (
-    <Card padding={0} style={styles.container}>
+    <Card padding={0} bordered={false} style={styles.container}>
       <View style={[styles.accent, { backgroundColor: accentColor }]} />
       <View style={styles.content}>
         <View style={styles.mainRow}>
@@ -70,7 +70,7 @@ export function RecordCard({ accentColor, title, subtitle, meta, total, badge, s
 }
 
 const styles = StyleSheet.create({
-  container: { flexDirection: 'row', marginBottom: spacing.md, overflow: 'hidden', padding: 0 },
+  container: { flexDirection: 'row', overflow: 'hidden', padding: 0 },
   accent: { width: 4 },
   content: { flex: 1 },
   mainRow: {
