@@ -35,7 +35,7 @@ function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome 
   const tipoLabel = tipoNome ?? (data as any).tipoNome ?? `Tipo ${data.tipoProdutoId}`;
 
   return (
-    <Card style={styles.container}>
+    <Card bordered={false} style={styles.container}>
       <View style={styles.info}>
         <Text style={styles.nome}>{data.nome}</Text>
         <Text style={styles.preco}>Preço: R$ {data.preco.toFixed(2)}</Text>

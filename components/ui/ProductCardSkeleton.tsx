@@ -6,7 +6,7 @@ import { spacing, radius } from '@/constants/theme';
 
 export function ProductCardSkeleton() {
   return (
-    <Card style={styles.container}>
+    <Card bordered={false} style={styles.container}>
       <View style={styles.leftInfo}>
         <Skeleton width="70%" height={16} />
         <Skeleton width="40%" height={13} style={styles.spacingTop} />
@@ -21,7 +21,7 @@ export function ProductCardSkeleton() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md, gap: spacing.md },
+  container: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   leftInfo: { flex: 1 },
   spacingTop: { marginTop: spacing.xs },
   actions: { flexDirection: 'row', gap: spacing.sm },
