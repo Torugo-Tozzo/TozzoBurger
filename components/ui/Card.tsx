@@ -5,15 +5,21 @@ import { radius, spacing } from '@/constants/theme';
 
 type Props = ViewProps & {
   padding?: number;
+  bordered?: boolean;
 };
 
-export function Card({ style, padding = spacing.lg, children, ...rest }: Props) {
+export function Card({ style, padding = spacing.lg, bordered = true, children, ...rest }: Props) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
   return (
     <View
-      style={[styles.base, { backgroundColor: colors.surface, borderColor: colors.border, padding }, style as any]}
+      style={[
+        styles.base,
+        { backgroundColor: colors.surface, padding },
+        bordered ? { borderColor: colors.border, borderWidth: 1 } : null,
+        style as any,
+      ]}
       {...rest}
     >
       {children}
@@ -24,6 +30,5 @@ export function Card({ style, padding = spacing.lg, children, ...rest }: Props) 
 const styles = StyleSheet.create({
   base: {
     borderRadius: radius.md,
-    borderWidth: 1,
   },
 });
