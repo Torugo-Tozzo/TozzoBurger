@@ -4,6 +4,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Link, Tabs } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import SyncIndicator from '@/components/SyncIndicator';
+import { CustomTabBar } from '@/components/CustomTabBar';
 import { useAuth } from '@/context/AuthContext';
 
 import Colors from '@/constants/Colors';
@@ -25,21 +26,8 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].background,
-        tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
-        tabBarActiveBackgroundColor: Colors[colorScheme ?? 'light'].text,
-        tabBarItemStyle: {
-          borderRadius: 0,
-          borderRightWidth: 1,
-          borderRightColor: Colors[colorScheme ?? 'light'].border,
-        },
-        tabBarStyle: {
-          borderTopWidth: 1,
-          borderTopColor: Colors[colorScheme ?? 'light'].border,
-          elevation: 0,
-          shadowOpacity: 0,
-        },
         headerStyle: {
           borderBottomWidth: 1,
           borderBottomColor: Colors[colorScheme ?? 'light'].border,
