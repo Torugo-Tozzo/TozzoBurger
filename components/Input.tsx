@@ -1,7 +1,11 @@
 import React from "react";
 import { TextInput, TextInputProps, useColorScheme } from "react-native";
 import Colors from '@/constants/Colors';
-import { radius, spacing } from '@/constants/theme';
+import { spacing } from '@/constants/theme';
+
+// Exceção ao design system (cantos retos): input de pesquisa mantém
+// borda arredondada a pedido do usuário.
+const INPUT_BORDER_RADIUS = 12;
 
 export function Input({ style, ...rest }: TextInputProps) {
   const colorScheme = useColorScheme() ?? 'light';
@@ -13,9 +17,11 @@ export function Input({ style, ...rest }: TextInputProps) {
         {
           height: 54,
           borderWidth: 1,
-          borderRadius: radius.sm,
+          borderRadius: INPUT_BORDER_RADIUS,
           borderColor: colors.border,
           paddingHorizontal: spacing.lg,
+          marginTop: spacing.md,
+          marginBottom: spacing.md,
           color: colors.text,
         },
         style,
