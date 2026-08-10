@@ -11,6 +11,8 @@ import { router } from "expo-router"
 import { useSyncRefresh } from "@/hooks/useSyncRefresh";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProductCardSkeleton } from "@/components/ui/ProductCardSkeleton";
+import { ListFrame } from "@/components/ui/ListFrame";
+import { ListDivider } from "@/components/ui/ListDivider";
 import { useMinLoadingDuration } from "@/hooks/useMinLoadingDuration";
 
 export default function ProdutosScreen() {
@@ -42,52 +44,58 @@ export default function ProdutosScreen() {
         onSelect={filterByTipo}
       />
       {showSkeleton ? (
-        <>
+        <ListFrame>
           <ProductCardSkeleton />
+          <ListDivider />
           <ProductCardSkeleton />
+          <ListDivider />
           <ProductCardSkeleton />
+          <ListDivider />
           <ProductCardSkeleton />
+          <ListDivider />
           <ProductCardSkeleton />
-        </>
+        </ListFrame>
       ) : (
-        <FlatList
-          data={products}
-          keyExtractor={(item) => String(item.id)}
-          refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
-          ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto cadastrado" message="Toque no + pra adicionar o primeiro item." />}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
-          renderItem={({ item }) => {
-            const tipo = tiposProduto?.find((t: any) => Number(t.id) === Number(item.tipoProdutoId))?.descricao;
+        <ListFrame style={{ flex: 1 }}>
+          <FlatList
+            data={products}
+            keyExtractor={(item) => String(item.id)}
+            refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
+            ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto cadastrado" message="Toque no + pra adicionar o primeiro item." />}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
+            ItemSeparatorComponent={ListDivider}
+            renderItem={({ item }) => {
+              const tipo = tiposProduto?.find((t: any) => Number(t.id) === Number(item.tipoProdutoId))?.descricao;
 
-            return (
-              <Product
-                data={item}
-                tipoNome={tipo}
-                onDelete={() => {
-                  Alert.alert(
-                    'Confirmar Remoção',
-                    'Tem certeza que deseja remover este produto?',
-                    [
-                      { text: 'Cancelar', style: 'cancel' },
-                      {
-                        text: 'Remover',
-                        onPress: () => {
-                          remove(item.id);
-                          filterByTipo(Number(tipoProdutoId));
+              return (
+                <Product
+                  data={item}
+                  tipoNome={tipo}
+                  onDelete={() => {
+                    Alert.alert(
+                      'Confirmar Remoção',
+                      'Tem certeza que deseja remover este produto?',
+                      [
+                        { text: 'Cancelar', style: 'cancel' },
+                        {
+                          text: 'Remover',
+                          onPress: () => {
+                            remove(item.id);
+                            filterByTipo(Number(tipoProdutoId));
+                          },
+                          style: 'destructive',
                         },
-                        style: 'destructive',
-                      },
-                    ]
-                  );
-                }}
-                onOpen={() => router.push(`/modais/produtoModal?productId=${item.id}`)}
-              />
-            )
-          }}
-          contentContainerStyle={{ gap: 16 }}
-        />
+                      ]
+                    );
+                  }}
+                  onOpen={() => router.push(`/modais/produtoModal?productId=${item.id}`)}
+                />
+              )
+            }}
+          />
+        </ListFrame>
       )}
     </View>
   );
