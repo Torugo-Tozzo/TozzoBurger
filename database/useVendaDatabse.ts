@@ -1,6 +1,7 @@
 import { useSQLiteContext } from "expo-sqlite";
 import { VendaProduto, VendaDatabase } from "./types/Venda";
 import { generateUUID } from "./utils/uuid";
+import { markChanged } from "./tableWatermark";
 
 export function useVendasDatabase() {
     const database = useSQLiteContext();
@@ -40,6 +41,8 @@ export function useVendasDatabase() {
                             }
                         }
 
+                        markChanged('vendas')
+
                         return { vendaId };
         } catch (error) {
             throw error;
@@ -78,6 +81,8 @@ export function useVendasDatabase() {
                         }
                     }
                 }
+
+                markChanged('vendas')
 
                 return { vendaId: data.id };
             } catch (error) {
@@ -121,6 +126,8 @@ export function useVendasDatabase() {
             } finally {
                 await stmt.finalizeAsync();
             }
+
+            markChanged('vendas')
         } catch (error) {
             throw error;
         }
