@@ -6,6 +6,8 @@ import { Input } from '@/components/Input';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ProductCardSkeleton } from '@/components/ui/ProductCardSkeleton';
+import { ListFrame } from '@/components/ui/ListFrame';
+import { ListDivider } from '@/components/ui/ListDivider';
 import { useMinLoadingDuration } from '@/hooks/useMinLoadingDuration';
 import { spacing } from '@/constants/theme';
 import useProductList from '@/hooks/useProductList';
@@ -97,33 +99,37 @@ export default function VendaScreen() {
       />
 
       {showSkeleton ? (
-        <>
+        <ListFrame>
           <ProductCardSkeleton />
+          <ListDivider />
           <ProductCardSkeleton />
+          <ListDivider />
           <ProductCardSkeleton />
+          <ListDivider />
           <ProductCardSkeleton />
+          <ListDivider />
           <ProductCardSkeleton />
-        </>
+        </ListFrame>
       ) : (
-        <FlatList
-          data={products}
-          keyExtractor={keyExtractor}
-          renderItem={renderItem}
-          contentContainerStyle={listContentStyle}
-          refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
-          ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto encontrado" message="Ajuste a busca ou o filtro de tipo." />}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
-        />
+        <ListFrame style={{ flex: 1 }}>
+          <FlatList
+            data={products}
+            keyExtractor={keyExtractor}
+            renderItem={renderItem}
+            refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
+            ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto encontrado" message="Ajuste a busca ou o filtro de tipo." />}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
+            ItemSeparatorComponent={ListDivider}
+          />
+        </ListFrame>
       )}
 
       <CartButton />
     </View>
   );
 }
-
-const listContentStyle = { gap: 16 };
 
 const styles = StyleSheet.create({
   container: {
