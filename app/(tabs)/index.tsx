@@ -138,7 +138,6 @@ export default function VendaScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 16,
   },
   buttonWrap: {
     marginTop: spacing.lg,

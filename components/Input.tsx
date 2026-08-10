@@ -16,7 +16,6 @@ export function Input({ style, ...rest }: TextInputProps) {
           borderRadius: radius.sm,
           borderColor: colors.border,
           paddingHorizontal: spacing.lg,
-          marginBottom: spacing.xs,
           color: colors.text,
         },
         style,
