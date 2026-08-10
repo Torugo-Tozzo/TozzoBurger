@@ -6,6 +6,8 @@ import { useAutoSync } from '@/context/AutoSyncContext';
 import PedidoItem from '@/components/PedidoItem';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { RecordCardSkeleton } from '@/components/ui/RecordCardSkeleton';
+import { ListFrame } from '@/components/ui/ListFrame';
+import { ListDivider } from '@/components/ui/ListDivider';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useSyncRefresh } from '@/hooks/useSyncRefresh';
@@ -103,11 +105,17 @@ export default function Pedidos() {
     return (
       <View style={styles.container}>
         <Text style={styles.title}>Pedidos Recentes</Text>
-        <RecordCardSkeleton />
-        <RecordCardSkeleton />
-        <RecordCardSkeleton />
-        <RecordCardSkeleton />
-        <RecordCardSkeleton />
+        <ListFrame>
+          <RecordCardSkeleton />
+          <ListDivider />
+          <RecordCardSkeleton />
+          <ListDivider />
+          <RecordCardSkeleton />
+          <ListDivider />
+          <RecordCardSkeleton />
+          <ListDivider />
+          <RecordCardSkeleton />
+        </ListFrame>
       </View>
     );
   }
@@ -123,7 +131,14 @@ export default function Pedidos() {
         renderItem={({ item: dataKey }) => (
           <View style={styles.group}>
             <Text style={styles.date}>{dataKey}</Text>
-            {(pedidosPorData[dataKey] || []).map((p) => renderPedido(p))}
+            <ListFrame>
+              {(pedidosPorData[dataKey] || []).map((p, idx) => (
+                <React.Fragment key={p.id}>
+                  {idx > 0 ? <ListDivider /> : null}
+                  {renderPedido(p)}
+                </React.Fragment>
+              ))}
+            </ListFrame>
           </View>
         )}
       />
