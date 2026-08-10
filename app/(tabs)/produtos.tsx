@@ -77,7 +77,7 @@ export default function ProdutosScreen() {
 
   return (
     <View style={styles.container}>
-      <Input placeholder="Pesquisar" onChangeText={setSearch} style={styles.input} />
+      <Input placeholder="Pesquisar" onChangeText={setSearch} />
       <FiltroTipos
         data={tiposProduto}
         selectedId={Number(tipoProdutoId)}
@@ -108,9 +108,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: 16,
-  },
-  input: {
-    marginHorizontal: 16,
   },
   footerLoader: {
     paddingVertical: 16,

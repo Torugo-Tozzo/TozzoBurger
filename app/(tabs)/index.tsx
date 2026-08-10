@@ -104,7 +104,7 @@ export default function VendaScreen() {
 
   return (
     <View style={styles.container}>
-      <Input placeholder="Pesquisar" onChangeText={setSearch} value={search} style={styles.input} />
+      <Input placeholder="Pesquisar" onChangeText={setSearch} value={search} />
 
       <FiltroTipos
         data={tiposProduto}
@@ -139,9 +139,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: 16,
-  },
-  input: {
-    marginHorizontal: 16,
   },
   buttonWrap: {
     marginTop: spacing.lg,
