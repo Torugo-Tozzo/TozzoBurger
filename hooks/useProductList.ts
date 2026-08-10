@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import {  useProductDatabase } from "@/database/useProductDatabase"
 import { ProductDatabase } from "@/database/types/Produto"
 import { useAutoSync } from '@/context/AutoSyncContext'
+import { useShouldReload } from '@/hooks/useShouldReload'
 
 const PAGE_SIZE = 20
 
@@ -99,13 +100,28 @@ export function useProductList() {
     }
   }
 
-  // Carregar os produtos e tipos de produto quando a pesquisa mudar
-  // e também recarregar quando uma sincronização remota for aplicada (lastSync)
-  const { lastSync } = useAutoSync();
+  // Carregar produtos+tipos quando a pesquisa mudar - acao direta do usuario,
+  // sempre roda, nao passa pelo gate.
   useEffect(() => {
     list()
     loadTiposProduto()
-  }, [search, lastSync])
+  }, [search])
+
+  // Recarregar quando uma sincronizacao remota for aplicada (lastSync) - so
+  // se a tabela de produtos realmente mudou desde a ultima vez que esta tela
+  // recarregou. Pula a 1a execucao (mount), ja coberta pelo efeito acima.
+  const { lastSync } = useAutoSync();
+  const shouldReloadProdutos = useShouldReload(['produtos'])
+  const isFirstLastSync = useRef(true)
+  useEffect(() => {
+    if (isFirstLastSync.current) {
+      isFirstLastSync.current = false
+      return
+    }
+    if (!shouldReloadProdutos()) return
+    list()
+    loadTiposProduto()
+  }, [lastSync])
 
   return {
     search,
