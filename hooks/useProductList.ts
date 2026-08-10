@@ -116,6 +116,7 @@ export function useProductList() {
   useEffect(() => {
     if (isFirstLastSync.current) {
       isFirstLastSync.current = false
+      shouldReloadProdutos() // marca o baseline do mount, ignora o resultado
       return
     }
     if (!shouldReloadProdutos()) return
