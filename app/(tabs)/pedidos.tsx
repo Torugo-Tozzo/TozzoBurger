@@ -122,7 +122,6 @@ export default function Pedidos() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Pedidos Recentes</Text>
       <FlatList
         data={Object.keys(pedidosPorData)}
         keyExtractor={(d) => d}
@@ -147,7 +146,7 @@ export default function Pedidos() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: spacing.lg },
+  container: { flex: 1, paddingTop: spacing.lg, borderColor: 'black', borderWidth: 1 },
   title: { fontSize: type.title, fontWeight: 'bold', marginBottom: spacing.md, paddingHorizontal: spacing.lg },
   group: { marginBottom: spacing.xl },
   date: { fontSize: type.body, fontWeight: '600', marginBottom: spacing.sm, paddingHorizontal: spacing.lg },

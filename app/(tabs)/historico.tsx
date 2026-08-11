@@ -62,6 +62,8 @@ export default function HistoricoScreen() {
     container: {
       flex: 1,
       paddingTop: spacing.xl,
+      borderColor: 'black',
+      borderWidth: 1,
     },
     title: {
       fontSize: type.heading,

@@ -273,7 +273,7 @@ export default function PedidoModal() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
+  container: { flex: 1, padding: 16, borderColor: 'black', borderWidth: 1 },
   title: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
   label: { marginTop: 8, fontWeight: '600' },
   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 8, marginTop: 6 },

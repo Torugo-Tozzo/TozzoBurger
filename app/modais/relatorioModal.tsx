@@ -425,6 +425,8 @@ export default function RelatorioModal() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    borderColor: 'black',
+    borderWidth: 1,
   },
   header: {
     flexDirection: 'row',

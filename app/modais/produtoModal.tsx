@@ -76,7 +76,7 @@ export default function ProdutoModalScreen() {
   }
 
   return (
-    <View style={{ flex: 1, padding: spacing.xl }}>
+    <View style={{ flex: 1, padding: spacing.xl, borderColor: 'black', borderWidth: 1 }}>
       <Text style={{ fontSize: type.heading, fontWeight: 'bold' }}>
         {productId ? 'Editar Produto' : 'Cadastrar Produto'}
       </Text>

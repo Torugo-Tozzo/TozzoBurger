@@ -110,7 +110,7 @@ const BluetoothScreen = () => {
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: colors.background }}
+      style={{ flex: 1, backgroundColor: colors.background, borderColor: 'black', borderWidth: 1 }}
       contentContainerStyle={{ padding: 20 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
@@ -126,12 +126,12 @@ const BluetoothScreen = () => {
               <FontAwesome name="user-circle" size={56} color={colors.textMuted} style={styles.userIcon} />
               <Text style={[styles.username, { color: colors.text }]}>{user.nome ?? user.email}</Text>
               <View style={{ marginTop: 8 }}>
-                <Button title="Sair" onPress={() => logout()} variant="outline" />
+                <Button title="Sair" onPress={() => logout()} />
               </View>
             </View>
           ) : (
             <View>
-              <Text style={{ marginBottom: 8, color: colors.text }}>Conecte-se à API para sincronizar</Text>
+              <Text style={{ marginBottom: 8, color: colors.text }}>Conecte-se à internet para sincronizar</Text>
               <TextInput
                 placeholder="E-mail"
                 value={email}
@@ -215,7 +215,6 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 16,
-    borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: '#fff',
     borderWidth: 1,
@@ -224,6 +223,8 @@ const styles = StyleSheet.create({
   sectionHeader: {
     padding: 12,
     backgroundColor: '#fafafa',
+    borderBottomColor: 'black',
+    borderBottomWidth: 1
   },
   sectionTitle: {
     fontSize: 16,

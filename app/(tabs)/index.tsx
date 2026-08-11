@@ -138,13 +138,16 @@ export default function VendaScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    borderColor: 'black',
+    borderWidth: 1,
   },
   input: {
     marginHorizontal: 16,
   },
   buttonWrap: {
-    marginTop: spacing.lg,
+    marginBlock: spacing.lg,
     marginHorizontal: 16,
+    
   },
   title: {
     fontSize: 20,

@@ -49,7 +49,7 @@ export default function AdicionalModalScreen() {
   }
 
   return (
-    <View style={{ flex: 1, padding: spacing.xl }}>
+    <View style={{ flex: 1, padding: spacing.xl, borderColor: 'black', borderWidth: 1 }}>
       <Text style={{ fontSize: type.heading, fontWeight: 'bold' }}>Produto Adicional</Text>
       <View style={{ marginVertical: spacing.xl, height: 1, backgroundColor: colors.border }} />
 
