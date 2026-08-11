@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useCallback, useMemo, useRe
 // Context para dados do cart (muda quando cart muda)
 type CartDataContextType = {
   cart: ProductDatabase[];
+  cliente: string;
 };
 
 // Context para ações (referências estáveis, nunca muda)
@@ -14,6 +15,7 @@ type CartActionsContextType = {
   clearCart: () => void;
   /** Adiciona ao cart apenas se o produto ainda não existe. Retorna true se adicionou. */
   addIfNotInCart: (product: ProductDatabase) => boolean;
+  setCliente: (nome: string) => void;
 };
 
 const CartDataContext = createContext<CartDataContextType | undefined>(undefined);
@@ -21,6 +23,7 @@ const CartActionsContext = createContext<CartActionsContextType | undefined>(und
 
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [cart, setCart] = useState<ProductDatabase[]>([]);
+  const [cliente, setCliente] = useState('');
   const cartRef = useRef<ProductDatabase[]>(cart);
   cartRef.current = cart;
 
@@ -74,12 +77,13 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   const clearCart = useCallback(() => {
     setCart([]);
+    setCliente('');
   }, []);
 
-  const dataValue = useMemo(() => ({ cart }), [cart]);
+  const dataValue = useMemo(() => ({ cart, cliente }), [cart, cliente]);
 
   const actionsValue = useMemo(
-    () => ({ addToCart, removeFromCart, updateCartItem, clearCart, addIfNotInCart }),
+    () => ({ addToCart, removeFromCart, updateCartItem, clearCart, addIfNotInCart, setCliente }),
     [addToCart, removeFromCart, updateCartItem, clearCart, addIfNotInCart]
   );
 
