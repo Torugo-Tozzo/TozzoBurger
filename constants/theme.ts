@@ -10,7 +10,7 @@ export const spacing = {
 
 export const radius = {
   sm: 0,
-  md: 0,
+  md: 10,
   lg: 0,
   full: 0,
 };

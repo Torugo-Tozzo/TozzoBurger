@@ -50,6 +50,7 @@ export function Button({ title, variant = 'primary', loading = false, disabled =
       disabled={isDisabled}
       {...rest}
     >
+      <View style={[styles.innerBorder, { borderColor: contentText }]} pointerEvents="none" />
       {loading ? (
         <ActivityIndicator color={contentText} />
       ) : (
@@ -61,12 +62,23 @@ export function Button({ title, variant = 'primary', loading = false, disabled =
 
 const styles = StyleSheet.create({
   content: {
-    borderWidth: 1,
+    borderWidth: 2,
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  innerBorder: {
+    position: 'absolute',
+    top: 2,
+    left: 2,
+    right: 2,
+    bottom: 2,
+    borderWidth: 1,
+    borderRadius: Math.max(radius.md - 3, 0),
   },
   outlineBase: {
     borderWidth: 1,
