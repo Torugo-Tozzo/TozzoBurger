@@ -5,7 +5,7 @@ import { useCart } from '@/context/CartContext';  // Importando corretamente o u
 import { useVendasDatabase } from '@/database/useVendaDatabse';
 import { router } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { captureScreen } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
@@ -14,18 +14,25 @@ import { useProductDatabase } from '@/database/useProductDatabase';
 import { useAuth } from '@/context/AuthContext';
 import { useAutoSync } from '@/context/AutoSyncContext';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { IconButton } from '@/components/ui/IconButton';
+import { ListFrame } from '@/components/ui/ListFrame';
+import { ListDivider } from '@/components/ui/ListDivider';
 import Colors from '@/constants/Colors';
-import { spacing, radius } from '@/constants/theme';
+import { spacing, radius, type } from '@/constants/theme';
 
 export default function ContaModalScreen() {
-  const { cart, clearCart, updateCartItem, addToCart } = useCart();
+  const { cart, cliente, clearCart, updateCartItem, addToCart, setCliente } = useCart();
   const { createVenda } = useVendasDatabase();
   const { createPedido, getPedidoById, countPedidosAbertos } = usePedidosDatabase();
   const { show: showProduto } = useProductDatabase();
   const { user } = useAuth();
   const isCliente = user?.role === 'CLIENTE';
   const { triggerSync } = useAutoSync();
-  const [cliente, setCliente] = useState(isCliente ? (user?.nome ?? '') : '');
+
+  useEffect(() => {
+    if (isCliente && !cliente && user?.nome) setCliente(user.nome);
+  }, [isCliente, cliente, user?.nome, setCliente]);
 
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -130,7 +137,8 @@ export default function ContaModalScreen() {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      padding: 20
+      borderColor: 'black',
+      borderWidth: 1,
     },
     title: {
       fontSize: 24,
@@ -138,21 +146,27 @@ export default function ContaModalScreen() {
       marginBottom: 20,
     },
     separator: {
-      marginVertical: 10,
       height: 1,
       width: "100%",
       backgroundColor: colors.border,
     },
+    listFrame: {
+      flex: 1,
+    },
     cartItem: {
       flexDirection: "row",
-      justifyContent: "space-between",
-      marginBottom: 10,
+      alignItems: "center",
     },
-    itemText: {
-      fontSize: 16,
-    },
-    fleNome: {
+    itemInfo: {
       flex: 1,
+    },
+    itemNome: {
+      fontSize: type.body,
+      fontWeight: "bold",
+      marginBottom: 4,
+    },
+    itemPreco: {
+      fontSize: type.bodySm,
     },
     totalText: {
       fontSize: 25,
@@ -163,21 +177,23 @@ export default function ContaModalScreen() {
     quantityControls: {
       flexDirection: "row",
       alignItems: "center",
+      gap: spacing.sm,
     },
-    quantityButton: {
-      backgroundColor: colors.primary,
-      padding: 5,
-      borderRadius: 5,
-      marginHorizontal: 10,
+    quantityText: {
+      fontSize: type.body,
+      fontWeight: "bold",
+      minWidth: 24,
+      textAlign: "center",
     },
-    topRow: { flexDirection: 'row', marginTop: spacing.md, alignItems: 'center' },
-    bottomRow: { flexDirection: 'row', marginTop: spacing.md, alignItems: 'center' },
+    topRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.md },
+    bottomRow: { flexDirection: 'row', margin: spacing.md, alignItems: 'center'},
     iconBtn: { backgroundColor: colors.primary, padding: spacing.md, borderRadius: radius.md, flex: 3, marginRight: spacing.sm, alignItems: 'center', justifyContent: 'center' },
     iconBtnDanger: { backgroundColor: Colors.status.danger, padding: spacing.md, borderRadius: radius.md, flex: 3, marginRight: spacing.sm, alignItems: 'center', justifyContent: 'center' },
     ctaFlex: { flex: 7 },
     buttonDisabled: { opacity: 0.5 },
     input: {
-      width: '100%',
+      width: '90%',
+      alignSelf: 'center',
       padding: 10,
       marginVertical: 10,
       borderWidth: 1,
@@ -189,10 +205,6 @@ export default function ContaModalScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>
-        Carrinho de Compras
-      </Text>
-      <View style={styles.separator} />
       <TextInput
         style={[styles.input, isCliente && { backgroundColor: colors.surface }]}
         placeholder="Nome do Cliente"
@@ -201,34 +213,42 @@ export default function ContaModalScreen() {
         placeholderTextColor={placeholderColor}
         editable={!isCliente}
       />
-      <FlatList
-        data={cart}
-        keyExtractor={(item) => String(item.id)}  // Garantir que o item tem id
-        renderItem={({ item }) => (
-          <View style={styles.cartItem}>
-            <Text style={[styles.itemText, styles.fleNome]}>{item.nome}</Text>
-            <Text style={styles.itemText}>R$ {((item.quantidade ?? 0) * item.preco).toFixed(2)}</Text>
+      <ListFrame style={styles.listFrame}>
+        <FlatList
+          data={cart}
+          keyExtractor={(item) => String(item.id)}  // Garantir que o item tem id
+          ItemSeparatorComponent={ListDivider}
+          renderItem={({ item }) => {
+            const isUltimo = (item.quantidade ?? 0) <= 1;
 
-            <View style={styles.quantityControls}>
-              <TouchableOpacity
-                onPress={() => alterarQuantidade(item.id, 'decrementar')}
-                style={styles.quantityButton}
-              >
-                <FontAwesome name="minus" size={20} color={colors.background} />
-              </TouchableOpacity>
+            return (
+              <Card bordered={false} style={styles.cartItem}>
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemNome}>{item.nome}</Text>
+                  <Text style={styles.itemPreco}>R$ {((item.quantidade ?? 0) * item.preco).toFixed(2)}</Text>
+                </View>
 
-              <Text style={styles.itemText}>{item.quantidade}</Text>
+                <View style={styles.quantityControls}>
+                  <IconButton
+                    icon={isUltimo ? 'trash' : 'minus'}
+                    label={isUltimo ? 'Remover item' : 'Diminuir quantidade'}
+                    destructive={isUltimo}
+                    onPress={() => alterarQuantidade(item.id, 'decrementar')}
+                  />
 
-              <TouchableOpacity
-                onPress={() => alterarQuantidade(item.id, 'incrementar')}
-                style={styles.quantityButton}
-              >
-                <FontAwesome name="plus" size={20} color={colors.background} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-      />
+                  <Text style={styles.quantityText}>{item.quantidade}</Text>
+
+                  <IconButton
+                    icon="plus"
+                    label="Aumentar quantidade"
+                    onPress={() => alterarQuantidade(item.id, 'incrementar')}
+                  />
+                </View>
+              </Card>
+            );
+          }}
+        />
+      </ListFrame>
 
       <View style={styles.separator} />
       <Text style={styles.totalText}>Total: R$ {total.toFixed(2)}</Text>
