@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
 import { Image } from 'react-native';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useAuth } from '@/context/AuthContext';
 import { useAutoSync } from '@/context/AutoSyncContext';
+import { Button } from '@/components/ui/Button';
 import Colors from '@/constants/Colors';
 
 export default function LoginScreen() {
@@ -102,16 +103,13 @@ export default function LoginScreen() {
           style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
           placeholderTextColor={colors.textMuted}
         />
-        <Pressable style={[styles.button, { backgroundColor: colors.primary }]} onPress={handleLogin} disabled={loading}>
-          {(loading || waitingSync) ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <ActivityIndicator color={colors.background} />
-              <Text style={[styles.buttonText, { color: colors.background, marginLeft: 8 }]}>{waitingSync ? 'Sincronizando...' : 'Entrando...'}</Text>
-            </View>
-          ) : (
-            <Text style={[styles.buttonText, { color: colors.background }]}>Entrar</Text>
-          )}
-        </Pressable>
+        <Button
+          title="Entrar"
+          onPress={handleLogin}
+          loading={loading || waitingSync}
+          disabled={loading}
+          style={styles.button}
+        />
       </View>
     </View>
   );
@@ -123,6 +121,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
+    borderColor: 'black',
+    borderWidth: 1,
   },
   title: {
     fontSize: 24,
@@ -147,13 +147,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   button: {
-    height: 48,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
     marginTop: 8,
-  },
-  buttonText: {
-    fontWeight: '700',
   },
 });

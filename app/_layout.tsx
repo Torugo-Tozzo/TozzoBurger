@@ -12,7 +12,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { useAuth } from '@/context/AuthContext';
 import { useAutoSync } from '@/context/AutoSyncContext';
 import { AutoSyncProvider } from '@/context/AutoSyncContext';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { StatusBar } from 'expo-status-bar';
@@ -68,12 +68,12 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const { isSyncing, lastSync } = useAutoSync();
   // Redirect to login or main tabs depending on auth
   // Use replace so user can't go back to the wrong screen
   useEffect(() => {
     if (loading) return;
-    const pathname = (router as any).pathname as string | undefined;
     if (!user && pathname !== '/login') {
       (router as any).replace('/login');
       return;
@@ -98,7 +98,7 @@ function RootLayoutNav() {
       })();
       return () => { mounted = false; };
     }
-  }, [loading, user, router, isSyncing, lastSync]);
+  }, [loading, user, router, pathname, isSyncing, lastSync]);
 
   // While auth is rehydrating, don't render navigation (prevents flicker)
   if (loading) return null;
@@ -111,6 +111,7 @@ function RootLayoutNav() {
         translucent={true}
       />
       <Stack>
+        <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modais/contaModal" options={{ presentation: 'modal', title: 'Conta' }} />
         <Stack.Screen name="modais/produtoModal" options={{ presentation: 'modal', title: 'Produto' }} />
