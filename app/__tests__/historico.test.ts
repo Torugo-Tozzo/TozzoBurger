@@ -1,4 +1,4 @@
-import { PAGE_SIZE, withPage } from '@/app/(tabs)/historico';
+import { canLoadNextPage, PAGE_SIZE, withPage } from '@/app/(tabs)/historico';
 
 jest.mock('@expo/vector-icons', () => ({
   __esModule: true,
@@ -38,5 +38,15 @@ describe('paginação do histórico', () => {
       page: 2,
       limit: 50,
     });
+  });
+
+  it('não inicia próxima página quando o estado ainda está no reset da consulta', () => {
+    expect(canLoadNextPage({
+      page: 0,
+      hasNextPage: true,
+      loadingInitial: false,
+      loadingMore: false,
+      error: null,
+    }, null, 1)).toBe(false);
   });
 });

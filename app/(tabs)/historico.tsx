@@ -57,6 +57,18 @@ type ManualRefresh = {
   started: boolean;
 };
 
+export function canLoadNextPage(
+  state: VendasPageState,
+  inFlight: Pick<InFlightRequest, 'generation'> | null,
+  generation: number,
+): boolean {
+  return state.page > 0
+    && !state.loadingInitial
+    && !state.loadingMore
+    && state.hasNextPage
+    && inFlight?.generation !== generation;
+}
+
 function groupByDate(vendas: VendaRenderizavel[]): GroupedSales {
   return vendas.reduce<GroupedSales>((groups, venda) => {
     const date = new Date(venda.horario).toLocaleDateString('pt-BR');
@@ -334,10 +346,9 @@ export default function HistoricoScreen() {
   const groupedSales = useMemo(() => groupByDate(activeState.items), [activeState.items]);
 
   const handleEndReached = useCallback(() => {
-    if (activeState.loadingInitial || activeState.loadingMore || !activeState.hasNextPage) return;
-    const nextPage = activeState.page + 1;
     const generation = generationRef.current;
-    if (inFlightRef.current[section]?.generation === generation) return;
+    if (!canLoadNextPage(activeState, inFlightRef.current[section], generation)) return;
+    const nextPage = activeState.page + 1;
     if (section === 'device') void loadLocalPage(appliedFilters, nextPage, generation);
     else void loadRemotePage(appliedFilters, nextPage, generation);
   }, [activeState, appliedFilters, loadLocalPage, loadRemotePage, section]);
