@@ -2,6 +2,22 @@ import { useSQLiteContext } from "expo-sqlite";
 import { VendaProduto, VendaDatabase } from "./types/Venda";
 import { generateUUID } from "./utils/uuid";
 import { markChanged } from "./tableWatermark";
+import type { VendasFilters } from "../services/vendas";
+import { buildLocalVendasQuery } from "./vendasQuery";
+
+type VendaComProdutos = VendaDatabase & { produtos: string[] };
+type VendasRecentesAgrupadas = Record<string, VendaComProdutos[]>;
+type VendasRecentesPaginadas = {
+    vendas: VendaComProdutos[];
+    fechamento: number;
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+        hasNextPage: boolean;
+    };
+};
 
 export function useVendasDatabase() {
     const database = useSQLiteContext();
@@ -151,16 +167,17 @@ export function useVendasDatabase() {
         return total;
     }
 
-    async function listVendasRecentes() {
+    async function listVendasRecentes(): Promise<VendasRecentesAgrupadas>;
+    async function listVendasRecentes(filters: VendasFilters): Promise<VendasRecentesPaginadas>;
+    async function listVendasRecentes(filters?: VendasFilters): Promise<VendasRecentesAgrupadas | VendasRecentesPaginadas> {
         try {
-            const seteDiasAtras = new Date();
-            seteDiasAtras.setDate(seteDiasAtras.getDate() - 3);
-            const seteDiasAtrasISO = seteDiasAtras.toISOString();
-    
-            const vendas = await database.getAllAsync<VendaDatabase>(
-                `SELECT * FROM TB_VENDAS WHERE horario >= ? AND (deleted_at IS NULL) AND (excluida IS NULL OR excluida = 0) ORDER BY horario DESC LIMIT 500`,
-                [seteDiasAtrasISO]
-            );
+            const query = buildLocalVendasQuery(filters ?? {});
+            const vendas = await database.getAllAsync<VendaDatabase>(query.select, query.params);
+            const totalResult = await database.getFirstAsync<{ total: number }>(query.count, query.countParams);
+            const fechamentoResult = await database.getFirstAsync<{ fechamento: number }>(query.sum, query.sumParams);
+            const total = Number(totalResult?.total ?? 0);
+            const fechamento = Number(fechamentoResult?.fechamento ?? 0);
+            const totalPages = total === 0 ? 0 : Math.ceil(total / query.limit);
     
             const vendasComProdutos = await Promise.all(
                 vendas.map(async (venda) => {
@@ -185,18 +202,28 @@ export function useVendasDatabase() {
                     return { ...venda, produtos: produtosExibidos };
                 })
             );
-    
-            const vendasPorData: Record<string, (VendaDatabase & { produtos: string[] })[]> = {};
-    
-            for (const venda of vendasComProdutos) {
-                const dataVenda = new Date(venda.horario).toLocaleDateString(); // Agrupamento por data
-                if (!vendasPorData[dataVenda]) {
-                    vendasPorData[dataVenda] = [];
+
+            if (filters === undefined) {
+                const vendasPorData: VendasRecentesAgrupadas = {};
+                for (const venda of vendasComProdutos) {
+                    const dataVenda = new Date(venda.horario).toLocaleDateString();
+                    if (!vendasPorData[dataVenda]) vendasPorData[dataVenda] = [];
+                    vendasPorData[dataVenda].push(venda);
                 }
-                vendasPorData[dataVenda].push(venda);
+                return vendasPorData;
             }
-    
-            return vendasPorData; // Retorna vendas agrupadas por data com produtos
+
+            return {
+                vendas: vendasComProdutos,
+                fechamento,
+                pagination: {
+                    page: query.page,
+                    limit: query.limit,
+                    total,
+                    totalPages,
+                    hasNextPage: query.page < totalPages,
+                },
+            };
         } catch (error) {
             throw error;
         }

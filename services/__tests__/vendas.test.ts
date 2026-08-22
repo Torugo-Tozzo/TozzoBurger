@@ -1,6 +1,20 @@
-import { buildVendasQueryParams, filterVendasLocais, mapVendaApiToRender, VendaRenderizavel } from '../vendas';
+import {
+  buildVendasQueryParams,
+  DEFAULT_VENDAS_LIMIT,
+  DEFAULT_VENDAS_PAGE,
+  filterVendasLocais,
+  mapVendaApiToRender,
+  MAX_VENDAS_LIMIT,
+  VendaRenderizavel,
+} from '../vendas';
 
 describe('serviços puros de vendas', () => {
+  it('expõe os limites compartilhados da paginação local', () => {
+    expect(DEFAULT_VENDAS_PAGE).toBe(1);
+    expect(DEFAULT_VENDAS_LIMIT).toBe(50);
+    expect(MAX_VENDAS_LIMIT).toBe(100);
+  });
+
   it('monta os parâmetros da API com limites de data no fuso local e omite vazios', () => {
     const params = buildVendasQueryParams({
       page: 2, limit: 25, dataInicial: '2026-08-20', dataFinal: '2026-08-21', horaInicial: '08:30', horaFinal: '22:15', cliente: ' Ana Silva ', totalMin: '10,50', totalMax: 99.9,

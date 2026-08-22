@@ -10,6 +10,10 @@ export type VendasFilters = {
   limit?: number | string | null;
 };
 
+export const DEFAULT_VENDAS_PAGE = 1;
+export const DEFAULT_VENDAS_LIMIT = 50;
+export const MAX_VENDAS_LIMIT = 100;
+
 export const EMPTY_VENDAS_FILTERS: VendasFilters = {
   dataInicial: null,
   dataFinal: null,
