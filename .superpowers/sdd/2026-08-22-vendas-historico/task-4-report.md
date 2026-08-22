@@ -8,52 +8,58 @@ DONE_WITH_CONCERNS
 
 - Repositório: `C:/RN/TozzoBurger`
 - Branch: `feat/fase-3-vendas-historico`
-- Alterado na integração: somente `app/(tabs)/historico.tsx`
-- Relatório: este arquivo
+- Implementação: `app/(tabs)/historico.tsx`
+- Check unitário da integração: `app/__tests__/historico.test.ts`
 - Nenhum serviço, banco, API ou outro repositório foi alterado.
-- Não houve push, merge ou criação de subagentes/revisores.
+- Não houve push, merge, subagentes ou revisores.
+
+O branch já continha a primeira integração da tela no commit `7dc6628` (`feat-mobile-historico-incremental`). Esta execução substituta revisou essa implementação, adicionou o check TDD da tela e consolidou as correções no commit `c0e889c`.
 
 ## Implementação
 
-- `PAGE_SIZE = 50` para as consultas local e remota.
-- Estados independentes para cada seção com itens, total, fechamento, página, `hasNextPage`, carregamento inicial, carregamento incremental e erro.
-- `mergeVendasPage` usado para substituir a página 1 e concatenar/deduplicar páginas posteriores; a página e `hasNextPage` vêm sempre da paginação retornada.
-- `resetVendasPageState` usado na criação dos estados resetados.
-- Geração numérica em `useRef` e guarda de requisição em voo para descartar respostas obsoletas e impedir chamadas duplicadas de `onEndReached`.
-- Reset e carregamento da página 1 ao aplicar/limpar filtros, trocar seção e atualizar; `page`/`limit` antigos são removidos antes dos valores atuais serem enviados.
-- SQLite usa a página filtrada e o `fechamento` completo retornado por `listVendasRecentes`; o filtro em memória de `localSales` foi removido.
-- A seção remota usa `response.fechamento` como total filtrado.
-- Falhas iniciais deixam a lista vazia com erro; falhas incrementais preservam itens, registram o erro e mantêm a possibilidade de nova tentativa.
-- `onEndReached`, indicador discreto no rodapé e mensagem de erro foram adicionados. Abrir, imprimir, excluir e o modo remoto somente leitura foram preservados.
+- `PAGE_SIZE` é 50 para as consultas local e remota.
+- Cada seção mantém estado independente com itens, contagem total, fechamento financeiro, página, `hasNextPage`, `loadingInitial`, `loadingMore` e erro.
+- A consulta local usa `useVendasDatabase().listVendasRecentes` já filtrada e o `fechamento` retornado pelo SQLite; não há filtro em memória de `localSales`.
+- A consulta remota usa `api.listVendas` e `response.fechamento` como total financeiro do período filtrado.
+- `withPage` remove `page`/`limit` recebidos nos filtros antes de acrescentar a página solicitada e o limite 50.
+- `mergeVendasPage` é usado para substituir/deduplicar a página 1 e concatenar/deduplicar páginas posteriores; página e `hasNextPage` vêm exclusivamente dos metadados da resposta.
+- `resetVendasPageState` é usado na criação dos estados de seção.
+- Aplicar/limpar filtros, trocar seção e atualizar invalidam a geração, limpam a consulta ativa e iniciam a página 1; refresh substitui a lista em vez de concatenar.
+- Geração numérica em `useRef` descarta respostas e erros obsoletos após `await`, inclusive quando a tela é desmontada.
+- `onEndReached` usa `hasNextPage`, os estados de carregamento e o request em voo para impedir chamadas duplicadas. O rodapé mostra indicador durante carregamento incremental.
+- Falha na primeira página deixa lista vazia com erro; falha posterior preserva itens, registra o erro, interrompe nova tentativa automática e permite recuperação pelo refresh.
+- Foram preservadas as ações de abrir, imprimir e excluir na seção local; a seção remota continua somente leitura.
 
 ## TDD e validações
 
-Antes da integração, os checks existentes de `mergeVendasPage` e `resetVendasPageState` foram executados:
+O check novo foi escrito antes da alteração da tela. O RED observado foi:
 
 ```text
-npx jest services/__tests__/vendas.test.ts --runInBand
-PASS — 1 suíte, 9 testes
+TypeError: (0 , _historico.withPage) is not a function
 ```
 
-Após a implementação:
+Após exportar e usar o helper no fluxo da tela, o check passou.
+
+Validação final fresca:
 
 ```text
 npx jest --watchAll=false --runInBand
-PASS — 13 suítes, 60 testes, 1 snapshot
+PASS — 14 suítes, 62 testes, 1 snapshot
 
 npx tsc --noEmit
 PASS — exit 0
 
 git diff --check
-PASS — exit 0
+PASS — sem diferenças de whitespace
 ```
 
 ## Commits
 
-- `7dc6628 feat-mobile-historico-incremental`
-- O relatório será registrado no commit seguinte.
+- `7dc6628 feat-mobile-historico-incremental` — integração inicial já presente no branch.
+- `c0e889c feat-mobile-historico-incremental-fix` — revisão substituta, check TDD e correções finais.
 
 ## Preocupações
 
-- O repositório não possui teste de renderização/interação de `HistoricoScreen`, e o setup Expo contém dependências nativas. Por isso, a cobertura automatizada específica desta task ficou limitada aos helpers já testados; a tela foi validada por TypeScript, suíte completa e inspeção do diff.
-- O build nativo Android não foi executado nesta task; o brief da Task 4 especifica Jest completo e `tsc` como validação da tela.
+- Não foi possível adicionar teste de renderização/interação completa de `HistoricoScreen` sem acoplar o setup a dependências nativas Expo/BLE; o check novo cobre `PAGE_SIZE` e a normalização de paginação, enquanto os helpers `mergeVendasPage`/`resetVendasPageState` permanecem cobertos na suíte existente.
+- `npx expo run:android` não foi executado nesta task; portanto, não há aprovação de build nativo Android neste relatório.
+- O proxy `rtk` não inicializou neste ambiente por ausência de `$HOME`; os comandos equivalentes nativos foram usados. O Git também emitiu avisos de acesso ao ignore global e normalização LF/CRLF, sem alterar o resultado dos testes ou do commit.
