@@ -2,7 +2,9 @@ import {
   DEFAULT_VENDAS_LIMIT,
   DEFAULT_VENDAS_PAGE,
   MAX_VENDAS_LIMIT,
+  parseTimezoneOffsetMinutes,
   type VendasFilters,
+  timezoneOffsetToSqliteModifier,
 } from '../services/vendas';
 
 export type LocalVendasQueryParam = string | number;
@@ -145,15 +147,18 @@ export function buildLocalVendasQuery(filters: VendasFilters = {}): LocalVendasQ
   ];
   const filterParams: LocalVendasQueryParam[] = [];
 
-  const addClause = (clause: string, parameter: LocalVendasQueryParam) => {
+  const addClause = (clause: string, ...parameters: LocalVendasQueryParam[]) => {
     clauses.push(clause);
-    filterParams.push(parameter);
+    filterParams.push(...parameters);
   };
 
   if (dataInicial) addClause('horario >= ?', dateBoundary(dataInicial, horaInicial, false));
   if (dataFinal) addClause('horario <= ?', dateBoundary(dataFinal, horaFinal, true));
-  if (horaInicial) addClause("strftime('%H:%M', horario) >= ?", horaInicial.sqliteValue);
-  if (horaFinal) addClause("strftime('%H:%M', horario) <= ?", horaFinal.sqliteValue);
+  const timezoneModifier = horaInicial || horaFinal
+    ? timezoneOffsetToSqliteModifier(parseTimezoneOffsetMinutes(filters.timezoneOffsetMinutes))
+    : undefined;
+  if (horaInicial) addClause("strftime('%H:%M', horario, ?) >= ?", timezoneModifier!, horaInicial.sqliteValue);
+  if (horaFinal) addClause("strftime('%H:%M', horario, ?) <= ?", timezoneModifier!, horaFinal.sqliteValue);
   if (cliente) addClause("LOWER(COALESCE(cliente, '')) LIKE LOWER(?)", `%${cliente}%`);
   if (totalMin != null) addClause('total >= ?', totalMin);
   if (totalMax != null) addClause('total <= ?', totalMax);

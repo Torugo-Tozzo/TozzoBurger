@@ -69,6 +69,34 @@ describe('buildLocalVendasQuery', () => {
     expect(query.sum).not.toContain('OFFSET');
   });
 
+  it('aplica o offset local como modifier parametrizado nas predicates de hora', () => {
+    const query = buildLocalVendasQuery({
+      horaInicial: '20:00',
+      horaFinal: '22:00',
+      timezoneOffsetMinutes: 180,
+      totalMin: '10,50',
+    });
+
+    expect(query.select).toContain("strftime('%H:%M', horario, ?) >= ?");
+    expect(query.select).toContain("strftime('%H:%M', horario, ?) <= ?");
+    expect(query.select).not.toContain('-03:00');
+    expect(query.params.filter((param) => param === '-03:00')).toHaveLength(2);
+    expect(query.params).toEqual(expect.arrayContaining(['20:00', '22:00', 10.5]));
+    expect(query.countParams.filter((param) => param === '-03:00')).toHaveLength(2);
+    expect(query.sumParams.filter((param) => param === '-03:00')).toHaveLength(2);
+  });
+
+  it('usa Date.getTimezoneOffset como default quando o filtro de hora não informa offset', () => {
+    const getTimezoneOffset = jest.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(180);
+
+    try {
+      const query = buildLocalVendasQuery({ horaInicial: '9:00' });
+      expect(query.params.filter((param) => param === '-03:00')).toHaveLength(1);
+    } finally {
+      getTimezoneOffset.mockRestore();
+    }
+  });
+
   it('rejeita paginação e filtros de data ou hora inválidos', () => {
     expect(() => buildLocalVendasQuery({ page: 0 })).toThrow(/page/i);
     expect(() => buildLocalVendasQuery({ limit: 101 })).toThrow(/limit/i);

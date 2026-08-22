@@ -34,6 +34,21 @@ describe('serviços puros de vendas', () => {
     expect([...emptyParams.keys()]).toEqual([]);
   });
 
+  it('envia o timezoneOffsetMinutes quando há filtro de hora e preserva a vírgula decimal', () => {
+    const params = buildVendasQueryParams({
+      horaInicial: '20:00',
+      horaFinal: '22:00',
+      timezoneOffsetMinutes: 180,
+      totalMin: '10,50',
+    });
+
+    expect(params.get('timezoneOffsetMinutes')).toBe('180');
+    expect(params.get('totalMin')).toBe('10,50');
+
+    const withoutHour = buildVendasQueryParams({ timezoneOffsetMinutes: 180 });
+    expect(withoutHour.get('timezoneOffsetMinutes')).toBeNull();
+  });
+
   it('mapeia itens, preços históricos e vendedor para o formato renderizável', () => {
     const venda = mapVendaApiToRender({
       id: 'venda-1', total: '42.5', horario: '2026-08-21T12:00:00.000Z', cliente: 'Ana Silva', vendedor: { id: 'usuario-1', nome: 'Caixa 1' },
