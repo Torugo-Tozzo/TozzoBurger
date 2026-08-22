@@ -31,7 +31,7 @@ import { setVendaDetalhes } from '@/services/vendasDetalhes';
 import Colors from '@/constants/Colors';
 import { spacing, type } from '@/constants/theme';
 
-const PAGE_SIZE = 50;
+export const PAGE_SIZE = 50;
 
 type SalesSection = 'device' | 'establishment';
 type GroupedSales = Record<string, VendaRenderizavel[]>;
@@ -79,7 +79,7 @@ function createSalesState(loadingInitial = false): SalesState {
   };
 }
 
-function withPage(filters: VendasFilters, page: number): VendasFilters {
+export function withPage(filters: VendasFilters, page: number): VendasFilters {
   const queryFilters = { ...filters };
   delete queryFilters.page;
   delete queryFilters.limit;
@@ -135,7 +135,7 @@ export default function HistoricoScreen() {
   const resetSectionState = useCallback((targetSection: SalesSection) => {
     const generation = generationRef.current + 1;
     generationRef.current = generation;
-    const nextState = createSalesState(true);
+    const nextState = createSalesState();
     if (targetSection === 'device') setLocalState(nextState);
     else setRemoteState(nextState);
     return generation;
@@ -194,6 +194,7 @@ export default function HistoricoScreen() {
         total: page === 1 ? 0 : state.total,
         fechamento: page === 1 ? 0 : state.fechamento,
         page: page === 1 ? 0 : state.page,
+        hasNextPage: false,
         loadingInitial: false,
         loadingMore: false,
         error: errorMessage(error, 'Não foi possível carregar as vendas deste aparelho.'),
@@ -242,6 +243,7 @@ export default function HistoricoScreen() {
         total: page === 1 ? 0 : state.total,
         fechamento: page === 1 ? 0 : state.fechamento,
         page: page === 1 ? 0 : state.page,
+        hasNextPage: false,
         loadingInitial: false,
         loadingMore: false,
         error: errorMessage(error, 'Não foi possível carregar as vendas do estabelecimento.'),
@@ -282,6 +284,10 @@ export default function HistoricoScreen() {
 
     beginSectionQuery('device', appliedFilters);
   }, [appliedFilters, beginSectionQuery, lastSync, loadLocalPage, section]);
+
+  useEffect(() => () => {
+    generationRef.current += 1;
+  }, []);
 
   const handleSectionChange = (nextSection: SalesSection) => {
     if (nextSection === section) return;
@@ -331,6 +337,7 @@ export default function HistoricoScreen() {
     if (activeState.loadingInitial || activeState.loadingMore || !activeState.hasNextPage) return;
     const nextPage = activeState.page + 1;
     const generation = generationRef.current;
+    if (inFlightRef.current[section]?.generation === generation) return;
     if (section === 'device') void loadLocalPage(appliedFilters, nextPage, generation);
     else void loadRemotePage(appliedFilters, nextPage, generation);
   }, [activeState, appliedFilters, loadLocalPage, loadRemotePage, section]);
