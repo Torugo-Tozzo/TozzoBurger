@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, RefreshControl, StyleSheet, TouchableOpacity, useColorScheme } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, TouchableOpacity, useColorScheme } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Text, View } from '@/components/Themed';
@@ -18,13 +18,44 @@ import { useSyncRefresh } from '@/hooks/useSyncRefresh';
 import { formatarVendaParaImpressao, Produto } from '@/hooks/formatarVendaImpressao';
 import { sendMessageToDevice } from '@/useBLE';
 import * as api from '@/services/api';
-import { EMPTY_VENDAS_FILTERS, filterVendasLocais, mapVendaApiToRender, type VendaRenderizavel, type VendasFilters } from '@/services/vendas';
+import {
+  EMPTY_VENDAS_FILTERS,
+  mapVendaApiToRender,
+  mergeVendasPage,
+  resetVendasPageState,
+  type VendaRenderizavel,
+  type VendasFilters,
+  type VendasPageState,
+} from '@/services/vendas';
 import { setVendaDetalhes } from '@/services/vendasDetalhes';
 import Colors from '@/constants/Colors';
 import { spacing, type } from '@/constants/theme';
 
+const PAGE_SIZE = 50;
+
 type SalesSection = 'device' | 'establishment';
 type GroupedSales = Record<string, VendaRenderizavel[]>;
+type LocalVendaPageItem = {
+  id: string;
+  total: number;
+  horario: string;
+  cliente?: string | null;
+  excluida: boolean;
+  criado_por?: string | null;
+  criado_por_nome?: string | null;
+  produtos: string[];
+};
+type SalesState = VendasPageState & {
+  items: VendaRenderizavel[];
+  total: number;
+  fechamento: number;
+};
+type InFlightRequest = { generation: number; page: number };
+type ManualRefresh = {
+  generation: number;
+  filters: VendasFilters;
+  started: boolean;
+};
 
 function groupByDate(vendas: VendaRenderizavel[]): GroupedSales {
   return vendas.reduce<GroupedSales>((groups, venda) => {
@@ -34,12 +65,44 @@ function groupByDate(vendas: VendaRenderizavel[]): GroupedSales {
   }, {});
 }
 
-function totalVendas(vendas: VendaRenderizavel[]) {
-  return vendas.filter((venda) => venda.excluida !== true).reduce((total, venda) => total + Number(venda.total || 0), 0);
-}
-
 function emptyFilters(): VendasFilters {
   return { ...EMPTY_VENDAS_FILTERS };
+}
+
+function createSalesState(loadingInitial = false): SalesState {
+  return {
+    items: [],
+    total: 0,
+    fechamento: 0,
+    ...resetVendasPageState(),
+    loadingInitial,
+  };
+}
+
+function withPage(filters: VendasFilters, page: number): VendasFilters {
+  const queryFilters = { ...filters };
+  delete queryFilters.page;
+  delete queryFilters.limit;
+  return { ...queryFilters, page, limit: PAGE_SIZE };
+}
+
+function mapLocalVendaToRender(venda: LocalVendaPageItem): VendaRenderizavel {
+  return {
+    id: String(venda.id),
+    total: Number(venda.total ?? 0),
+    horario: String(venda.horario),
+    cliente: venda.cliente == null ? null : String(venda.cliente),
+    excluida: venda.excluida === true,
+    criado_por: venda.criado_por == null ? null : String(venda.criado_por),
+    criado_por_nome: venda.criado_por_nome == null ? null : String(venda.criado_por_nome),
+    produtos: Array.isArray(venda.produtos) ? venda.produtos : [],
+    itens: [],
+  };
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim().length > 0) return error.message;
+  return fallback;
 }
 
 export default function HistoricoScreen() {
@@ -54,81 +117,223 @@ export default function HistoricoScreen() {
   const { getPrinter } = usePrinterDatabase();
 
   const [section, setSection] = useState<SalesSection>('device');
-  const [localSales, setLocalSales] = useState<VendaRenderizavel[]>([]);
-  const [remoteSales, setRemoteSales] = useState<VendaRenderizavel[]>([]);
-  const [remoteTotal, setRemoteTotal] = useState(0);
-  const [localLoaded, setLocalLoaded] = useState(false);
-  const [remoteLoaded, setRemoteLoaded] = useState(false);
+  const [localState, setLocalState] = useState<SalesState>(() => createSalesState(true));
+  const [remoteState, setRemoteState] = useState<SalesState>(() => createSalesState());
   const [showFilters, setShowFilters] = useState(false);
   const [draftFilters, setDraftFilters] = useState<VendasFilters>(emptyFilters);
   const [appliedFilters, setAppliedFilters] = useState<VendasFilters>(emptyFilters);
   const [loadingPrint, setLoadingPrint] = useState<string | null>(null);
 
-  const loadLocalSales = useCallback(async () => {
+  const generationRef = useRef(0);
+  const inFlightRef = useRef<Record<SalesSection, InFlightRequest | null>>({
+    device: null,
+    establishment: null,
+  });
+  const lastSyncSeenRef = useRef(lastSync);
+  const manualRefreshRef = useRef<ManualRefresh | null>(null);
+
+  const resetSectionState = useCallback((targetSection: SalesSection) => {
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
+    const nextState = createSalesState(true);
+    if (targetSection === 'device') setLocalState(nextState);
+    else setRemoteState(nextState);
+    return generation;
+  }, []);
+
+  const beginRequest = (targetSection: SalesSection, page: number, generation: number): boolean => {
+    const current = inFlightRef.current[targetSection];
+    if (current?.generation === generation) return false;
+    inFlightRef.current[targetSection] = { generation, page };
+    return true;
+  };
+
+  const finishRequest = (targetSection: SalesSection, page: number, generation: number): void => {
+    const current = inFlightRef.current[targetSection];
+    if (current?.generation === generation && current.page === page) {
+      inFlightRef.current[targetSection] = null;
+    }
+  };
+
+  const loadLocalPage = useCallback(async (filters: VendasFilters, page: number, generation: number) => {
+    if (!beginRequest('device', page, generation)) return;
+    if (generationRef.current !== generation) {
+      finishRequest('device', page, generation);
+      return;
+    }
+
+    setLocalState((state) => ({
+      ...state,
+      loadingInitial: page === 1,
+      loadingMore: page !== 1,
+      error: null,
+    }));
+
     try {
-      const grouped = await listVendasRecentes();
-      setLocalSales(Object.values(grouped).flat().map((sale) => ({ ...sale, itens: [] })) as VendaRenderizavel[]);
+      const response = await listVendasRecentes(withPage(filters, page));
+      if (generationRef.current !== generation) return;
+
+      const incoming = response.vendas.map((venda) => mapLocalVendaToRender(venda as LocalVendaPageItem));
+      setLocalState((state) => ({
+        ...state,
+        items: mergeVendasPage(state.items, incoming, response.pagination.page),
+        total: response.pagination.total,
+        fechamento: Number(response.fechamento ?? 0),
+        page: response.pagination.page,
+        hasNextPage: response.pagination.hasNextPage,
+        loadingInitial: false,
+        loadingMore: false,
+        error: null,
+      }));
     } catch (error) {
+      if (generationRef.current !== generation) return;
       console.error('Erro ao carregar vendas deste aparelho:', error);
-      Alert.alert('Erro', 'Não foi possível carregar as vendas deste aparelho.');
+      setLocalState((state) => ({
+        ...state,
+        items: page === 1 ? [] : state.items,
+        total: page === 1 ? 0 : state.total,
+        fechamento: page === 1 ? 0 : state.fechamento,
+        page: page === 1 ? 0 : state.page,
+        loadingInitial: false,
+        loadingMore: false,
+        error: errorMessage(error, 'Não foi possível carregar as vendas deste aparelho.'),
+      }));
     } finally {
-      setLocalLoaded(true);
+      finishRequest('device', page, generation);
     }
   }, []);
 
-  const loadRemoteSales = useCallback(async (filters: VendasFilters) => {
-    if (!token) return;
+  const loadRemotePage = useCallback(async (filters: VendasFilters, page: number, generation: number) => {
+    if (!token || !beginRequest('establishment', page, generation)) return;
+    if (generationRef.current !== generation) {
+      finishRequest('establishment', page, generation);
+      return;
+    }
+
+    setRemoteState((state) => ({
+      ...state,
+      loadingInitial: page === 1,
+      loadingMore: page !== 1,
+      error: null,
+    }));
+
     try {
-      const response = await api.listVendas(token, { ...filters, page: 1, limit: 100 });
-      const sales = (response.vendas ?? []).map(mapVendaApiToRender);
-      setRemoteSales(sales);
-      setRemoteTotal(Number(response.fechamento ?? totalVendas(sales)));
-      setRemoteLoaded(true);
+      const response = await api.listVendas(token, withPage(filters, page));
+      if (generationRef.current !== generation) return;
+
+      const incoming = (response.vendas ?? []).map(mapVendaApiToRender);
+      setRemoteState((state) => ({
+        ...state,
+        items: mergeVendasPage(state.items, incoming, response.pagination.page),
+        total: response.pagination.total,
+        fechamento: Number(response.fechamento ?? 0),
+        page: response.pagination.page,
+        hasNextPage: response.pagination.hasNextPage,
+        loadingInitial: false,
+        loadingMore: false,
+        error: null,
+      }));
     } catch (error) {
+      if (generationRef.current !== generation) return;
       console.error('Erro ao carregar vendas do estabelecimento:', error);
-      Alert.alert('Erro', 'Não foi possível carregar as vendas do estabelecimento.');
-      setRemoteLoaded(true);
+      setRemoteState((state) => ({
+        ...state,
+        items: page === 1 ? [] : state.items,
+        total: page === 1 ? 0 : state.total,
+        fechamento: page === 1 ? 0 : state.fechamento,
+        page: page === 1 ? 0 : state.page,
+        loadingInitial: false,
+        loadingMore: false,
+        error: errorMessage(error, 'Não foi possível carregar as vendas do estabelecimento.'),
+      }));
+    } finally {
+      finishRequest('establishment', page, generation);
     }
   }, [token]);
 
+  const beginSectionQuery = useCallback((targetSection: SalesSection, filters: VendasFilters) => {
+    const generation = resetSectionState(targetSection);
+    if (targetSection === 'device') void loadLocalPage(filters, 1, generation);
+    else void loadRemotePage(filters, 1, generation);
+  }, [loadLocalPage, loadRemotePage, resetSectionState]);
+
   useFocusEffect(useCallback(() => {
-    if (section === 'device') void loadLocalSales();
-  }, [loadLocalSales, section]));
+    if (section === 'device') beginSectionQuery('device', appliedFilters);
+  }, [appliedFilters, beginSectionQuery, section]));
 
   useEffect(() => {
-    if (section === 'device' && lastSync !== null) void loadLocalSales();
-  }, [lastSync, section, loadLocalSales]);
+    if (section === 'establishment' && token) beginSectionQuery('establishment', appliedFilters);
+  }, [appliedFilters, beginSectionQuery, section, token]);
 
   useEffect(() => {
-    if (section === 'establishment' && !remoteLoaded) void loadRemoteSales(appliedFilters);
-  }, [section, remoteLoaded, appliedFilters, loadRemoteSales]);
+    if (lastSync === lastSyncSeenRef.current) return;
+    lastSyncSeenRef.current = lastSync;
+    if (section !== 'device') return;
 
-  const localFilteredSales = useMemo(() => filterVendasLocais(localSales, appliedFilters), [localSales, appliedFilters]);
-  const activeSales = section === 'device' ? localFilteredSales : remoteSales;
-  const groupedSales = useMemo(() => groupByDate(activeSales), [activeSales]);
-  const activeTotal = section === 'device' ? totalVendas(localFilteredSales) : remoteTotal;
-  const activeLoaded = section === 'device' ? localLoaded : remoteLoaded;
+    const manualRefresh = manualRefreshRef.current;
+    if (manualRefresh?.generation === generationRef.current) {
+      if (!manualRefresh.started) {
+        manualRefresh.started = true;
+        void loadLocalPage(manualRefresh.filters, 1, manualRefresh.generation);
+      }
+      manualRefreshRef.current = null;
+      return;
+    }
+
+    beginSectionQuery('device', appliedFilters);
+  }, [appliedFilters, beginSectionQuery, lastSync, loadLocalPage, section]);
 
   const handleSectionChange = (nextSection: SalesSection) => {
+    if (nextSection === section) return;
+    resetSectionState(nextSection);
     setSection(nextSection);
   };
 
   const handleApplyFilters = () => {
+    resetSectionState(section);
     setAppliedFilters({ ...draftFilters });
-    setRemoteLoaded(false);
     setShowFilters(false);
   };
 
   const handleClearFilters = () => {
     const nextFilters = emptyFilters();
+    resetSectionState(section);
     setDraftFilters(nextFilters);
+    setAppliedFilters(nextFilters);
+    setShowFilters(false);
   };
 
   const handleRefresh = async () => {
-    await onRefresh();
-    if (section === 'device') await loadLocalSales();
-    else await loadRemoteSales(appliedFilters);
+    const targetSection = section;
+    const filters = appliedFilters;
+    const generation = resetSectionState(targetSection);
+    const manualRefresh: ManualRefresh = { generation, filters, started: false };
+    manualRefreshRef.current = manualRefresh;
+
+    try {
+      await onRefresh();
+    } catch (error) {
+      console.error('Erro ao atualizar vendas:', error);
+    } finally {
+      if (generationRef.current === generation && !manualRefresh.started) {
+        manualRefresh.started = true;
+        if (targetSection === 'device') void loadLocalPage(filters, 1, generation);
+        else void loadRemotePage(filters, 1, generation);
+      }
+      if (manualRefreshRef.current === manualRefresh) manualRefreshRef.current = null;
+    }
   };
+
+  const activeState = section === 'device' ? localState : remoteState;
+  const groupedSales = useMemo(() => groupByDate(activeState.items), [activeState.items]);
+
+  const handleEndReached = useCallback(() => {
+    if (activeState.loadingInitial || activeState.loadingMore || !activeState.hasNextPage) return;
+    const nextPage = activeState.page + 1;
+    const generation = generationRef.current;
+    if (section === 'device') void loadLocalPage(appliedFilters, nextPage, generation);
+    else void loadRemotePage(appliedFilters, nextPage, generation);
+  }, [activeState, appliedFilters, loadLocalPage, loadRemotePage, section]);
 
   const handlePrint = async (vendaId: string) => {
     setLoadingPrint(vendaId);
@@ -155,7 +360,16 @@ export default function HistoricoScreen() {
       { text: 'Excluir', style: 'destructive', onPress: async () => {
         try {
           await removeVenda(vendaId);
-          setLocalSales((sales) => sales.map((sale) => sale.id === vendaId ? { ...sale, excluida: true } : sale));
+          setLocalState((state) => {
+            const sale = state.items.find((item) => item.id === vendaId);
+            if (!sale || sale.excluida) return state;
+            return {
+              ...state,
+              items: state.items.map((item) => item.id === vendaId ? { ...item, excluida: true } : item),
+              total: Math.max(0, state.total - 1),
+              fechamento: Math.max(0, state.fechamento - Number(sale.total || 0)),
+            };
+          });
         } catch (error) {
           console.error('Erro ao excluir venda:', error);
           Alert.alert('Erro', 'Não foi possível excluir a venda.');
@@ -194,9 +408,9 @@ export default function HistoricoScreen() {
           <Text style={styles.filterText}>Filtros</Text>
         </TouchableOpacity>
       </View>
-      <Text style={[styles.total, { color: colors.textMuted }]}>Total do período: R$ {activeTotal.toFixed(2)}</Text>
+      <Text style={[styles.total, { color: colors.textMuted }]}>Total do período: R$ {activeState.fechamento.toFixed(2)}</Text>
 
-      {!activeLoaded ? (
+      {activeState.loadingInitial ? (
         <ListFrame style={styles.skeletonFrame}>
           <RecordCardSkeleton /><ListDivider /><RecordCardSkeleton /><ListDivider /><RecordCardSkeleton /><ListDivider /><RecordCardSkeleton />
         </ListFrame>
@@ -228,7 +442,11 @@ export default function HistoricoScreen() {
           )}
           contentContainerStyle={styles.listContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-          ListEmptyComponent={<EmptyState icon="clock-o" title="Nenhuma venda encontrada" message="Ajuste os filtros ou aguarde novas vendas." />}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.5}
+          ListHeaderComponent={activeState.error && activeState.items.length > 0 ? <Text style={[styles.error, { color: colors.textMuted }]}>{activeState.error}</Text> : null}
+          ListFooterComponent={activeState.loadingMore ? <ActivityIndicator style={styles.footerLoader} color={colors.text} /> : null}
+          ListEmptyComponent={<EmptyState icon="clock-o" title="Nenhuma venda encontrada" message={activeState.error ?? 'Ajuste os filtros ou aguarde novas vendas.'} />}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -253,4 +471,6 @@ const styles = StyleSheet.create({
   listContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl },
   group: { marginBottom: spacing.lg },
   dateHeader: { fontSize: type.bodySm, fontWeight: '700', marginBottom: spacing.sm },
+  error: { paddingHorizontal: spacing.xl, paddingVertical: spacing.sm },
+  footerLoader: { paddingVertical: spacing.lg },
 });
