@@ -71,6 +71,20 @@ describe('serviços puros de vendas', () => {
     expect(mergeVendasPage(existing, incoming, 2)[0]).toBe(incoming[0]);
   });
 
+  it('deduplica o estado existente pela primeira ocorrência antes de mesclar página posterior', () => {
+    const first = { id: 'v1', total: 10 } as VendaRenderizavel;
+    const duplicate = { id: 'v1', total: 11 } as VendaRenderizavel;
+    const other = { id: 'v2', total: 20 } as VendaRenderizavel;
+    const replacement = { id: 'v1', total: 99 } as VendaRenderizavel;
+    const incoming = [replacement, { id: 'v3', total: 30 } as VendaRenderizavel];
+
+    const merged = mergeVendasPage([first, duplicate, other], incoming, 2);
+
+    expect(merged.map((v) => v.id)).toEqual(['v1', 'v2', 'v3']);
+    expect(merged[0]).toBe(replacement);
+    expect(merged[1]).toBe(other);
+  });
+
   it('substitui a lista anterior pela página 1 deduplicada', () => {
     const existing = [{ id: 'old' } as VendaRenderizavel];
     const incoming = [{ id: 'v1' } as VendaRenderizavel, { id: 'v1', total: 2 } as VendaRenderizavel];

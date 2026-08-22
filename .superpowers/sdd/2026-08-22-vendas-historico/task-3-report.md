@@ -38,3 +38,21 @@ Implementado:
 ## Preocupações
 
 Nenhuma preocupação funcional identificada. O build Android não foi executado porque esta task altera apenas serviços/tipos/testes e o brief exige validação por Jest e TypeScript; a tela permanece para a Task 4.
+
+## Fix round 1 — revisão da Task 3
+
+### Findings corrigidos
+
+- `mergeVendasPage()` agora deduplica também `existing` para `page > 1`, mantém a posição da primeira ocorrência, substitui pelo item de `incoming` quando o ID reaparece e adiciona somente IDs novos.
+- `validPagination()` agora aceita somente campos numéricos inteiros dentro dos limites do contrato (`page`/`limit` positivos; `total`/`totalPages` não negativos), exige `hasNextPage` booleano e retorna um objeto normalizado. Paginação com strings, `null` ou valores inválidos usa o fallback remoto/local.
+
+### TDD e validações
+
+- RED: `npx jest services/__tests__/api.test.ts services/__tests__/vendas.test.ts --runInBand` — 2 novos testes falharam; os 11 testes anteriores permaneceram aprovados.
+- GREEN focado: 13/13 testes aprovados.
+- Suíte completa: 13/13 suítes, 60/60 testes e 1 snapshot aprovados.
+- TypeScript: `npx tsc --noEmit` — exit `0`.
+
+### Commit
+
+- Commit da fix round 1: `fix-mobile-contrato-vendas-review`.

@@ -40,6 +40,23 @@ describe('listVendas', () => {
     expect(result.pagination).toEqual({ page: 2, limit: 25, total: 101, totalPages: 5, hasNextPage: true });
   });
 
+  it('usa o fallback quando os campos da paginação chegam como strings', async () => {
+    const payload = {
+      vendas: [{ id: 'venda-3', total: 30 }],
+      fechamento: 30,
+      pagination: { page: '2', limit: '25', total: '101', totalPages: '5', hasNextPage: true },
+    };
+    fetchMock.mockResolvedValue({
+      ok: true,
+      text: jest.fn(async () => JSON.stringify(payload)),
+      headers: { get: jest.fn((name: string) => name === 'X-Total-Count' ? '101' : null) },
+    } as unknown as Response);
+
+    const result = await listVendas('token-123', { page: 1, limit: 50 });
+
+    expect(result.pagination).toEqual({ page: 1, limit: 50, total: 101, totalPages: 3, hasNextPage: true });
+  });
+
   it('propaga erro HTTP sem engolir a falha', async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 500, text: jest.fn(async () => JSON.stringify({ message: 'Falha ao listar vendas' })) } as unknown as Response);
     await expect(listVendas('token-123', {})).rejects.toThrow('Falha ao listar vendas');

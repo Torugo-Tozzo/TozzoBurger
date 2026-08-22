@@ -29,14 +29,20 @@ function nonNegativeInteger(value: unknown): number | undefined {
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
-function validPagination(value: unknown): value is VendasPagination {
-  if (!value || typeof value !== 'object') return false;
-  const pagination = value as Partial<VendasPagination>;
-  return positiveInteger(pagination.page, 0) > 0
-    && positiveInteger(pagination.limit, 0) > 0
-    && nonNegativeInteger(pagination.total) != null
-    && nonNegativeInteger(pagination.totalPages) != null
-    && typeof pagination.hasNextPage === 'boolean';
+function validPagination(value: unknown): VendasPagination | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const pagination = value as Partial<Record<keyof VendasPagination, unknown>>;
+  const page = integerAtLeast(pagination.page, 1);
+  const limit = integerAtLeast(pagination.limit, 1);
+  const total = integerAtLeast(pagination.total, 0);
+  const totalPages = integerAtLeast(pagination.totalPages, 0);
+  if (page == null || limit == null || total == null || totalPages == null || typeof pagination.hasNextPage !== 'boolean') return undefined;
+  return { page, limit, total, totalPages, hasNextPage: pagination.hasNextPage };
+}
+
+function integerAtLeast(value: unknown, minimum: number): number | undefined {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < minimum) return undefined;
+  return value;
 }
 
 function readTotalCountHeader(res: Response): number | undefined {
@@ -166,10 +172,11 @@ export async function listVendas(token: string, filters: VendasFilters = {}): Pr
 
     const body = await handleJsonResponse(res);
     const vendas = Array.isArray(body?.vendas) ? body.vendas : [];
+    const pagination = validPagination(body?.pagination);
     return {
       vendas,
       fechamento: body?.fechamento ?? 0,
-      pagination: validPagination(body?.pagination) ? body.pagination : fallbackVendasPagination(res, filters, vendas.length),
+      pagination: pagination ?? fallbackVendasPagination(res, filters, vendas.length),
     };
   } catch (err: any) {
     console.error('Network/listVendas request failed', url.toString(), err?.message ?? err);

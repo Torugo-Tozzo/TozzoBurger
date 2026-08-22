@@ -86,13 +86,20 @@ export type VendasPageState = {
 };
 
 export function mergeVendasPage(existing: VendaRenderizavel[], incoming: VendaRenderizavel[], page: number): VendaRenderizavel[] {
-  const merged: VendaRenderizavel[] = page === 1 ? [] : [...existing];
+  const merged: VendaRenderizavel[] = [];
   const indexes = new Map<string, number>();
-  merged.forEach((venda, index) => indexes.set(venda.id, index));
+
+  if (page !== 1) {
+    existing.forEach((venda) => {
+      if (indexes.has(venda.id)) return;
+      indexes.set(venda.id, merged.length);
+      merged.push(venda);
+    });
+  }
 
   incoming.forEach((venda) => {
     const existingIndex = indexes.get(venda.id);
-    if (existingIndex == null) {
+    if (existingIndex === undefined) {
       indexes.set(venda.id, merged.length);
       merged.push(venda);
     } else {
