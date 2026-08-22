@@ -63,3 +63,13 @@ PASS — sem diferenças de whitespace
 - Não foi possível adicionar teste de renderização/interação completa de `HistoricoScreen` sem acoplar o setup a dependências nativas Expo/BLE; o check novo cobre `PAGE_SIZE` e a normalização de paginação, enquanto os helpers `mergeVendasPage`/`resetVendasPageState` permanecem cobertos na suíte existente.
 - `npx expo run:android` não foi executado nesta task; portanto, não há aprovação de build nativo Android neste relatório.
 - O proxy `rtk` não inicializou neste ambiente por ausência de `$HOME`; os comandos equivalentes nativos foram usados. O Git também emitiu avisos de acesso ao ignore global e normalização LF/CRLF, sem alterar o resultado dos testes ou do commit.
+
+## Fix round 1 — Finding Important
+
+- Finding: após um reset, `createSalesState` mantém `page=0`, `hasNextPage=true` e `loadingInitial=false`; nesse intervalo o `onEndReached` poderia iniciar página 1 em paralelo com a carga inicial.
+- RED: o teste `não inicia próxima página quando o estado ainda está no reset da consulta` falhou com `TypeError: (0 , _historico.canLoadNextPage) is not a function` antes da implementação do guard.
+- Correção mínima: foi adicionado o helper reutilizável `canLoadNextPage`, usado pelo `handleEndReached`, que mantém os guards existentes e exige `state.page > 0`. O estado de reset não foi alterado; a carga inicial continua responsável por marcar `loadingInitial`.
+- GREEN: o teste focado passou com 3/3 testes.
+- Validação completa: `npx jest --watchAll=false --runInBand` passou com 14 suítes, 63 testes e 1 snapshot; `npx tsc --noEmit` passou; `git diff --check` passou.
+- Commit do fix: `56f85b6 fix-mobile-historico-pagination-guard`.
+- O minor de dependências ausentes permanece deferred, conforme orientação do revisor.
