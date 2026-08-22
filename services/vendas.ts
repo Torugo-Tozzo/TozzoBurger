@@ -63,7 +63,49 @@ export type VendaRenderizavel = {
   itens: VendaItemRenderizavel[];
 };
 
-export type VendasListResponse = { vendas: VendaApi[]; fechamento: number };
+export type VendasPagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+};
+
+export type VendasListResponse = {
+  vendas: VendaApi[];
+  fechamento: number;
+  pagination: VendasPagination;
+};
+
+export type VendasPageState = {
+  page: number;
+  hasNextPage: boolean;
+  loadingInitial: boolean;
+  loadingMore: boolean;
+  error: string | null;
+};
+
+export function mergeVendasPage(existing: VendaRenderizavel[], incoming: VendaRenderizavel[], page: number): VendaRenderizavel[] {
+  const merged: VendaRenderizavel[] = page === 1 ? [] : [...existing];
+  const indexes = new Map<string, number>();
+  merged.forEach((venda, index) => indexes.set(venda.id, index));
+
+  incoming.forEach((venda) => {
+    const existingIndex = indexes.get(venda.id);
+    if (existingIndex == null) {
+      indexes.set(venda.id, merged.length);
+      merged.push(venda);
+    } else {
+      merged[existingIndex] = venda;
+    }
+  });
+
+  return merged;
+}
+
+export function resetVendasPageState(): VendasPageState {
+  return { page: 0, hasNextPage: true, loadingInitial: false, loadingMore: false, error: null };
+}
 
 function nonEmptyString(value: string | null | undefined): string | undefined {
   if (value == null) return undefined;

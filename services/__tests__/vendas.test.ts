@@ -5,6 +5,8 @@ import {
   filterVendasLocais,
   mapVendaApiToRender,
   MAX_VENDAS_LIMIT,
+  mergeVendasPage,
+  resetVendasPageState,
   VendaRenderizavel,
 } from '../vendas';
 
@@ -59,5 +61,35 @@ describe('serviços puros de vendas', () => {
     const filtered = filterVendasLocais(vendas, { dataInicial: '2026-08-20', dataFinal: '2026-08-20', horaInicial: '09:00', horaFinal: '10:00', cliente: 'JOÃO', totalMin: '19,99', totalMax: 20 });
     expect(filtered.map(({ id }) => id)).toEqual(['venda-1']);
     expect(vendas).toHaveLength(3);
+  });
+
+  it('mescla página posterior sem duplicar IDs e substitui a venda repetida', () => {
+    const existing = [{ id: 'v1', total: 10 } as VendaRenderizavel];
+    const incoming = [{ id: 'v1', total: 20 } as VendaRenderizavel, { id: 'v2', total: 30 } as VendaRenderizavel];
+
+    expect(mergeVendasPage(existing, incoming, 2).map((v) => v.id)).toEqual(['v1', 'v2']);
+    expect(mergeVendasPage(existing, incoming, 2)[0]).toBe(incoming[0]);
+  });
+
+  it('substitui a lista anterior pela página 1 deduplicada', () => {
+    const existing = [{ id: 'old' } as VendaRenderizavel];
+    const incoming = [{ id: 'v1' } as VendaRenderizavel, { id: 'v1', total: 2 } as VendaRenderizavel];
+
+    expect(mergeVendasPage(existing, incoming, 1).map((v) => v.id)).toEqual(['v1']);
+    expect(mergeVendasPage(existing, incoming, 1)[0]).toBe(incoming[1]);
+  });
+
+  it('mantém itens existentes quando uma página posterior vem vazia', () => {
+    const existing = [{ id: 'v1' } as VendaRenderizavel, { id: 'v2' } as VendaRenderizavel];
+
+    expect(mergeVendasPage(existing, [], 3)).toEqual(existing);
+  });
+
+  it('cria o estado inicial padrão para resetar a paginação', () => {
+    const first = resetVendasPageState();
+    const second = resetVendasPageState();
+
+    expect(first).toEqual({ page: 0, hasNextPage: true, loadingInitial: false, loadingMore: false, error: null });
+    expect(second).not.toBe(first);
   });
 });
