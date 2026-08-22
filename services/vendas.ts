@@ -3,12 +3,19 @@ export type VendasFilters = {
   dataFinal?: string | null;
   horaInicial?: string | null;
   horaFinal?: string | null;
+  timezoneOffsetMinutes?: number | string | null;
   cliente?: string | null;
   totalMin?: number | string | null;
   totalMax?: number | string | null;
   page?: number | string | null;
   limit?: number | string | null;
 };
+
+export const DEFAULT_VENDAS_PAGE = 1;
+export const DEFAULT_VENDAS_LIMIT = 50;
+export const MAX_VENDAS_LIMIT = 100;
+export const MIN_TIMEZONE_OFFSET_MINUTES = -14 * 60;
+export const MAX_TIMEZONE_OFFSET_MINUTES = 14 * 60;
 
 export const EMPTY_VENDAS_FILTERS: VendasFilters = {
   dataInicial: null,
@@ -59,7 +66,56 @@ export type VendaRenderizavel = {
   itens: VendaItemRenderizavel[];
 };
 
-export type VendasListResponse = { vendas: VendaApi[]; fechamento: number };
+export type VendasPagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+};
+
+export type VendasListResponse = {
+  vendas: VendaApi[];
+  fechamento: number;
+  pagination: VendasPagination;
+};
+
+export type VendasPageState = {
+  page: number;
+  hasNextPage: boolean;
+  loadingInitial: boolean;
+  loadingMore: boolean;
+  error: string | null;
+};
+
+export function mergeVendasPage(existing: VendaRenderizavel[], incoming: VendaRenderizavel[], page: number): VendaRenderizavel[] {
+  const merged: VendaRenderizavel[] = [];
+  const indexes = new Map<string, number>();
+
+  if (page !== 1) {
+    existing.forEach((venda) => {
+      if (indexes.has(venda.id)) return;
+      indexes.set(venda.id, merged.length);
+      merged.push(venda);
+    });
+  }
+
+  incoming.forEach((venda) => {
+    const existingIndex = indexes.get(venda.id);
+    if (existingIndex === undefined) {
+      indexes.set(venda.id, merged.length);
+      merged.push(venda);
+    } else {
+      merged[existingIndex] = venda;
+    }
+  });
+
+  return merged;
+}
+
+export function resetVendasPageState(): VendasPageState {
+  return { page: 0, hasNextPage: true, loadingInitial: false, loadingMore: false, error: null };
+}
 
 function nonEmptyString(value: string | null | undefined): string | undefined {
   if (value == null) return undefined;
@@ -106,6 +162,33 @@ function appendParam(params: URLSearchParams, name: string, value: string | numb
   if (normalized.length > 0) params.set(name, normalized);
 }
 
+export function parseTimezoneOffsetMinutes(value: VendasFilters['timezoneOffsetMinutes']): number {
+  const fallback = new Date().getTimezoneOffset();
+  const normalized = value == null || (typeof value === 'string' && value.trim() === '')
+    ? fallback
+    : typeof value === 'string'
+      ? Number(value.trim())
+      : value;
+
+  if (
+    !Number.isInteger(normalized) ||
+    normalized < MIN_TIMEZONE_OFFSET_MINUTES ||
+    normalized > MAX_TIMEZONE_OFFSET_MINUTES
+  ) {
+    throw new Error('timezoneOffsetMinutes inválido');
+  }
+
+  return normalized;
+}
+
+export function timezoneOffsetToSqliteModifier(timezoneOffsetMinutes: number): string {
+  const sign = timezoneOffsetMinutes > 0 ? '-' : '+';
+  const absolute = Math.abs(timezoneOffsetMinutes);
+  const hours = Math.floor(absolute / 60);
+  const minutes = absolute % 60;
+  return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
 export function buildVendasQueryParams(filters: VendasFilters = {}): URLSearchParams {
   const params = new URLSearchParams();
   appendParam(params, 'page', filters.page);
@@ -116,6 +199,9 @@ export function buildVendasQueryParams(filters: VendasFilters = {}): URLSearchPa
   appendParam(params, 'dataFinal', dataFinal ? dateBoundary(dataFinal, filters.horaFinal, true) ?? dataFinal : undefined);
   appendParam(params, 'horaInicial', filters.horaInicial);
   appendParam(params, 'horaFinal', filters.horaFinal);
+  if (nonEmptyString(filters.horaInicial) || nonEmptyString(filters.horaFinal)) {
+    appendParam(params, 'timezoneOffsetMinutes', parseTimezoneOffsetMinutes(filters.timezoneOffsetMinutes));
+  }
   appendParam(params, 'cliente', filters.cliente);
   appendParam(params, 'totalMin', filters.totalMin);
   appendParam(params, 'totalMax', filters.totalMax);

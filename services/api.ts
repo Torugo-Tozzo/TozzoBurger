@@ -1,4 +1,4 @@
-import { buildVendasQueryParams, VendasFilters, VendasListResponse } from './vendas';
+import { buildVendasQueryParams, DEFAULT_VENDAS_LIMIT, DEFAULT_VENDAS_PAGE, VendasFilters, VendasListResponse, VendasPagination } from './vendas';
 
 // Fallback = produção. Para dev/homolog, defina EXPO_PUBLIC_API_URL no .env (ver .env.example).
 export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.tozzo.uk';
@@ -17,6 +17,46 @@ async function handleJsonResponse(res: Response) {
   } catch (err) {
     return txt;
   }
+}
+
+function positiveInteger(value: unknown, fallback: number): number {
+  const parsed = Number(typeof value === 'string' ? value.trim() : value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function nonNegativeInteger(value: unknown): number | undefined {
+  const parsed = Number(typeof value === 'string' ? value.trim() : value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function validPagination(value: unknown): VendasPagination | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const pagination = value as Partial<Record<keyof VendasPagination, unknown>>;
+  const page = integerAtLeast(pagination.page, 1);
+  const limit = integerAtLeast(pagination.limit, 1);
+  const total = integerAtLeast(pagination.total, 0);
+  const totalPages = integerAtLeast(pagination.totalPages, 0);
+  if (page == null || limit == null || total == null || totalPages == null || typeof pagination.hasNextPage !== 'boolean') return undefined;
+  return { page, limit, total, totalPages, hasNextPage: pagination.hasNextPage };
+}
+
+function integerAtLeast(value: unknown, minimum: number): number | undefined {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < minimum) return undefined;
+  return value;
+}
+
+function readTotalCountHeader(res: Response): number | undefined {
+  const headers = (res as Response & { headers?: { get?: (name: string) => string | null } }).headers;
+  const value = headers?.get?.('X-Total-Count');
+  return nonNegativeInteger(value);
+}
+
+function fallbackVendasPagination(res: Response, filters: VendasFilters, receivedCount: number): VendasPagination {
+  const page = positiveInteger(filters.page, DEFAULT_VENDAS_PAGE);
+  const limit = positiveInteger(filters.limit, DEFAULT_VENDAS_LIMIT);
+  const total = readTotalCountHeader(res) ?? receivedCount;
+  const totalPages = Math.ceil(total / limit);
+  return { page, limit, total, totalPages, hasNextPage: page < totalPages };
 }
 
 export async function login(email: string, senha: string) {
@@ -131,9 +171,12 @@ export async function listVendas(token: string, filters: VendasFilters = {}): Pr
     }
 
     const body = await handleJsonResponse(res);
+    const vendas = Array.isArray(body?.vendas) ? body.vendas : [];
+    const pagination = validPagination(body?.pagination);
     return {
-      vendas: Array.isArray(body?.vendas) ? body.vendas : [],
+      vendas,
       fechamento: body?.fechamento ?? 0,
+      pagination: pagination ?? fallbackVendasPagination(res, filters, vendas.length),
     };
   } catch (err: any) {
     console.error('Network/listVendas request failed', url.toString(), err?.message ?? err);
