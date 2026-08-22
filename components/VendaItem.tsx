@@ -1,26 +1,28 @@
 import React from 'react';
 import { RecordCard, RecordCardAction } from '@/components/ui/RecordCard';
 import { getStatusColor } from '@/constants/status';
-import { VendaDatabase } from '@/database/types/Venda';
+import type { VendaRenderizavel } from '@/services/vendas';
 
 type Props = {
-  data: VendaDatabase & { produtos: string[] };
+  data: VendaRenderizavel;
   index: number;
-  onView: () => void;
-  onPrint: () => void;
-  onDelete: () => void;
+  onPress?: () => void;
+  onView?: () => void;
+  onPrint?: () => void;
+  onDelete?: () => void;
   printing?: boolean;
+  readOnly?: boolean;
 };
 
-export function VendaItem({ data, index, onView, onPrint, onDelete, printing }: Props) {
+export function VendaItem({ data, index, onPress, onView, onPrint, onDelete, printing, readOnly = false }: Props) {
   const excluida = data.excluida === true;
   const horaFormatada = new Date(data.horario).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const autorTrecho = data.criado_por_nome ? `Criado por ${data.criado_por_nome} · ` : '';
 
-  const actions: RecordCardAction[] = [
-    { icon: 'eye', label: 'Ver detalhes', onPress: onView, disabled: excluida },
-    { icon: 'print', label: 'Imprimir', onPress: onPrint, disabled: excluida, loading: printing },
-    { icon: 'trash', label: 'Excluir venda', onPress: onDelete, disabled: excluida, destructive: true },
+  const actions: RecordCardAction[] = readOnly ? [] : [
+    ...(onView ? [{ icon: 'eye' as const, label: 'Ver detalhes', onPress: onView, disabled: excluida }] : []),
+    ...(onPrint ? [{ icon: 'print' as const, label: 'Imprimir', onPress: onPrint, disabled: excluida, loading: printing }] : []),
+    ...(onDelete ? [{ icon: 'trash' as const, label: 'Excluir venda', onPress: onDelete, disabled: excluida, destructive: true }] : []),
   ];
 
   return (
@@ -32,6 +34,7 @@ export function VendaItem({ data, index, onView, onPrint, onDelete, printing }: 
       total={data.total ?? 0}
       strikethrough={excluida}
       actions={actions}
+      onPress={onPress}
     />
   );
 }

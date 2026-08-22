@@ -1,9 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
 import { Image } from 'react-native';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useAuth } from '@/context/AuthContext';
-import { useAutoSync } from '@/context/AutoSyncContext';
 import { Button } from '@/components/ui/Button';
 import Colors from '@/constants/Colors';
 
@@ -14,13 +13,6 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
-  const [waitingSync, setWaitingSync] = useState(false);
-  const { isSyncing, lastSync, triggerSync } = useAutoSync();
-  const isSyncingRef = useRef(isSyncing);
-  const lastSyncRef = useRef(lastSync);
-
-  useEffect(() => { isSyncingRef.current = isSyncing; }, [isSyncing]);
-  useEffect(() => { lastSyncRef.current = lastSync; }, [lastSync]);
 
   const handleLogin = async () => {
     if (!email || !senha) {
@@ -31,30 +23,7 @@ export default function LoginScreen() {
     try {
       const ok = await login(email, senha);
       if (ok) {
-        // Start/ensure a sync and wait for the initial sync to complete
-        setWaitingSync(true);
-        try {
-          await triggerSync();
-        } catch (e) {
-          console.warn('triggerSync failed', e);
-        }
-
-        // Wait until we observe a completed sync or timeout (20s)
-        await new Promise((resolve) => {
-          const start = Date.now();
-          const interval = setInterval(() => {
-            if (lastSyncRef.current !== null && !isSyncingRef.current) {
-              clearInterval(interval);
-              resolve(null);
-            } else if (Date.now() - start > 20000) {
-              clearInterval(interval);
-              resolve(null);
-            }
-          }, 250);
-        });
-
-        setWaitingSync(false);
-        console.log('Login successful — initial sync awaited');
+        console.log('Login successful - initial sync running in background');
       } else {
         Alert.alert('Falha no login', 'Credenciais inválidas');
       }
@@ -63,16 +32,7 @@ export default function LoginScreen() {
       console.warn('Login error:', err);
       Alert.alert('Erro', msg);
     } finally {
-      // keep loading true while waiting for sync; otherwise hide
-      if (!waitingSync) setLoading(false);
-      else {
-        const t = setInterval(() => {
-          if (!isSyncingRef.current) {
-            setLoading(false);
-            clearInterval(t);
-          }
-        }, 300);
-      }
+      setLoading(false);
     }
   };
 
@@ -106,7 +66,7 @@ export default function LoginScreen() {
         <Button
           title="Entrar"
           onPress={handleLogin}
-          loading={loading || waitingSync}
+          loading={loading}
           disabled={loading}
           style={styles.button}
         />

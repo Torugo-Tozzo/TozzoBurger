@@ -111,7 +111,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Common keys: token, accessToken. Try both.
       const t = body?.token ?? body?.accessToken ?? body?.access_token ?? null;
       if (!t) return false;
-      setToken(t);
       try {
         await SecureStore.setItemAsync(TOKEN_KEY, t);
       } catch (err) {
@@ -121,7 +120,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Fetch user profile
       try {
         const me = await api.getMe(t);
-        setUser(me || null);
+        if (!me) {
+          console.warn('Failed to fetch /usuarios/me: empty profile');
+          return false;
+        }
+        setUser(me);
 
         try {
           const prev = await database.getFirstAsync<{ id?: number; email?: string; estabelecimentoId?: string }>(`SELECT id, email, estabelecimentoId FROM TB_USUARIO LIMIT 1`).catch(() => null);
@@ -186,24 +189,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } catch (err) {
           console.warn('Failed to check/replace TB_USUARIO on login', err);
         }
-        // After user and local DB have been updated, synchronize with server
-        try {
-          if (t) {
-            const res = await runWithLock(() => sincronizarComServidor(database, t)).catch((e) => {
-              console.warn('sync after login failed', e);
-              return null;
-            });
-            if (res === null) {
-              console.log('[sync] skipped login-triggered sync; another sync is in progress');
-            }
-          }
-        } catch (err) {
-          console.warn('Synchronization after login failed', err);
-        }
+        setToken(t);
+        // The first sync must not block navigation. The list screens show their
+        // skeletons while this background sync populates the local database.
+        void runWithLock(() => sincronizarComServidor(database, t))
+          .then((res) => {
+            if (res === null) console.log('[sync] skipped login-triggered sync; another sync is in progress');
+          })
+          .catch((err) => console.warn('sync after login failed', err));
         
       } catch (err) {
-        // ignore profile fetch errors but keep token
         console.warn('Failed to fetch /usuarios/me', err);
+        return false;
       }
 
       return true;

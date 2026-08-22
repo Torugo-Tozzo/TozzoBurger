@@ -1,3 +1,5 @@
+import { buildVendasQueryParams, VendasFilters, VendasListResponse } from './vendas';
+
 // Fallback = produção. Para dev/homolog, defina EXPO_PUBLIC_API_URL no .env (ver .env.example).
 export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.tozzo.uk';
 
@@ -107,6 +109,34 @@ export async function getChanges(token: string, since?: string | null) {
     return handleJsonResponse(res);
   } catch (err: any) {
     console.error('Network/getChanges request failed', url, err?.message ?? err);
+    throw err;
+  }
+}
+
+export async function listVendas(token: string, filters: VendasFilters = {}): Promise<VendasListResponse> {
+  const url = new URL('/vendas', BASE_URL);
+  url.search = buildVendasQueryParams(filters).toString();
+
+  try {
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
+    });
+
+    if (!res.ok) {
+      const errBody = await handleJsonResponse(res).catch(() => null);
+      const message = (errBody && (errBody.message || JSON.stringify(errBody))) || `HTTP ${res.status}`;
+      console.error('API listVendas error:', url.toString(), message);
+      throw new Error(message);
+    }
+
+    const body = await handleJsonResponse(res);
+    return {
+      vendas: Array.isArray(body?.vendas) ? body.vendas : [],
+      fechamento: body?.fechamento ?? 0,
+    };
+  } catch (err: any) {
+    console.error('Network/listVendas request failed', url.toString(), err?.message ?? err);
     throw err;
   }
 }
