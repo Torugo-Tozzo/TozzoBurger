@@ -17,12 +17,12 @@ import { useMinLoadingDuration } from "@/hooks/useMinLoadingDuration";
 
 export default function ProdutosScreen() {
   const { remove } = useProductDatabase();
-  const { products, tiposProduto, tipoProdutoId, filterByTipo, setSearch, isLoading, isLoadingMore, loadMore } = useProductList()
+  const { products, productTypes, productTypeId, filterByProductType, setSearch, isLoading, isLoadingMore, loadMore } = useProductList()
   const { refreshing, onRefresh } = useSyncRefresh();
 
   useFocusEffect(
     useCallback(() => {
-      filterByTipo(null);
+      filterByProductType(null);
       return;
     }, [])
   );
@@ -45,12 +45,12 @@ export default function ProdutosScreen() {
       ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
       ItemSeparatorComponent={ListDivider}
       renderItem={({ item }) => {
-        const tipo = tiposProduto?.find((t: any) => Number(t.id) === Number(item.tipoProdutoId))?.descricao;
+        const productType = productTypes?.find((t: any) => Number(t.id) === Number(item.productTypeId))?.description;
 
         return (
           <Product
             data={item}
-            tipoNome={tipo}
+            tipoNome={productType}
             onDelete={() => {
               Alert.alert(
                 'Confirmar Remoção',
@@ -61,7 +61,7 @@ export default function ProdutosScreen() {
                     text: 'Remover',
                     onPress: () => {
                       remove(item.id);
-                      filterByTipo(Number(tipoProdutoId));
+                      filterByProductType(Number(productTypeId));
                     },
                     style: 'destructive',
                   },
@@ -79,9 +79,9 @@ export default function ProdutosScreen() {
     <View style={styles.container}>
       <Input placeholder="Pesquisar" onChangeText={setSearch} style={styles.input} />
       <FiltroTipos
-        data={tiposProduto}
-        selectedId={Number(tipoProdutoId)}
-        onSelect={filterByTipo}
+        data={productTypes}
+        selectedId={Number(productTypeId)}
+        onSelect={filterByProductType}
       />
       {showSkeleton ? (
         <ListFrame>

@@ -1,72 +1,72 @@
-export type VendasFilters = {
+export type SalesFilters = {
   dataInicial?: string | null;
   dataFinal?: string | null;
   horaInicial?: string | null;
   horaFinal?: string | null;
   timezoneOffsetMinutes?: number | string | null;
-  cliente?: string | null;
+  customerName?: string | null;
   totalMin?: number | string | null;
   totalMax?: number | string | null;
   page?: number | string | null;
   limit?: number | string | null;
 };
 
-export const DEFAULT_VENDAS_PAGE = 1;
-export const DEFAULT_VENDAS_LIMIT = 50;
-export const MAX_VENDAS_LIMIT = 100;
+export const DEFAULT_SALES_PAGE = 1;
+export const DEFAULT_SALES_LIMIT = 50;
+export const MAX_SALES_LIMIT = 100;
 export const MIN_TIMEZONE_OFFSET_MINUTES = -14 * 60;
 export const MAX_TIMEZONE_OFFSET_MINUTES = 14 * 60;
 
-export const EMPTY_VENDAS_FILTERS: VendasFilters = {
+export const EMPTY_SALES_FILTERS: SalesFilters = {
   dataInicial: null,
   dataFinal: null,
   horaInicial: '',
   horaFinal: '',
-  cliente: '',
+  customerName: '',
   totalMin: '',
   totalMax: '',
 };
 
-export type VendaApi = {
+export type SaleApi = {
   id: string | number;
   total: number | string;
-  horario: string | number | Date;
-  cliente?: string | null;
-  excluida?: boolean | null;
-  vendedor?: { id?: string | number | null; nome?: string | null } | null;
-  itens?: VendaApiItem[] | null;
+  soldAt: string | number | Date;
+  customerName?: string | null;
+  isCancelled?: boolean | null;
+  seller?: { id?: string | number | null; name?: string | null } | null;
+  items?: SaleApiItem[] | null;
 };
 
-export type VendaApiItem = {
+export type SaleApiItem = {
   id?: string | number | null;
-  produtoId?: string | number | null;
-  quantidade: number | string;
-  precoHistorico?: number | string | null;
-  produto?: { id?: string | number | null; nome?: string | null; preco?: number | string | null } | null;
+  productId?: string | number | null;
+  quantity: number | string;
+  unitPriceAtSale?: number | string | null;
+  product?: { id?: string | number | null; name?: string | null; price?: number | string | null } | null;
 };
 
-export type VendaItemRenderizavel = {
+export type SaleItemRenderable = {
   id?: string;
-  produtoId?: string;
-  nome: string;
-  quantidade: number;
-  preco: number;
+  productId?: string;
+  name: string;
+  quantity: number;
+  price: number;
   subtotal: number;
 };
 
-export type VendaRenderizavel = {
+export type SaleRenderable = {
   id: string;
   total: number;
-  horario: string;
-  cliente: string | null;
-  excluida: boolean;
-  criado_por: string | null;
-  criado_por_nome: string | null;
-  produtos: string[];
-  itens: VendaItemRenderizavel[];
+  soldAt: string;
+  customerName: string | null;
+  isCancelled: boolean;
+  createdBy: string | null;
+  createdByName: string | null;
+  products: string[];
+  items: SaleItemRenderable[];
 };
 
-export type VendasPagination = {
+export type SalesPagination = {
   page: number;
   limit: number;
   total: number;
@@ -74,13 +74,13 @@ export type VendasPagination = {
   hasNextPage: boolean;
 };
 
-export type VendasListResponse = {
-  vendas: VendaApi[];
-  fechamento: number;
-  pagination: VendasPagination;
+export type SalesListResponse = {
+  sales: SaleApi[];
+  closing: number;
+  pagination: SalesPagination;
 };
 
-export type VendasPageState = {
+export type SalesPageState = {
   page: number;
   hasNextPage: boolean;
   loadingInitial: boolean;
@@ -88,32 +88,32 @@ export type VendasPageState = {
   error: string | null;
 };
 
-export function mergeVendasPage(existing: VendaRenderizavel[], incoming: VendaRenderizavel[], page: number): VendaRenderizavel[] {
-  const merged: VendaRenderizavel[] = [];
+export function mergeSalesPage(existing: SaleRenderable[], incoming: SaleRenderable[], page: number): SaleRenderable[] {
+  const merged: SaleRenderable[] = [];
   const indexes = new Map<string, number>();
 
   if (page !== 1) {
-    existing.forEach((venda) => {
-      if (indexes.has(venda.id)) return;
-      indexes.set(venda.id, merged.length);
-      merged.push(venda);
+    existing.forEach((sale) => {
+      if (indexes.has(sale.id)) return;
+      indexes.set(sale.id, merged.length);
+      merged.push(sale);
     });
   }
 
-  incoming.forEach((venda) => {
-    const existingIndex = indexes.get(venda.id);
+  incoming.forEach((sale) => {
+    const existingIndex = indexes.get(sale.id);
     if (existingIndex === undefined) {
-      indexes.set(venda.id, merged.length);
-      merged.push(venda);
+      indexes.set(sale.id, merged.length);
+      merged.push(sale);
     } else {
-      merged[existingIndex] = venda;
+      merged[existingIndex] = sale;
     }
   });
 
   return merged;
 }
 
-export function resetVendasPageState(): VendasPageState {
+export function resetSalesPageState(): SalesPageState {
   return { page: 0, hasNextPage: true, loadingInitial: false, loadingMore: false, error: null };
 }
 
@@ -162,7 +162,7 @@ function appendParam(params: URLSearchParams, name: string, value: string | numb
   if (normalized.length > 0) params.set(name, normalized);
 }
 
-export function parseTimezoneOffsetMinutes(value: VendasFilters['timezoneOffsetMinutes']): number {
+export function parseTimezoneOffsetMinutes(value: SalesFilters['timezoneOffsetMinutes']): number {
   const fallback = new Date().getTimezoneOffset();
   const normalized = value == null || (typeof value === 'string' && value.trim() === '')
     ? fallback
@@ -189,7 +189,7 @@ export function timezoneOffsetToSqliteModifier(timezoneOffsetMinutes: number): s
   return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-export function buildVendasQueryParams(filters: VendasFilters = {}): URLSearchParams {
+export function buildSalesQueryParams(filters: SalesFilters = {}): URLSearchParams {
   const params = new URLSearchParams();
   appendParam(params, 'page', filters.page);
   appendParam(params, 'limit', filters.limit);
@@ -202,7 +202,7 @@ export function buildVendasQueryParams(filters: VendasFilters = {}): URLSearchPa
   if (nonEmptyString(filters.horaInicial) || nonEmptyString(filters.horaFinal)) {
     appendParam(params, 'timezoneOffsetMinutes', parseTimezoneOffsetMinutes(filters.timezoneOffsetMinutes));
   }
-  appendParam(params, 'cliente', filters.cliente);
+  appendParam(params, 'customerName', filters.customerName);
   appendParam(params, 'totalMin', filters.totalMin);
   appendParam(params, 'totalMax', filters.totalMax);
   return params;
@@ -223,37 +223,37 @@ function optionalFilterNumber(value: number | string | null | undefined): number
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function normalizeHorario(value: string | number | Date): string {
+function normalizeSoldAt(value: string | number | Date): string {
   if (value instanceof Date) return value.toISOString();
   if (typeof value === 'number') return new Date(value).toISOString();
   return String(value);
 }
 
-export function mapVendaApiToRender(venda: VendaApi): VendaRenderizavel {
-  const itens = (venda.itens ?? []).map((item) => {
-    const quantidade = toFiniteNumber(item.quantidade);
-    const preco = toFiniteNumber(item.precoHistorico ?? item.produto?.preco);
-    const nome = nonEmptyString(item.produto?.nome) ?? 'Produto desconhecido';
-    const produtoId = item.produtoId ?? item.produto?.id;
+export function mapSaleApiToRender(sale: SaleApi): SaleRenderable {
+  const items = (sale.items ?? []).map((item) => {
+    const quantity = toFiniteNumber(item.quantity);
+    const price = toFiniteNumber(item.unitPriceAtSale ?? item.product?.price);
+    const name = nonEmptyString(item.product?.name) ?? 'Unknown product';
+    const productId = item.productId ?? item.product?.id;
     return {
       id: item.id == null ? undefined : String(item.id),
-      produtoId: produtoId == null ? undefined : String(produtoId),
-      nome,
-      quantidade,
-      preco,
-      subtotal: preco * quantidade,
+      productId: productId == null ? undefined : String(productId),
+      name,
+      quantity,
+      price,
+      subtotal: price * quantity,
     };
   });
   return {
-    id: String(venda.id),
-    total: toFiniteNumber(venda.total),
-    horario: normalizeHorario(venda.horario),
-    cliente: venda.cliente == null ? null : String(venda.cliente),
-    excluida: venda.excluida === true,
-    criado_por: venda.vendedor?.id == null ? null : String(venda.vendedor.id),
-    criado_por_nome: venda.vendedor?.nome == null ? null : String(venda.vendedor.nome),
-    produtos: itens.map((item) => `( ${item.quantidade}x ) ${item.nome}`),
-    itens,
+    id: String(sale.id),
+    total: toFiniteNumber(sale.total),
+    soldAt: normalizeSoldAt(sale.soldAt),
+    customerName: sale.customerName == null ? null : String(sale.customerName),
+    isCancelled: sale.isCancelled === true,
+    createdBy: sale.seller?.id == null ? null : String(sale.seller.id),
+    createdByName: sale.seller?.name == null ? null : String(sale.seller.name),
+    products: items.map((item) => `( ${item.quantity}x ) ${item.name}`),
+    items,
   };
 }
 
@@ -267,33 +267,52 @@ function localDateFromValue(value: string | number | Date): Date | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
-export type VendaLocalFiltravel = { total: number; horario: string | number | Date; cliente?: string | null };
+export type LocalSaleFilterable = { total: number; soldAt: string | number | Date; customerName?: string | null };
 
-export function filterVendasLocais<T extends VendaLocalFiltravel>(vendas: T[], filters: VendasFilters = {}): T[] {
+export function filterLocalSales<T extends LocalSaleFilterable>(sales: T[], filters: SalesFilters = {}): T[] {
   const inicio = dateBoundary(filters.dataInicial, filters.horaInicial, false);
   const fim = dateBoundary(filters.dataFinal, filters.horaFinal, true);
   const inicioMs = inicio ? new Date(inicio).getTime() : undefined;
   const fimMs = fim ? new Date(fim).getTime() : undefined;
   const horaInicial = minutesFromTime(filters.horaInicial);
   const horaFinal = minutesFromTime(filters.horaFinal);
-  const cliente = nonEmptyString(filters.cliente)?.toLocaleLowerCase('pt-BR');
+  const customerName = nonEmptyString(filters.customerName)?.toLocaleLowerCase('pt-BR');
   const totalMin = optionalFilterNumber(filters.totalMin);
   const totalMax = optionalFilterNumber(filters.totalMax);
 
-  return vendas.filter((venda) => {
-    const horario = localDateFromValue(venda.horario);
-    const horarioMs = horario?.getTime();
-    if (inicioMs != null && (horarioMs == null || horarioMs < inicioMs)) return false;
-    if (fimMs != null && (horarioMs == null || horarioMs > fimMs)) return false;
-    if (horario && (horaInicial != null || horaFinal != null) && inicioMs == null && fimMs == null) {
-      const minutos = horario.getHours() * 60 + horario.getMinutes();
+  return sales.filter((sale) => {
+    const soldAt = localDateFromValue(sale.soldAt);
+    const soldAtMs = soldAt?.getTime();
+    if (inicioMs != null && (soldAtMs == null || soldAtMs < inicioMs)) return false;
+    if (fimMs != null && (soldAtMs == null || soldAtMs > fimMs)) return false;
+    if (soldAt && (horaInicial != null || horaFinal != null) && inicioMs == null && fimMs == null) {
+      const minutos = soldAt.getHours() * 60 + soldAt.getMinutes();
       if (horaInicial != null && minutos < horaInicial) return false;
       if (horaFinal != null && minutos > horaFinal) return false;
     }
-    if (cliente && !String(venda.cliente ?? '').toLocaleLowerCase('pt-BR').includes(cliente)) return false;
-    const total = toFiniteNumber(venda.total);
+    if (customerName && !String(sale.customerName ?? '').toLocaleLowerCase('pt-BR').includes(customerName)) return false;
+    const total = toFiniteNumber(sale.total);
     if (totalMin != null && total < totalMin) return false;
     if (totalMax != null && total > totalMax) return false;
     return true;
   });
 }
+
+/** @deprecated Source compatibility for code not yet migrated to the English names. */
+export type VendasFilters = SalesFilters;
+export type VendaApi = SaleApi;
+export type VendaApiItem = SaleApiItem;
+export type VendaItemRenderizavel = SaleItemRenderable;
+export type VendaRenderizavel = SaleRenderable;
+export type VendasPagination = SalesPagination;
+export type VendasListResponse = SalesListResponse;
+export type VendasPageState = SalesPageState;
+export const DEFAULT_VENDAS_PAGE = DEFAULT_SALES_PAGE;
+export const DEFAULT_VENDAS_LIMIT = DEFAULT_SALES_LIMIT;
+export const MAX_VENDAS_LIMIT = MAX_SALES_LIMIT;
+export const EMPTY_VENDAS_FILTERS = EMPTY_SALES_FILTERS;
+export const buildVendasQueryParams = buildSalesQueryParams;
+export const mergeVendasPage = mergeSalesPage;
+export const resetVendasPageState = resetSalesPageState;
+export const mapVendaApiToRender = mapSaleApiToRender;
+export const filterVendasLocais = filterLocalSales;

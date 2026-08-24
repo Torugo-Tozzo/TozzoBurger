@@ -11,8 +11,8 @@ import { useCart } from '@/context/CartContext';
 
 export default function AdicionalModalScreen() {
   const { create } = useProductDatabase();
-  const [nome, setNome] = useState('');
-  const [preco, setPreco] = useState('');
+  const [name, setNome] = useState('');
+  const [price, setPreco] = useState('');
   const router = useRouter();
   const { addToCart } = useCart();
   const colorScheme = useColorScheme() ?? 'light';
@@ -20,24 +20,24 @@ export default function AdicionalModalScreen() {
 
   async function handleSave() {
     try {
-      if (!nome || !preco) {
+      if (!name || !price) {
         Alert.alert('Erro', 'Por favor, preencha todos os campos.');
         return;
       }
 
       // create gera UUID string — o antigo insertedRowId numérico virava NaN aqui
       const response = await create({
-        nome,
-        preco: parseFloat(preco),
-        tipoProdutoId: 8,
+        name,
+        price: parseFloat(price),
+        productTypeId: 8,
       });
 
       await addToCart({
         id: response.id,
-        nome,
-        preco: parseFloat(preco),
-        tipoProdutoId: 8,
-        quantidade: 1,
+        name,
+        price: parseFloat(price),
+        productTypeId: 8,
+        quantity: 1,
         updated_at: Date.now(),
       });
 
@@ -57,7 +57,7 @@ export default function AdicionalModalScreen() {
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
         placeholder="Digite o Nome..."
-        value={nome}
+        value={name}
         onChangeText={setNome}
         placeholderTextColor={colors.textMuted}
       />
@@ -66,7 +66,7 @@ export default function AdicionalModalScreen() {
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
         placeholder="Digite o Preço..."
-        value={preco}
+        value={price}
         keyboardType="numeric"
         onChangeText={setPreco}
         placeholderTextColor={colors.textMuted}

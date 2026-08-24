@@ -12,7 +12,7 @@ function parseTimestamp(val: any): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
-export async function sincronizarComServidor(database: SQLiteDatabase, token: string) {
+export async function synchronizeWithServer(database: SQLiteDatabase, token: string) {
   try {
     // read last sync timestamp (if any)
     const schema = await database.getFirstAsync<{ lastSyncAt?: number }>(`SELECT lastSyncAt FROM TB_SCHEMA LIMIT 1`).catch(() => null);
@@ -21,57 +21,57 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
     // Collect local products to push: only items changed since last sync (if we have `since`), otherwise push all
     // Prefer explicit pending-state push: send only rows marked as pending
     const produtosLocal: any[] = await database.getAllAsync(
-      `SELECT id, nome, tipoProdutoId, preco, origemProdutoId, ingredientes, updated_at, deleted_at FROM TB_PRODUTOS WHERE sync_status = 'pending' OR sync_status IS NULL;`
+      `SELECT id, name, productTypeId, price, sourceProductId, ingredients, updated_at, deleted_at FROM TB_PRODUCTS WHERE sync_status = 'pending' OR sync_status IS NULL;`
     ).catch((e) => { console.warn('[sync] query failed', e); return []; });
 
-    // Collect vendas and pedidos to push: only those where every item already has origemProdutoId (so we can reference server product ids)
-    const vendasRows: any[] = await database.getAllAsync(`SELECT id, total, horario, cliente, excluida, updated_at, deleted_at, criado_por FROM TB_VENDAS WHERE sync_status = 'pending' OR sync_status IS NULL;`).catch((e) => { console.warn('[sync] query failed', e); return []; });
+    // Collect vendas and pedidos to push: only those where every item already has sourceProductId (so we can reference server product ids)
+    const vendasRows: any[] = await database.getAllAsync(`SELECT id, total, soldAt, customerName, isCancelled, updated_at, deleted_at, createdBy, createdByName FROM TB_SALES WHERE sync_status = 'pending' OR sync_status IS NULL;`).catch((e) => { console.warn('[sync] query failed', e); return []; });
 
-    const pedidosRows: any[] = await database.getAllAsync(`SELECT id, total, horario, cliente, status, updated_at, deleted_at, criado_por FROM TB_PEDIDOS WHERE sync_status = 'pending' OR sync_status IS NULL;`).catch((e) => { console.warn('[sync] query failed', e); return []; });
+    const pedidosRows: any[] = await database.getAllAsync(`SELECT id, total, openedAt, customerName, status, updated_at, deleted_at, createdBy, createdByName FROM TB_ORDERS WHERE sync_status = 'pending' OR sync_status IS NULL;`).catch((e) => { console.warn('[sync] query failed', e); return []; });
 
     const vendasLocal: any[] = [];
     for (const v of vendasRows) {
       // include relation id and prefer produto origem (server id) when available
       const items = await database.getAllAsync(
-        `SELECT R.id as relId, R.vendaId as vendaId, R.produtoId as produtoId, R.quantidade as quantidade, P.origemProdutoId as origemProdutoId
-         FROM RL_VENDA_PRODUTO R
-         LEFT JOIN TB_PRODUTOS P ON P.id = R.produtoId
-         WHERE R.vendaId = ?`,
+        `SELECT R.id as relId, R.saleId as saleId, R.productId as productId, R.quantity as quantity, P.sourceProductId as sourceProductId
+         FROM RL_SALE_PRODUCT R
+         LEFT JOIN TB_PRODUCTS P ON P.id = R.productId
+         WHERE R.saleId = ?`,
         [String(v.id)]
       ).catch((e) => { console.warn('[sync] query failed', e); return []; });
 
       const mappedItems: any[] = (items || []).map((it: any) => ({
         id: it.relId ? String(it.relId) : generateUUID(),
-        vendaId: String(v.id),
-        produtoId: it.origemProdutoId ? String(it.origemProdutoId) : String(it.produtoId),
-        quantidade: Number(it.quantidade ?? 1),
+        saleId: String(v.id),
+        productId: it.sourceProductId ? String(it.sourceProductId) : String(it.productId),
+        quantity: Number(it.quantity ?? 1),
       }));
 
-      vendasLocal.push({ ...v, itens: mappedItems });
+      vendasLocal.push({ ...v, items: mappedItems, soldAt: v.soldAt });
     }
 
     const pedidosLocal: any[] = [];
     for (const p of pedidosRows) {
       // include relation id and prefer produto origem (server id) when available
       const items = await database.getAllAsync(
-        `SELECT R.id as relId, R.pedidoId as pedidoId, R.produtoId as produtoId, R.quantidade as quantidade, P.origemProdutoId as origemProdutoId
-         FROM RL_PEDIDO_PRODUTO R
-         LEFT JOIN TB_PRODUTOS P ON P.id = R.produtoId
-         WHERE R.pedidoId = ?`,
+        `SELECT R.id as relId, R.orderId as orderId, R.productId as productId, R.quantity as quantity, P.sourceProductId as sourceProductId
+         FROM RL_ORDER_PRODUCT R
+         LEFT JOIN TB_PRODUCTS P ON P.id = R.productId
+         WHERE R.orderId = ?`,
         [String(p.id)]
       ).catch((e) => { console.warn('[sync] query failed', e); return []; });
 
       const mappedItems: any[] = (items || []).map((it: any) => ({
         id: it.relId ? String(it.relId) : generateUUID(),
-        pedidoId: String(p.id),
-        produtoId: it.origemProdutoId ? String(it.origemProdutoId) : String(it.produtoId),
-        quantidade: Number(it.quantidade ?? 1),
+        orderId: String(p.id),
+        productId: it.sourceProductId ? String(it.sourceProductId) : String(it.productId),
+        quantity: Number(it.quantity ?? 1),
       }));
 
-      pedidosLocal.push({ ...p, itens: mappedItems });
+      pedidosLocal.push({ ...p, items: mappedItems, openedAt: p.openedAt });
     }
 
-    const payload = { produtos: produtosLocal, vendas: vendasLocal, pedidos: pedidosLocal };
+    const payload = { products: produtosLocal, sales: vendasLocal, orders: pedidosLocal };
     console.log('[sync] push: payload counts', { produtos: produtosLocal.length, vendas: vendasLocal.length, pedidos: pedidosLocal.length });
 
     // Detailed debug: log full payload when there is anything to push
@@ -92,7 +92,8 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
     }
 
     // push local data to server (POST /sincronizacao/push)
-    const syncRes: any = await api.sincronizar(token, payload).catch((err) => {
+    const synchronize = api.synchronize ?? (api as any).sincronizar;
+    const syncRes: any = await synchronize(token, payload).catch((err) => {
       console.warn('[sync] push failed', err);
       return null;
     });
@@ -102,36 +103,36 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
       // If push succeeded but server did not return explicit maps for vendas/pedidos,
       // mark the records we pushed as 'synced' to avoid repeatedly re-sending them.
       // We do this only for vendas and pedidos (not produtos) because produtos
-      // require server-origin IDs (origemProdutoId) to be safe to mark fully synced.
+      // require server-origin IDs (sourceProductId) to be safe to mark fully synced.
       try {
         if (Array.isArray(vendasLocal) && vendasLocal.length) {
           for (const v of vendasLocal) {
-            await database.runAsync('UPDATE TB_VENDAS SET sync_status = ? WHERE id = ?', ['synced', String(v.id)]).catch((e) => console.warn('[sync] db op failed', e));
+            await database.runAsync('UPDATE TB_SALES SET sync_status = ? WHERE id = ?', ['synced', String(v.id)]).catch((e) => console.warn('[sync] db op failed', e));
           }
         }
         if (Array.isArray(pedidosLocal) && pedidosLocal.length) {
           for (const p of pedidosLocal) {
-            await database.runAsync('UPDATE TB_PEDIDOS SET sync_status = ? WHERE id = ?', ['synced', String(p.id)]).catch((e) => console.warn('[sync] db op failed', e));
+            await database.runAsync('UPDATE TB_ORDERS SET sync_status = ? WHERE id = ?', ['synced', String(p.id)]).catch((e) => console.warn('[sync] db op failed', e));
           }
         }
       } catch (err) {
         // ignore; we still proceed to per-map handling below
       }
-      const mapaProdutos = syncRes.mapaProdutos || syncRes.mapa_produtos || null;
-      const mapaPedidos = syncRes.mapaPedidos || syncRes.mapa_pedidos || null;
-      const mapaVendas = syncRes.mapaVendas || syncRes.mapa_vendas || null;
+      const mapaProdutos = syncRes.productIdMap || null;
+      const mapaPedidos = syncRes.orderIdMap || null;
+      const mapaVendas = syncRes.saleIdMap || null;
 
       if (mapaProdutos && typeof mapaProdutos === 'object' && Object.keys(mapaProdutos).length > 0) {
         for (const localId of Object.keys(mapaProdutos)) {
           const serverId = String(mapaProdutos[localId]);
-          await database.runAsync('UPDATE TB_PRODUTOS SET origemProdutoId = ?, sync_status = ? WHERE id = ?', [serverId, 'synced', String(localId)]).catch((e) => console.warn('[sync] db op failed', e));
+          await database.runAsync('UPDATE TB_PRODUCTS SET sourceProductId = ?, sync_status = ? WHERE id = ?', [serverId, 'synced', String(localId)]).catch((e) => console.warn('[sync] db op failed', e));
           console.log('[sync] mapaProdutos applied', { localId, serverId });
         }
       }
 
       if (mapaPedidos && typeof mapaPedidos === 'object' && Object.keys(mapaPedidos).length > 0) {
         for (const localId of Object.keys(mapaPedidos)) {
-          await database.runAsync('UPDATE TB_PEDIDOS SET sync_status = ? WHERE id = ?', ['synced', String(localId)]).catch((e) => console.warn('[sync] db op failed', e));
+          await database.runAsync('UPDATE TB_ORDERS SET sync_status = ? WHERE id = ?', ['synced', String(localId)]).catch((e) => console.warn('[sync] db op failed', e));
         }
       }
 
@@ -139,7 +140,7 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
         console.log('[sync] mapaVendas', mapaVendas);
         for (const localId of Object.keys(mapaVendas)) {
           const serverId = String(mapaVendas[localId]);
-          await database.runAsync('UPDATE TB_VENDAS SET sync_status = ? WHERE id = ?', ['synced', String(localId)]).catch((e) => console.warn('[sync] db op failed', e));
+          await database.runAsync('UPDATE TB_SALES SET sync_status = ? WHERE id = ?', ['synced', String(localId)]).catch((e) => console.warn('[sync] db op failed', e));
           console.log('[sync] mapaVendas applied', { localId, serverId });
         }
       }
@@ -181,31 +182,31 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
       : null;
     const baseServerTime = baseServerTimeRaw !== null ? baseServerTimeRaw : Date.now();
 
-    // Replace TB_TP_PRODUTO if server provided tipos
-    if (changes && Array.isArray(changes.tiposProduto) && changes.tiposProduto.length > 0) {
+    // Replace TB_PRODUCT_TYPES if server provided tipos
+    if (changes && Array.isArray(changes.productTypes) && changes.productTypes.length > 0) {
       try {
         await database.execAsync('BEGIN;');
         // Apply tipos received from server using conditional upserts:
         // - do INSERT when local row doesn't exist
         // - do UPDATE only when server updated_at >= local.updated_at
-        // - honor deleted_at by setting deleted_at and ativo = 0
-        for (const t of changes.tiposProduto) {
+        // - honor deleted_at by setting deleted_at and isActive = 0
+        for (const t of changes.productTypes) {
           const idNum = Number(t.id);
           if (Number.isNaN(idNum)) continue;
-          const descricao = String(t.descricao ?? '');
-          const cor = t.cor ? String(t.cor) : '#9E9E9E';
-          const ativoFlag = typeof t.ativo !== 'undefined' && t.ativo !== null ? (t.ativo ? 1 : 0) : 1;
+          const description = String(t.description ?? '');
+          const color = t.color ? String(t.color) : '#9E9E9E';
+          const isActive = typeof t.isActive !== 'undefined' && t.isActive !== null ? (t.isActive ? 1 : 0) : 1;
           const updatedAtRaw = parseTimestamp(t.updated_at ?? t.updatedAt);
           const updatedAt = updatedAtRaw !== null ? updatedAtRaw : Date.now();
           const deletedAtRaw = parseTimestamp(t.deleted_at ?? t.deletedAt);
           const deletedAt = deletedAtRaw !== null ? deletedAtRaw : null;
 
-          const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_TP_PRODUTO WHERE id = ? LIMIT 1`, [idNum]).catch(() => null);
+          const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_PRODUCT_TYPES WHERE id = ? LIMIT 1`, [idNum]).catch(() => null);
 
           if (!local) {
             await database.runAsync(
-              'INSERT OR IGNORE INTO TB_TP_PRODUTO (id, descricao, cor, ativo, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?)',
-              [idNum, descricao, cor, ativoFlag, updatedAt, deletedAt]
+              'INSERT OR IGNORE INTO TB_PRODUCT_TYPES (id, description, color, isActive, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?)',
+              [idNum, description, color, isActive, updatedAt, deletedAt]
             ).catch((e) => console.warn('[sync] db op failed', e));
             continue;
           }
@@ -213,43 +214,43 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
           const localUpdated = Number(parseTimestamp(local.updated_at) || 0);
           if (updatedAt >= localUpdated) {
             await database.runAsync(
-              'UPDATE TB_TP_PRODUTO SET descricao = ?, cor = ?, ativo = ?, updated_at = ?, deleted_at = ? WHERE id = ?',
-              [descricao, cor, ativoFlag, updatedAt, deletedAt, idNum]
+              'UPDATE TB_PRODUCT_TYPES SET description = ?, color = ?, isActive = ?, updated_at = ?, deleted_at = ? WHERE id = ?',
+              [description, color, isActive, updatedAt, deletedAt, idNum]
             ).catch((e) => console.warn('[sync] db op failed', e));
           }
         }
         await database.execAsync('COMMIT;');
-        markChanged('produtos');
+        markChanged('products');
       } catch (err) {
         await database.execAsync('ROLLBACK;').catch((e) => console.warn('[sync] db op failed', e));
       }
     }
 
-    // Upsert produtos: match by origemProdutoId OR id to avoid duplicates; respect deleted_at
-    if (changes && Array.isArray(changes.produtos) && changes.produtos.length > 0) {
+    // Upsert produtos: match by sourceProductId OR id to avoid duplicates; respect deleted_at
+    if (changes && Array.isArray(changes.products) && changes.products.length > 0) {
       try {
         await database.execAsync('BEGIN;');
-        for (const p of changes.produtos) {
+        for (const p of changes.products) {
           const id = String(p.id);
-          const nome = String(p.nome ?? '');
-          const ingredientes = p.ingredientes ? String(p.ingredientes) : null;
-          const tipoProdutoId = typeof p.tipoProdutoId !== 'undefined' && p.tipoProdutoId !== null ? Number(p.tipoProdutoId) : null;
-          const origemProdutoId = p.origemProdutoId ? String(p.origemProdutoId) : null;
+          const name = String(p.name ?? '');
+          const ingredients = p.ingredients ? String(p.ingredients) : null;
+          const productTypeId = typeof p.productTypeId !== 'undefined' && p.productTypeId !== null ? Number(p.productTypeId) : null;
+          const sourceProductId = p.sourceProductId ? String(p.sourceProductId) : null;
           const updatedAtRaw = parseTimestamp(p.updated_at ?? p.updatedAt);
           const updatedAt = updatedAtRaw !== null ? updatedAtRaw : baseServerTime;
           const deletedAtRaw = parseTimestamp(p.deleted_at ?? p.deletedAt);
           const deletedAt = deletedAtRaw !== null ? deletedAtRaw : null;
           console.log('[sync] produto recebido', {
-            id, nome, preco: p.preco, tipoProdutoId: p.tipoProdutoId,
-            origemProdutoId: p.origemProdutoId,
+            id, name, price: p.price, productTypeId: p.productTypeId,
+            sourceProductId: p.sourceProductId,
             updated_at: updatedAt, deleted_at: deletedAt,
           });
 
-          const local = await database.getFirstAsync<{ updated_at?: number; id?: string }>(`SELECT id, updated_at FROM TB_PRODUTOS WHERE origemProdutoId = ? OR id = ? LIMIT 1`, [id, id]).catch(() => null);
+          const local = await database.getFirstAsync<{ updated_at?: number; id?: string }>(`SELECT id, updated_at FROM TB_PRODUCTS WHERE sourceProductId = ? OR id = ? LIMIT 1`, [id, id]).catch(() => null);
 
           if (deletedAt !== null && !Number.isNaN(deletedAt)) {
             await database.runAsync(
-              'UPDATE TB_PRODUTOS SET deleted_at = ?, updated_at = ? WHERE id = ? OR origemProdutoId = ?',
+              'UPDATE TB_PRODUCTS SET deleted_at = ?, updated_at = ? WHERE id = ? OR sourceProductId = ?',
               [deletedAt, updatedAt, id, id]
             ).catch((e) => console.warn('[sync] db op failed', e));
             continue;
@@ -257,160 +258,159 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
 
           if (!local) {
             await database.runAsync(
-              'INSERT OR IGNORE INTO TB_PRODUTOS (id, nome, tipoProdutoId, preco, origemProdutoId, ingredientes, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-              [id, nome, tipoProdutoId, Number(p.preco ?? 0), origemProdutoId, ingredientes, updatedAt, deletedAt]
+              'INSERT OR IGNORE INTO TB_PRODUCTS (id, name, productTypeId, price, sourceProductId, ingredients, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+              [id, name, productTypeId, Number(p.price ?? 0), sourceProductId, ingredients, updatedAt, deletedAt]
             ).catch((e) => console.warn('[sync] db op failed', e));
           } else {
             const localUpdated = Number(parseTimestamp(local.updated_at) || 0);
             if (updatedAt >= localUpdated) {
               const targetId = String(local.id ?? id);
               await database.runAsync(
-                'UPDATE TB_PRODUTOS SET nome = ?, tipoProdutoId = ?, preco = ?, origemProdutoId = ?, ingredientes = ?, updated_at = ?, deleted_at = ?, sync_status = ? WHERE id = ?',
-                [nome, tipoProdutoId, Number(p.preco ?? 0), origemProdutoId, ingredientes, updatedAt, deletedAt, 'synced', targetId]
+                'UPDATE TB_PRODUCTS SET name = ?, productTypeId = ?, price = ?, sourceProductId = ?, ingredients = ?, updated_at = ?, deleted_at = ?, sync_status = ? WHERE id = ?',
+                [name, productTypeId, Number(p.price ?? 0), sourceProductId, ingredients, updatedAt, deletedAt, 'synced', targetId]
               ).catch((e) => console.warn('[sync] db op failed', e));
             }
           }
         }
         await database.execAsync('COMMIT;');
-        markChanged('produtos');
+        markChanged('products');
       } catch (err) {
         await database.execAsync('ROLLBACK;').catch((e) => console.warn('[sync] db op failed', e));
       }
     }
 
     // Upsert pedidos (orders) from server
-    if (changes && Array.isArray(changes.pedidos) && changes.pedidos.length > 0) {
+    if (changes && Array.isArray(changes.orders) && changes.orders.length > 0) {
       try {
         await database.execAsync('BEGIN;');
-        for (const ped of changes.pedidos) {
+        for (const ped of changes.orders) {
           const id = String(ped.id);
-          const horario = ped.horario ? String(ped.horario) : new Date().toISOString();
-          const cliente = typeof ped.cliente !== 'undefined' && ped.cliente !== null ? String(ped.cliente) : null;
-          const status = ped.status ? String(ped.status) : 'ABERTO';
+          const openedAt = ped.openedAt ? String(ped.openedAt) : new Date().toISOString();
+          const customerName = typeof ped.customerName !== 'undefined' && ped.customerName !== null ? String(ped.customerName) : null;
+          const status = ped.status ? String(ped.status) : 'OPEN';
           const updatedAtRaw = parseTimestamp(ped.updated_at ?? ped.updatedAt);
           const updatedAt = updatedAtRaw !== null ? updatedAtRaw : baseServerTime;
           const deletedAtRaw = parseTimestamp(ped.deleted_at ?? ped.deletedAt);
           const deletedAt = deletedAtRaw !== null ? deletedAtRaw : null;
 
-          if (status === 'FECHADO' || (deletedAt !== null && !Number.isNaN(deletedAt))) {
-            await database.runAsync('DELETE FROM RL_PEDIDO_PRODUTO WHERE pedidoId = ?', [id]).catch((e) => console.warn('[sync] db op failed', e));
-            await database.runAsync('DELETE FROM TB_PEDIDOS WHERE id = ?', [id]).catch((e) => console.warn('[sync] db op failed', e));
+          if (status === 'CLOSED' || (deletedAt !== null && !Number.isNaN(deletedAt))) {
+            await database.runAsync('DELETE FROM RL_ORDER_PRODUCT WHERE orderId = ?', [id]).catch((e) => console.warn('[sync] db op failed', e));
+            await database.runAsync('DELETE FROM TB_ORDERS WHERE id = ?', [id]).catch((e) => console.warn('[sync] db op failed', e));
             continue;
           }
 
-          const itensArray = Array.isArray(ped.itens) ? ped.itens : Array.isArray(ped.items) ? ped.items : [];
+          const itemsArray = Array.isArray(ped.items) ? ped.items : [];
 
-          const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_PEDIDOS WHERE id = ?`, [id]).catch(() => null);
+          const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_ORDERS WHERE id = ?`, [id]).catch(() => null);
 
-          const criadoPor = ped.usuarioVendedorId ? String(ped.usuarioVendedorId) : (ped.vendedor?.id ? String(ped.vendedor.id) : null);
-          const criadoPorNome = ped.vendedor?.nome ? String(ped.vendedor.nome) : null;
+          const createdBy = ped.createdBy ? String(ped.createdBy) : null;
+          const createdByName = ped.createdByName ? String(ped.createdByName) : null;
 
           if (!local) {
             await database.runAsync(
-              'INSERT INTO TB_PEDIDOS (id, total, horario, cliente, status, updated_at, deleted_at, criado_por, criado_por_nome) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-              [id, Number(ped.total ?? 0), horario, cliente, status, updatedAt, deletedAt, criadoPor, criadoPorNome]
+              'INSERT INTO TB_ORDERS (id, total, openedAt, customerName, status, updated_at, deleted_at, createdBy, createdByName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              [id, Number(ped.total ?? 0), openedAt, customerName, status, updatedAt, deletedAt, createdBy, createdByName]
             ).catch((e) => console.warn('[sync] db op failed', e));
-            for (const it of itensArray) {
-              const produtoId = String(it.produtoId);
+            for (const it of itemsArray) {
+              const productId = String(it.productId);
               const relId = it.id ? String(it.id) : generateUUID();
               await database.runAsync(
-                'INSERT INTO RL_PEDIDO_PRODUTO (id, pedidoId, produtoId, quantidade) VALUES (?, ?, ?, ?)',
-                [relId, id, produtoId, Number(it.quantidade ?? 1)]
+                'INSERT INTO RL_ORDER_PRODUCT (id, orderId, productId, quantity) VALUES (?, ?, ?, ?)',
+                [relId, id, productId, Number(it.quantity ?? 1)]
               ).catch((e) => console.warn('[sync] db op failed', e));
             }
           } else {
             const localUpdated = Number(local.updated_at || 0);
             if (updatedAt >= localUpdated) {
               await database.runAsync(
-                'UPDATE TB_PEDIDOS SET total = ?, horario = ?, cliente = ?, status = ?, updated_at = ?, deleted_at = ?, criado_por = ?, criado_por_nome = ?, sync_status = ? WHERE id = ?',
-                [Number(ped.total ?? 0), horario, cliente, status, updatedAt, deletedAt, criadoPor, criadoPorNome, 'synced', id]
+                'UPDATE TB_ORDERS SET total = ?, openedAt = ?, customerName = ?, status = ?, updated_at = ?, deleted_at = ?, createdBy = ?, createdByName = ?, sync_status = ? WHERE id = ?',
+                [Number(ped.total ?? 0), openedAt, customerName, status, updatedAt, deletedAt, createdBy, createdByName, 'synced', id]
               ).catch((e) => console.warn('[sync] db op failed', e));
-              await database.runAsync('DELETE FROM RL_PEDIDO_PRODUTO WHERE pedidoId = ?', [id]).catch((e) => console.warn('[sync] db op failed', e));
-              for (const it of itensArray) {
-                const produtoId = String(it.produtoId);
+              await database.runAsync('DELETE FROM RL_ORDER_PRODUCT WHERE orderId = ?', [id]).catch((e) => console.warn('[sync] db op failed', e));
+              for (const it of itemsArray) {
+                const productId = String(it.productId);
                 const relId = it.id ? String(it.id) : generateUUID();
                 await database.runAsync(
-                  'INSERT INTO RL_PEDIDO_PRODUTO (id, pedidoId, produtoId, quantidade) VALUES (?, ?, ?, ?)',
-                  [relId, id, produtoId, Number(it.quantidade ?? 1)]
+                  'INSERT INTO RL_ORDER_PRODUCT (id, orderId, productId, quantity) VALUES (?, ?, ?, ?)',
+                  [relId, id, productId, Number(it.quantity ?? 1)]
                 ).catch((e) => console.warn('[sync] db op failed', e));
               }
             }
           }
         }
         await database.execAsync('COMMIT;');
-        markChanged('pedidos');
+        markChanged('orders');
       } catch (err) {
         await database.execAsync('ROLLBACK;').catch((e) => console.warn('[sync] db op failed', e));
       }
     }
 
     // Upsert vendas (completed sales) from server
-    if (changes && Array.isArray(changes.vendas) && changes.vendas.length > 0) {
+    if (changes && Array.isArray(changes.sales) && changes.sales.length > 0) {
       try {
         await database.execAsync('BEGIN;');
-        for (const ven of changes.vendas) {
+        for (const ven of changes.sales) {
           const id = String(ven.id);
-          const horario = ven.horario ? String(ven.horario) : new Date().toISOString();
-          const cliente = typeof ven.cliente !== 'undefined' && ven.cliente !== null ? String(ven.cliente) : null;
-          const excluida = ven.excluida ? 1 : 0;
+          const soldAt = ven.soldAt ? String(ven.soldAt) : new Date().toISOString();
+          const customerName = typeof ven.customerName !== 'undefined' && ven.customerName !== null ? String(ven.customerName) : null;
+          const isCancelled = ven.isCancelled ? 1 : 0;
           const updatedAtRaw = parseTimestamp(ven.updated_at ?? ven.updatedAt);
           const updatedAt = updatedAtRaw !== null ? updatedAtRaw : baseServerTime;
           const deletedAtRaw = parseTimestamp(ven.deleted_at ?? ven.deletedAt);
           const deletedAt = deletedAtRaw !== null ? deletedAtRaw : null;
 
-          const venExcluidaFlag = ven.excluida === true || ven.excluida === 1 || String(ven.excluida) === '1' || String(ven.excluida) === 'true';
-          const isVendaDeleted = (deletedAt !== null && !Number.isNaN(deletedAt)) || venExcluidaFlag;
-          if (isVendaDeleted) {
+          const isSaleDeleted = (deletedAt !== null && !Number.isNaN(deletedAt)) || isCancelled === 1;
+          if (isSaleDeleted) {
             const deletedEpoch = deletedAt !== null && !Number.isNaN(deletedAt) ? deletedAt : updatedAt;
             await database.runAsync(
-              'UPDATE TB_VENDAS SET deleted_at = ?, updated_at = ?, excluida = 1 WHERE id = ?',
+              'UPDATE TB_SALES SET deleted_at = ?, updated_at = ?, isCancelled = 1 WHERE id = ?',
               [deletedEpoch, updatedAt, id]
             ).catch((e) => console.warn('[sync] db op failed', e));
             continue;
           }
 
-          const itensArray = Array.isArray(ven.itens) ? ven.itens : Array.isArray(ven.items) ? ven.items : [];
-          console.log('[sync] venda itens', { id, itensArray });
+          const itemsArray = Array.isArray(ven.items) ? ven.items : [];
+          console.log('[sync] sale items', { id, itemsArray });
 
-          const venCriadoPor = ven.usuarioVendedorId ? String(ven.usuarioVendedorId) : (ven.vendedor?.id ? String(ven.vendedor.id) : null);
-          const venCriadoPorNome = ven.vendedor?.nome ? String(ven.vendedor.nome) : null;
+          const createdBy = ven.createdBy ? String(ven.createdBy) : null;
+          const createdByName = ven.createdByName ? String(ven.createdByName) : null;
 
-          const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_VENDAS WHERE id = ?`, [id]).catch(() => null);
+          const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_SALES WHERE id = ?`, [id]).catch(() => null);
 
           if (!local) {
             await database.runAsync(
-              'INSERT INTO TB_VENDAS (id, total, horario, cliente, excluida, updated_at, deleted_at, criado_por, criado_por_nome) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-              [id, Number(ven.total ?? 0), horario, cliente, excluida, updatedAt, deletedAt, venCriadoPor, venCriadoPorNome]
+              'INSERT INTO TB_SALES (id, total, soldAt, customerName, isCancelled, updated_at, deleted_at, createdBy, createdByName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              [id, Number(ven.total ?? 0), soldAt, customerName, isCancelled, updatedAt, deletedAt, createdBy, createdByName]
             ).catch((e) => console.warn('[sync] db op failed', e));
-            for (const it of itensArray) {
-              const produtoId = String(it.produtoId);
+            for (const it of itemsArray) {
+              const productId = String(it.productId);
               const relId = it.id ? String(it.id) : generateUUID();
               await database.runAsync(
-                'INSERT INTO RL_VENDA_PRODUTO (id, vendaId, produtoId, quantidade) VALUES (?, ?, ?, ?)',
-                [relId, id, produtoId, Number(it.quantidade ?? 1)]
+                'INSERT INTO RL_SALE_PRODUCT (id, saleId, productId, quantity) VALUES (?, ?, ?, ?)',
+                [relId, id, productId, Number(it.quantity ?? 1)]
               ).catch((e) => console.warn('[sync] db op failed', e));
             }
           } else {
             const localUpdated = Number(local.updated_at || 0);
             if (updatedAt >= localUpdated) {
               await database.runAsync(
-                'UPDATE TB_VENDAS SET total = ?, horario = ?, cliente = ?, excluida = ?, updated_at = ?, deleted_at = ?, criado_por = ?, criado_por_nome = ?, sync_status = ? WHERE id = ?',
-                [Number(ven.total ?? 0), horario, cliente, excluida, updatedAt, deletedAt, venCriadoPor, venCriadoPorNome, 'synced', id]
+                'UPDATE TB_SALES SET total = ?, soldAt = ?, customerName = ?, isCancelled = ?, updated_at = ?, deleted_at = ?, createdBy = ?, createdByName = ?, sync_status = ? WHERE id = ?',
+                [Number(ven.total ?? 0), soldAt, customerName, isCancelled, updatedAt, deletedAt, createdBy, createdByName, 'synced', id]
               ).catch((e) => console.warn('[sync] db op failed', e));
-              await database.runAsync('DELETE FROM RL_VENDA_PRODUTO WHERE vendaId = ?', [id]).catch((e) => console.warn('[sync] db op failed', e));
-              for (const it of itensArray) {
-                const produtoId = String(it.produtoId);
+              await database.runAsync('DELETE FROM RL_SALE_PRODUCT WHERE saleId = ?', [id]).catch((e) => console.warn('[sync] db op failed', e));
+              for (const it of itemsArray) {
+                const productId = String(it.productId);
                 const relId = it.id ? String(it.id) : generateUUID();
                 await database.runAsync(
-                  'INSERT INTO RL_VENDA_PRODUTO (id, vendaId, produtoId, quantidade) VALUES (?, ?, ?, ?)',
-                  [relId, id, produtoId, Number(it.quantidade ?? 1)]
+                  'INSERT INTO RL_SALE_PRODUCT (id, saleId, productId, quantity) VALUES (?, ?, ?, ?)',
+                  [relId, id, productId, Number(it.quantity ?? 1)]
                 ).catch((e) => console.warn('[sync] db op failed', e));
               }
             }
           }
         }
         await database.execAsync('COMMIT;');
-        markChanged('vendas');
+        markChanged('sales');
       } catch (err) {
         await database.execAsync('ROLLBACK;').catch((e) => console.warn('[sync] db op failed', e));
       }
@@ -424,22 +424,22 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
       try {
         // Remove vendas antigas que já foram sincronizadas
         await database.runAsync(
-          'DELETE FROM RL_VENDA_PRODUTO WHERE vendaId IN (SELECT id FROM TB_VENDAS WHERE horario < ? AND sync_status = ?)',
+          'DELETE FROM RL_SALE_PRODUCT WHERE saleId IN (SELECT id FROM TB_SALES WHERE soldAt < ? AND sync_status = ?)',
           [vendasLimite, 'synced']
         ).catch((e) => console.warn('[sync] db op failed', e));
         await database.runAsync(
-          'DELETE FROM TB_VENDAS WHERE horario < ? AND sync_status = ?',
+          'DELETE FROM TB_SALES WHERE soldAt < ? AND sync_status = ?',
           [vendasLimite, 'synced']
         ).catch((e) => console.warn('[sync] db op failed', e));
 
         // Remove qualquer pedido FECHADO que ainda reste localmente
         await database.runAsync(
-          'DELETE FROM RL_PEDIDO_PRODUTO WHERE pedidoId IN (SELECT id FROM TB_PEDIDOS WHERE status = ? AND sync_status = ?)',
-          ['FECHADO', 'synced']
+          'DELETE FROM RL_ORDER_PRODUCT WHERE orderId IN (SELECT id FROM TB_ORDERS WHERE status = ? AND sync_status = ?)',
+          ['CLOSED', 'synced']
         ).catch((e) => console.warn('[sync] db op failed', e));
         await database.runAsync(
-          'DELETE FROM TB_PEDIDOS WHERE status = ? AND sync_status = ?',
-          ['FECHADO', 'synced']
+          'DELETE FROM TB_ORDERS WHERE status = ? AND sync_status = ?',
+          ['CLOSED', 'synced']
         ).catch((e) => console.warn('[sync] db op failed', e));
       } catch (err) {
         console.warn('[sync] limpeza local falhou', err);
@@ -467,4 +467,6 @@ export async function sincronizarComServidor(database: SQLiteDatabase, token: st
   }
 }
 
-export default sincronizarComServidor;
+/** @deprecated Use synchronizeWithServer. */
+export const sincronizarComServidor = synchronizeWithServer;
+export default synchronizeWithServer;

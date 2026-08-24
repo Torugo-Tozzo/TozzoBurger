@@ -1,9 +1,9 @@
-export type Table = 'produtos' | 'pedidos' | 'vendas';
+export type Table = 'products' | 'orders' | 'sales';
 
 const changedAt: Record<Table, number> = {
-  produtos: 0,
-  pedidos: 0,
-  vendas: 0,
+  products: 0,
+  orders: 0,
+  sales: 0,
 };
 
 /**

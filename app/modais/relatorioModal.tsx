@@ -3,7 +3,7 @@ import { StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions
 import { View, Text } from '@/components/Themed';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useProductDatabase } from '@/database/useProductDatabase';
-import { useVendasDatabase } from '@/database/useVendaDatabse';
+import { useSaleDatabase } from '@/database/useSaleDatabase';
 import { Picker } from "@react-native-picker/picker";
 import { PieChart, ProgressChart } from 'react-native-chart-kit';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,8 +11,8 @@ import Colors from '@/constants/Colors';
 
 type RelatorioProduto = {
   id: string;
-  nome: string;
-  preco: number;
+  name: string;
+  price: number;
   totalVendido: number;
 };
 
@@ -20,8 +20,8 @@ type TipoGrafico = 'pizza' | 'progresso';
 
 export default function RelatorioModal() {
   const params = useLocalSearchParams();
-  const { getTipoProdutos } = useProductDatabase();
-  const { getRelatorioPorPeriodo } = useVendasDatabase();
+  const { getProductTypes } = useProductDatabase();
+  const { getSalesReportByPeriod } = useSaleDatabase();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -33,14 +33,14 @@ export default function RelatorioModal() {
     params.dataFinal ? new Date(params.dataFinal as string) : new Date()
   );
   
-  const [tipoProdutoId, setTipoProdutoId] = useState<number | null>(
-    params.tipoProdutoId && params.tipoProdutoId !== '' 
-      ? Number(params.tipoProdutoId) 
+  const [productTypeId, setTipoProdutoId] = useState<number | null>(
+    params.productTypeId && params.productTypeId !== ''
+      ? Number(params.productTypeId)
       : 100
   );
   
   const [tipoGrafico, setTipoGrafico] = useState<TipoGrafico>('pizza');
-  const [tiposProdutos, setTiposProdutos] = useState<{ id: number; descricao: string }[]>([]);
+  const [tiposProdutos, setTiposProdutos] = useState<{ id: number; description: string }[]>([]);
   
   const dataInicialFormatada = dataInicial.toLocaleDateString('pt-BR');
   const dataFinalFormatada = dataFinal.toLocaleDateString('pt-BR');
@@ -52,8 +52,8 @@ export default function RelatorioModal() {
   useEffect(() => {
     async function fetchTiposProdutos() {
       try {
-        const tipos = await getTipoProdutos();
-        setTiposProdutos(tipos);
+        const types = await getProductTypes();
+        setTiposProdutos(types);
       } catch (error) {
         console.error('Erro ao carregar tipos de produtos:', error);
       }
@@ -64,12 +64,12 @@ export default function RelatorioModal() {
   
   useEffect(() => {
     async function fetchTipoDescricao() {
-      if (tipoProdutoId && tipoProdutoId !== 100) {
+      if (productTypeId && productTypeId !== 100) {
         try {
-          const tipos = await getTipoProdutos();
-          const tipo = tipos.find(t => t.id === tipoProdutoId);
-          if (tipo) {
-            setTipoDescricao(tipo.descricao);
+          const types = await getProductTypes();
+          const productType = types.find(t => t.id === productTypeId);
+          if (productType) {
+            setTipoDescricao(productType.description);
           }
         } catch (error) {
           console.error('Erro ao carregar tipo de produto:', error);
@@ -80,7 +80,7 @@ export default function RelatorioModal() {
     }
     
     fetchTipoDescricao();
-  }, [tipoProdutoId]);
+  }, [productTypeId]);
   
   useEffect(() => {
     async function carregarDadosRelatorio() {
@@ -88,20 +88,20 @@ export default function RelatorioModal() {
       try {
         let tipoIdParam = '';
         
-        if (tipoProdutoId) {
-          if (tipoProdutoId === 100) {
+        if (productTypeId) {
+          if (productTypeId === 100) {
             tipoIdParam = '';
           } else {
-            tipoIdParam = tipoProdutoId.toString();
+            tipoIdParam = productTypeId.toString();
           }
         }
         
-        const dados = await getRelatorioPorPeriodo(
+        const report = await getSalesReportByPeriod(
           dataInicial.toISOString(),
           dataFinal.toISOString(),
           tipoIdParam
         );
-        setRelatorioData(dados);
+        setRelatorioData(report);
       } catch (error) {
         console.error('Erro ao carregar dados do relatório:', error);
       } finally {
@@ -110,7 +110,7 @@ export default function RelatorioModal() {
     }
     
     carregarDadosRelatorio();
-  }, [dataInicial, dataFinal, tipoProdutoId]);
+  }, [dataInicial, dataFinal, productTypeId]);
 
   const prepararDadosGrafico = () => {
     if (!relatorioData || relatorioData.length === 0) 
@@ -131,7 +131,7 @@ export default function RelatorioModal() {
         const color = getColor(index);
         colors.push(color);
         return {
-          name: item.nome,
+          name: item.name,
           totalVendido: item.totalVendido,
           color: color,
           legendFontColor: '#7F7F7F',
@@ -139,7 +139,7 @@ export default function RelatorioModal() {
         };
       });
       
-      labels = dadosOrdenados.map(item => item.nome);
+      labels = dadosOrdenados.map(item => item.name);
       values = dadosOrdenados.map(item => item.totalVendido);
     } else {
       const top5 = dadosOrdenados.slice(0, 5);
@@ -151,7 +151,7 @@ export default function RelatorioModal() {
         const color = getColor(index);
         colors.push(color);
         dadosPizza.push({
-          name: item.nome,
+          name: item.name,
           totalVendido: item.totalVendido,
           color: color,
           legendFontColor: '#7F7F7F',
@@ -169,7 +169,7 @@ export default function RelatorioModal() {
         legendFontSize: 12
       });
       
-      labels = [...top5.map(item => item.nome), 'Outros'];
+      labels = [...top5.map(item => item.name), 'Outros'];
       values = [...top5.map(item => item.totalVendido), totalOutros];
     }
     
@@ -226,11 +226,11 @@ export default function RelatorioModal() {
       textoRelatorio += "PRODUTOS VENDIDOS:\n";
       
       relatorioData.forEach((item, index) => {
-        textoRelatorio += `${index + 1}. ${item.nome}; ${item.totalVendido} unidades: Total: R$ ${(item.preco * item.totalVendido).toFixed(2)}\n`;
+        textoRelatorio += `${index + 1}. ${item.name}; ${item.totalVendido} unidades: Total: R$ ${(item.price * item.totalVendido).toFixed(2)}\n`;
       });
       
       const totalGeral = relatorioData.reduce((total, item) => total + item.totalVendido, 0);
-      const totalPreco = relatorioData.reduce((total, item) => total + (item.preco * item.totalVendido), 0);
+      const totalPreco = relatorioData.reduce((total, item) => total + (item.price * item.totalVendido), 0);
       textoRelatorio += `\nitens vendidos: ${totalGeral} unidades | Total: R$ ${totalPreco.toFixed(2)}`;
 
       await Share.share({
@@ -284,14 +284,14 @@ export default function RelatorioModal() {
             <Text style={styles.controlLabel}>Tipo de Produto:</Text>
             <View style={styles.pickerSmallContainer}>
               <Picker
-                selectedValue={tipoProdutoId}
+                selectedValue={productTypeId}
                 onValueChange={(itemValue) => setTipoProdutoId(itemValue)}
                 style={{ color: colors.text }}
                 dropdownIconColor={colors.text}
               >
                 <Picker.Item label="Todos os tipos" value={100} />
                 {tiposProdutos.map((tipo) => (
-                  <Picker.Item key={tipo.id} label={tipo.descricao} value={tipo.id} />
+                  <Picker.Item key={tipo.id} label={tipo.description} value={tipo.id} />
                 ))}
               </Picker>
             </View>
@@ -396,16 +396,16 @@ export default function RelatorioModal() {
             <ListHeader />
             {relatorioData.map(item => (
               <View key={item.id} style={styles.itemContainer}>
-                <Text style={styles.itemTabela}>{item.nome}</Text>
+                <Text style={styles.itemTabela}>{item.name}</Text>
                 <Text style={styles.itemTabela}>{item.totalVendido} un.</Text>
-                <Text style={styles.itemTabela}>R$ {(item.preco * item.totalVendido).toFixed(2)}</Text>
+                <Text style={styles.itemTabela}>R$ {(item.price * item.totalVendido).toFixed(2)}</Text>
               </View>
             ))}
             
               <View style={styles.itemContainer}>
                 <Text style={styles.itemTabela}>Total Geral</Text>
                 <Text style={styles.itemTabela}>{relatorioData.reduce((total, item) => total + item.totalVendido, 0)} un.</Text>
-                <Text style={styles.itemTabela}>R$ {relatorioData.reduce((total, item) => total + (item.preco * item.totalVendido), 0).toFixed(2)}</Text>
+                <Text style={styles.itemTabela}>R$ {relatorioData.reduce((total, item) => total + (item.price * item.totalVendido), 0).toFixed(2)}</Text>
               </View>
             
             <TouchableOpacity

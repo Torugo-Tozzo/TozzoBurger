@@ -8,10 +8,10 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   nomeProduto: string;
-  ingredientes?: string | null;
+  ingredients?: string | null;
 };
 
-export function IngredientesModal({ visible, onClose, nomeProduto, ingredientes }: Props) {
+export function IngredientesModal({ visible, onClose, nomeProduto, ingredients }: Props) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -21,7 +21,7 @@ export function IngredientesModal({ visible, onClose, nomeProduto, ingredientes 
         <View style={[styles.box, { backgroundColor: colors.background, borderColor: colors.border }]}>
           <Text style={[styles.title, { color: colors.text }]}>Ingredientes do {nomeProduto}:</Text>
           <Text style={[styles.body, { color: colors.text }]}>
-            {ingredientes ?? 'Os ingredientes não foram informados no cadastro deste produto'}
+            {ingredients ?? 'Os ingredients não foram informados no cadastro deste produto'}
           </Text>
           <Button title="Fechar" onPress={onClose} variant="outline" />
         </View>

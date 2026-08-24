@@ -11,13 +11,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 export default function ProdutoModalScreen() {
   const { productId } = useLocalSearchParams();
-  const { show, create, update, getTipoProdutos } = useProductDatabase();
+  const { show, create, update, getProductTypes } = useProductDatabase();
 
-  const [nome, setNome] = useState('');
-  const [preco, setPreco] = useState('');
-  const [ingredientes, setIngredientes] = useState('');
-  const [tipoProdutoId, setTipoProdutoId] = useState<number | undefined>();
-  const [tiposProdutos, setTiposProdutos] = useState<{ id: number; descricao: string }[]>([]);
+  const [name, setNome] = useState('');
+  const [price, setPreco] = useState('');
+  const [ingredients, setIngredientes] = useState('');
+  const [productTypeId, setTipoProdutoId] = useState<number | undefined>();
+  const [tiposProdutos, setTiposProdutos] = useState<{ id: number; description: string }[]>([]);
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -25,8 +25,8 @@ export default function ProdutoModalScreen() {
   useEffect(() => {
     async function fetchTiposProdutos() {
       try {
-        const tipos = await getTipoProdutos();
-        setTiposProdutos(tipos);
+        const types = await getProductTypes();
+        setTiposProdutos(types);
       } catch (error) {
         console.error('Erro ao carregar tipos de produtos:', error);
       }
@@ -42,10 +42,10 @@ export default function ProdutoModalScreen() {
         try {
           const product = await show(prodId);
           if (product) {
-            setNome(product.nome);
-            setPreco(product.preco.toString());
-            setTipoProdutoId(product.tipoProdutoId);
-            setIngredientes(product.ingredientes?.toString() || '');
+            setNome(product.name);
+            setPreco(product.price.toString());
+            setTipoProdutoId(product.productTypeId);
+            setIngredientes(product.ingredients?.toString() || '');
           }
         } catch (error) {
           console.error('Erro ao carregar o produto:', error);
@@ -58,15 +58,15 @@ export default function ProdutoModalScreen() {
 
   async function handleSave() {
     try {
-      if (!nome || !preco || !tipoProdutoId) {
+      if (!name || !price || !productTypeId) {
         Alert.alert('Erro', 'Por favor, preencha os campos obrigatórios: \nnome, preço e tipo.');
         return;
       }
 
       if (productId) {
-        await update({ id: String(productId), nome, preco: parseFloat(preco), tipoProdutoId, ingredientes });
+        await update({ id: String(productId), name, price: parseFloat(price), productTypeId, ingredients });
       } else {
-        await create({ nome, preco: parseFloat(preco), tipoProdutoId, ingredientes });
+        await create({ name, price: parseFloat(price), productTypeId, ingredients });
       }
       router.back();
     } catch (error) {
@@ -86,7 +86,7 @@ export default function ProdutoModalScreen() {
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
         placeholder="Digite o Nome..."
-        value={nome}
+        value={name}
         onChangeText={setNome}
         placeholderTextColor={colors.textMuted}
       />
@@ -95,7 +95,7 @@ export default function ProdutoModalScreen() {
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
         placeholder="Digite o Preço.."
-        value={preco}
+        value={price}
         keyboardType="numeric"
         onChangeText={setPreco}
         placeholderTextColor={colors.textMuted}
@@ -105,7 +105,7 @@ export default function ProdutoModalScreen() {
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text, height: 100, textAlignVertical: 'top' }}
         placeholder="Digite os Ingredientes.."
-        value={ingredientes}
+        value={ingredients}
         onChangeText={setIngredientes}
         placeholderTextColor={colors.textMuted}
         multiline
@@ -114,14 +114,14 @@ export default function ProdutoModalScreen() {
       <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>Tipo do Produto</Text>
       <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, marginBottom: spacing.md }}>
         <Picker
-          selectedValue={tipoProdutoId}
+          selectedValue={productTypeId}
           onValueChange={(itemValue) => setTipoProdutoId(Number(itemValue))}
           style={{ color: colors.textMuted }}
           dropdownIconColor={colors.text}
         >
           <Picker.Item label="Selecione um tipo" value={undefined} />
           {tiposProdutos.map((tipo) => (
-            <Picker.Item key={tipo.id} label={tipo.descricao} value={tipo.id} />
+            <Picker.Item key={tipo.id} label={tipo.description} value={tipo.id} />
           ))}
         </Picker>
       </View>

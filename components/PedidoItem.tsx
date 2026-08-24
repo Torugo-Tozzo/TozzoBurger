@@ -1,20 +1,20 @@
 import React from 'react';
 import { RecordCard, RecordCardAction } from '@/components/ui/RecordCard';
 import { getStatusColor, getStatusLabel } from '@/constants/status';
-import { PedidoDatabase } from '@/database/types/Pedido';
+import { Order } from '@/database/types/Order';
 
 type Props = {
-  data: PedidoDatabase;
-  produtos: string[];
+  data: Order;
+  products: string[];
   onEdit: () => void;
   onDelete?: () => void;
 };
 
-export function PedidoItem({ data, produtos, onEdit, onDelete }: Props) {
+export function PedidoItem({ data, products, onEdit, onDelete }: Props) {
   const statusLabel = data.status ?? 'DESCONHECIDO';
 
-  const horaFormatada = new Date(data.horario).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  const autorTrecho = data.criado_por_nome ? `Criado por ${data.criado_por_nome} · ` : '';
+  const horaFormatada = new Date(data.openedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const autorTrecho = data.createdByName ? `Criado por ${data.createdByName} · ` : '';
 
   const actions: RecordCardAction[] = [
     { icon: 'pencil', label: 'Editar pedido', onPress: onEdit },
@@ -27,8 +27,8 @@ export function PedidoItem({ data, produtos, onEdit, onDelete }: Props) {
     <RecordCard
       accentColor={getStatusColor(statusLabel)}
       badge={{ label: getStatusLabel(statusLabel), color: getStatusColor(statusLabel) }}
-      title={(data.cliente && String(data.cliente).trim().length > 0) ? data.cliente : 'Cliente não Informado'}
-      subtitle={produtos.length > 0 ? produtos.join(', ') : undefined}
+      title={(data.customerName && String(data.customerName).trim().length > 0) ? data.customerName : 'Cliente não Informado'}
+      subtitle={products.length > 0 ? products.join(', ') : undefined}
       meta={`${autorTrecho}${horaFormatada}`}
       total={data.total ?? 0}
       actions={actions}

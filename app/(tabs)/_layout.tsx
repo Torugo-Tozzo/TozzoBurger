@@ -22,7 +22,7 @@ function TabBarIcon(props: {
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { user } = useAuth();
-  const isCliente = user?.role === 'CLIENTE';
+  const isCliente = user?.role === 'CUSTOMER';
 
   return (
     <Tabs

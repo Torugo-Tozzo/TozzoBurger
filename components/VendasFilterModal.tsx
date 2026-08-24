@@ -14,7 +14,7 @@ import { Text, View } from '@/components/Themed';
 import { Button } from '@/components/ui/Button';
 import Colors from '@/constants/Colors';
 import { spacing, type } from '@/constants/theme';
-import type { VendasFilters } from '@/services/vendas';
+import type { VendasFilters } from '@/services/sales';
 
 type Props = {
   visible: boolean;
@@ -117,10 +117,10 @@ export function VendasFilterModal({ visible, filters, onChange, onApply, onClear
             </View>
 
             <Text style={styles.sectionLabel}>Venda</Text>
-            <Text style={styles.label}>Nome do cliente</Text>
+            <Text style={styles.label}>Nome do customerName</Text>
             <TextInput
-              value={filters.cliente ?? ''}
-              onChangeText={(value) => update('cliente', value)}
+              value={filters.customerName ?? ''}
+              onChangeText={(value) => update('customerName', value)}
               placeholder="Todos os clientes"
               placeholderTextColor={colors.textMuted}
               style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}

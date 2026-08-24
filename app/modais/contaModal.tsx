@@ -2,14 +2,14 @@ import { StatusBar } from 'expo-status-bar';
 import { Platform, StyleSheet, FlatList, Alert, TouchableOpacity, TextInput, useColorScheme } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useCart } from '@/context/CartContext';  // Importando corretamente o useCart
-import { useVendasDatabase } from '@/database/useVendaDatabse';
+import { useSaleDatabase } from '@/database/useSaleDatabase';
 import { router } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { captureScreen } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
-import { usePedidosDatabase } from '@/database/usePedidoDatabase';
+import { useOrderDatabase } from '@/database/useOrderDatabase';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { useAuth } from '@/context/AuthContext';
 import { useAutoSync } from '@/context/AutoSyncContext';
@@ -22,25 +22,25 @@ import Colors from '@/constants/Colors';
 import { spacing, radius, type } from '@/constants/theme';
 
 export default function ContaModalScreen() {
-  const { cart, cliente, clearCart, updateCartItem, addToCart, setCliente } = useCart();
-  const { createVenda } = useVendasDatabase();
-  const { createPedido, getPedidoById, countPedidosAbertos } = usePedidosDatabase();
+  const { cart, customerName, clearCart, updateCartItem, addToCart, setCliente } = useCart();
+  const { createSale } = useSaleDatabase();
+  const { createOrder, countOpenOrders } = useOrderDatabase();
   const { show: showProduto } = useProductDatabase();
   const { user } = useAuth();
-  const isCliente = user?.role === 'CLIENTE';
+  const isCliente = user?.role === 'CUSTOMER';
   const { triggerSync } = useAutoSync();
 
   useEffect(() => {
-    if (isCliente && !cliente && user?.nome) setCliente(user.nome);
-  }, [isCliente, cliente, user?.nome, setCliente]);
+    if (isCliente && !customerName && user?.name) setCliente(user.name);
+  }, [isCliente, customerName, user?.name, setCliente]);
 
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const placeholderColor = colors.textMuted;
 
   const total = cart.reduce((sum, item) => {
-    const quantidade = item.quantidade ?? 0; // Se quantidade for null ou undefined, usamos 0
-    return sum + item.preco * quantidade;
+    const quantity = item.quantity ?? 0; // Se quantity for null ou undefined, usamos 0
+    return sum + item.price * quantity;
   }, 0);
 
   const isCartEmpty = cart.length === 0 || total === 0;
@@ -67,16 +67,16 @@ export default function ContaModalScreen() {
       } 
     };
 
-  const imprimeConta = async (vendaId: string): Promise<void> => await router.push(`/modais/contaHistoricoModal?vendaId=${vendaId}`);
+  const imprimeConta = async (saleId: string): Promise<void> => await router.push(`/modais/contaHistoricoModal?saleId=${saleId}`);
 
   const finalizarCompra = async () => {
     try {
-      const produtos = cart.map(({ id, quantidade }) => ({
-        produtoId: id,
-        quantidade: quantidade ?? 0,
+      const produtos = cart.map(({ id, quantity }) => ({
+        productId: id,
+        quantity: quantity ?? 0,
       }));
 
-      const { vendaId } = await createVenda(produtos, cliente, user?.id, user?.nome ?? null);
+      const { saleId } = await createSale(produtos, customerName, user?.id, user?.name ?? null);
       await clearCart(); 
       router.back(); 
 
@@ -84,7 +84,7 @@ export default function ContaModalScreen() {
         { text: "Não", style: "cancel" },
         {
           text: "Sim",
-          onPress: () => imprimeConta(vendaId),
+          onPress: () => imprimeConta(saleId),
         },
       ]);
 
@@ -97,23 +97,23 @@ export default function ContaModalScreen() {
   const gerarPedido = async () => {
     try {
       if (isCliente) {
-        const abertos = await countPedidosAbertos(user?.id);
-        if (abertos >= 3) {
+        const openOrders = await countOpenOrders(user?.id);
+        if (openOrders >= 3) {
           Alert.alert('Limite atingido', 'Você já possui 3 pedidos abertos. Aguarde um ser aceito ou fechado para criar outro.');
           return;
         }
       }
 
-      const produtos = cart.map(({ id, quantidade }) => ({
-        produtoId: id,
-        quantidade: quantidade ?? 0,
+      const produtos = cart.map(({ id, quantity }) => ({
+        productId: id,
+        quantity: quantity ?? 0,
       }));
 
-      const { pedidoId } = await createPedido(produtos, cliente, undefined, user?.id, user?.nome ?? null);
+      const { orderId } = await createOrder(produtos, customerName, undefined, user?.id, user?.name ?? null);
       await clearCart();
       triggerSync().catch((e) => console.warn('[sync] trigger failed', e));
       router.back();
-      Alert.alert('Pedido Gerado!', `Pedido ${pedidoId} criado com sucesso.`);
+      Alert.alert('Pedido Gerado!', `Pedido ${orderId} criado com sucesso.`);
     } catch (error) {
       console.error('Erro ao gerar pedido:', error);
       Alert.alert('Erro', 'Não foi possível gerar o pedido.');
@@ -124,13 +124,13 @@ export default function ContaModalScreen() {
     const item = cart.find((cartItem) => cartItem.id === itemId);
     if (!item) return;
 
-    const novaQuantidade = operacao === 'incrementar' ? (item.quantidade ?? 0) + 1 : (item.quantidade ?? 0) - 1;
+    const novaQuantidade = operacao === 'incrementar' ? (item.quantity ?? 0) + 1 : (item.quantity ?? 0) - 1;
 
     if (novaQuantidade <= 0) {
-      // Se a quantidade for zero ou negativa, removemos o item
-      updateCartItem(itemId, 0);  // A quantidade vira 0 e o item sai do carrinho
+      // Se a quantity for zero ou negativa, removemos o item
+      updateCartItem(itemId, 0);  // A quantity vira 0 e o item sai do carrinho
     } else {
-      updateCartItem(itemId, novaQuantidade);  // Atualiza a quantidade
+      updateCartItem(itemId, novaQuantidade);  // Atualiza a quantity
     }
   };
 
@@ -208,7 +208,7 @@ export default function ContaModalScreen() {
       <TextInput
         style={[styles.input, isCliente && { backgroundColor: colors.surface }]}
         placeholder="Nome do Cliente"
-        value={cliente}
+        value={customerName}
         onChangeText={setCliente}
         placeholderTextColor={placeholderColor}
         editable={!isCliente}
@@ -219,28 +219,28 @@ export default function ContaModalScreen() {
           keyExtractor={(item) => String(item.id)}  // Garantir que o item tem id
           ItemSeparatorComponent={ListDivider}
           renderItem={({ item }) => {
-            const isUltimo = (item.quantidade ?? 0) <= 1;
+            const isUltimo = (item.quantity ?? 0) <= 1;
 
             return (
               <Card bordered={false} style={styles.cartItem}>
                 <View style={styles.itemInfo}>
-                  <Text style={styles.itemNome}>{item.nome}</Text>
-                  <Text style={styles.itemPreco}>R$ {((item.quantidade ?? 0) * item.preco).toFixed(2)}</Text>
+                  <Text style={styles.itemNome}>{item.name}</Text>
+                  <Text style={styles.itemPreco}>R$ {((item.quantity ?? 0) * item.price).toFixed(2)}</Text>
                 </View>
 
                 <View style={styles.quantityControls}>
                   <IconButton
                     icon={isUltimo ? 'trash' : 'minus'}
-                    label={isUltimo ? 'Remover item' : 'Diminuir quantidade'}
+                    label={isUltimo ? 'Remover item' : 'Diminuir quantity'}
                     destructive={isUltimo}
                     onPress={() => alterarQuantidade(item.id, 'decrementar')}
                   />
 
-                  <Text style={styles.quantityText}>{item.quantidade}</Text>
+                  <Text style={styles.quantityText}>{item.quantity}</Text>
 
                   <IconButton
                     icon="plus"
-                    label="Aumentar quantidade"
+                    label="Aumentar quantity"
                     onPress={() => alterarQuantidade(item.id, 'incrementar')}
                   />
                 </View>

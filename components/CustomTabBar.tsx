@@ -8,7 +8,7 @@ import { useColorScheme } from '@/components/useColorScheme';
  * Tab bar 100% custom. As props nativas da lib (tabBarActiveBackgroundColor +
  * tabBarButton/tabBarBackground customizado) tem um bug real nessa versao do
  * @react-navigation/bottom-tabs: qualquer tabBarButton/tabBarBackground
- * proprio quebra o icone+label do item ativo (fica em branco), e sem eles a
+ * proprio quebra o icone+label do item isActive (fica em branco), e sem eles a
  * borda por item (tabBarItemStyle.borderRightWidth) so aparece em 2 dos 5
  * botoes de forma inconsistente. Testado: config original, StyleSheet.
  * hairlineWidth, tabBarButton custom, tabBarBackground custom (com e sem as

@@ -18,7 +18,7 @@ const BluetoothScreen = () => {
   const [isScanning, setIsScanning] = useState(false); // Estado para controlar se está escaneando
 
   const { user, login, logout, token } = useAuth();
-  const isCliente = user?.role === 'CLIENTE';
+  const isCliente = user?.role === 'CUSTOMER';
   const colorScheme = useColorScheme() ?? 'light';
   const isDark = colorScheme === 'dark';
   const colors = Colors[colorScheme];
@@ -32,8 +32,8 @@ const BluetoothScreen = () => {
     const fetchPrinter = async () => {
       try {
         const printerUUID = await getPrinter(); // Obtém o UUID da impressora
-        if (printerUUID && printerUUID.nome) {
-          setConnectedPrinter(printerUUID.nome);
+        if (printerUUID && printerUUID.name) {
+          setConnectedPrinter(printerUUID.name);
         }
       } catch (error) {
         console.log('Nenhuma impressora registrada.');
@@ -66,9 +66,9 @@ const BluetoothScreen = () => {
       const connectedDevice = await connectToDevice(device.id); // Conecta ao dispositivo
 
       if (connectedDevice) {
-        // Quando o dispositivo for conectado, registra o UUID e o nome
+        // Quando o dispositivo for conectado, registra o UUID e o name
         await setPrinter(device.id, device.name); // Salva o UUID da impressora no banco de dados
-        setConnectedPrinter(device.name || device.id); // Atualiza o estado com o nome da impressora conectada
+        setConnectedPrinter(device.name || device.id); // Atualiza o estado com o name da impressora conectada
         setDevices([]); // Limpa a lista de dispositivos após conectar a impressora
         Alert.alert('Impressora conectada com sucesso!');
       } else {
@@ -124,7 +124,7 @@ const BluetoothScreen = () => {
           {user ? (
             <View style={{ alignItems: 'center' }}>
               <FontAwesome name="user-circle" size={56} color={colors.textMuted} style={styles.userIcon} />
-              <Text style={[styles.username, { color: colors.text }]}>{user.nome ?? user.email}</Text>
+              <Text style={[styles.username, { color: colors.text }]}>{user.name ?? user.email}</Text>
               <View style={{ marginTop: 8 }}>
                 <Button title="Sair" onPress={() => logout()} />
               </View>

@@ -9,7 +9,7 @@ import { ListFrame } from '@/components/ui/ListFrame';
 import { RecordCardSkeleton } from '@/components/ui/RecordCardSkeleton';
 import { VendaItem } from '@/components/VendaItem';
 import VendasFilterModal from '@/components/VendasFilterModal';
-import { useVendasDatabase } from '@/database/useVendaDatabse';
+import { useSaleDatabase } from '@/database/useSaleDatabase';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { usePrinterDatabase } from '@/database/usePrinterDatabase';
 import { useAuth } from '@/context/AuthContext';
@@ -19,46 +19,46 @@ import { formatarVendaParaImpressao, Produto } from '@/hooks/formatarVendaImpres
 import { sendMessageToDevice } from '@/useBLE';
 import * as api from '@/services/api';
 import {
-  EMPTY_VENDAS_FILTERS,
-  mapVendaApiToRender,
-  mergeVendasPage,
-  resetVendasPageState,
-  type VendaRenderizavel,
-  type VendasFilters,
-  type VendasPageState,
-} from '@/services/vendas';
-import { setVendaDetalhes } from '@/services/vendasDetalhes';
+  EMPTY_SALES_FILTERS,
+  mapSaleApiToRender,
+  mergeSalesPage,
+  resetSalesPageState,
+  type SaleRenderable,
+  type SalesFilters,
+  type SalesPageState,
+} from '@/services/sales';
+import { setVendaDetalhes } from '@/services/salesDetails';
 import Colors from '@/constants/Colors';
 import { spacing, type } from '@/constants/theme';
 
 export const PAGE_SIZE = 50;
 
 type SalesSection = 'device' | 'establishment';
-type GroupedSales = Record<string, VendaRenderizavel[]>;
+type GroupedSales = Record<string, SaleRenderable[]>;
 type LocalVendaPageItem = {
   id: string;
   total: number;
-  horario: string;
-  cliente?: string | null;
-  excluida: boolean;
-  criado_por?: string | null;
-  criado_por_nome?: string | null;
-  produtos: string[];
+  soldAt: string;
+  customerName?: string | null;
+  isCancelled: boolean;
+  createdBy?: string | null;
+  createdByName?: string | null;
+  products: string[];
 };
-type SalesState = VendasPageState & {
-  items: VendaRenderizavel[];
+type SalesState = SalesPageState & {
+  items: SaleRenderable[];
   total: number;
   fechamento: number;
 };
 type InFlightRequest = { generation: number; page: number };
 type ManualRefresh = {
   generation: number;
-  filters: VendasFilters;
+  filters: SalesFilters;
   started: boolean;
 };
 
 export function canLoadNextPage(
-  state: VendasPageState,
+  state: SalesPageState,
   inFlight: Pick<InFlightRequest, 'generation'> | null,
   generation: number,
 ): boolean {
@@ -69,16 +69,16 @@ export function canLoadNextPage(
     && inFlight?.generation !== generation;
 }
 
-function groupByDate(vendas: VendaRenderizavel[]): GroupedSales {
+function groupByDate(vendas: SaleRenderable[]): GroupedSales {
   return vendas.reduce<GroupedSales>((groups, venda) => {
-    const date = new Date(venda.horario).toLocaleDateString('pt-BR');
+    const date = new Date(venda.soldAt).toLocaleDateString('pt-BR');
     groups[date] = groups[date] ? [...groups[date], venda] : [venda];
     return groups;
   }, {});
 }
 
-function emptyFilters(): VendasFilters {
-  return { ...EMPTY_VENDAS_FILTERS };
+function emptyFilters(): SalesFilters {
+  return { ...EMPTY_SALES_FILTERS };
 }
 
 function createSalesState(loadingInitial = false): SalesState {
@@ -86,29 +86,29 @@ function createSalesState(loadingInitial = false): SalesState {
     items: [],
     total: 0,
     fechamento: 0,
-    ...resetVendasPageState(),
+    ...resetSalesPageState(),
     loadingInitial,
   };
 }
 
-export function withPage(filters: VendasFilters, page: number): VendasFilters {
+export function withPage(filters: SalesFilters, page: number): SalesFilters {
   const queryFilters = { ...filters };
   delete queryFilters.page;
   delete queryFilters.limit;
   return { ...queryFilters, page, limit: PAGE_SIZE };
 }
 
-function mapLocalVendaToRender(venda: LocalVendaPageItem): VendaRenderizavel {
+function mapLocalVendaToRender(venda: LocalVendaPageItem): SaleRenderable {
   return {
     id: String(venda.id),
     total: Number(venda.total ?? 0),
-    horario: String(venda.horario),
-    cliente: venda.cliente == null ? null : String(venda.cliente),
-    excluida: venda.excluida === true,
-    criado_por: venda.criado_por == null ? null : String(venda.criado_por),
-    criado_por_nome: venda.criado_por_nome == null ? null : String(venda.criado_por_nome),
-    produtos: Array.isArray(venda.produtos) ? venda.produtos : [],
-    itens: [],
+    soldAt: String(venda.soldAt),
+    customerName: venda.customerName == null ? null : String(venda.customerName),
+    isCancelled: venda.isCancelled === true,
+    createdBy: venda.createdBy == null ? null : String(venda.createdBy),
+    createdByName: venda.createdByName == null ? null : String(venda.createdByName),
+    products: Array.isArray(venda.products) ? venda.products : [],
+    items: [],
   };
 }
 
@@ -124,7 +124,7 @@ export default function HistoricoScreen() {
   const { token } = useAuth();
   const { lastSync } = useAutoSync();
   const { refreshing, onRefresh } = useSyncRefresh();
-  const { listVendasRecentes, removeVenda, getVendaById } = useVendasDatabase();
+  const { listRecentSales, removeSale, getSaleById } = useSaleDatabase();
   const { showAdd } = useProductDatabase();
   const { getPrinter } = usePrinterDatabase();
 
@@ -132,8 +132,8 @@ export default function HistoricoScreen() {
   const [localState, setLocalState] = useState<SalesState>(() => createSalesState(true));
   const [remoteState, setRemoteState] = useState<SalesState>(() => createSalesState());
   const [showFilters, setShowFilters] = useState(false);
-  const [draftFilters, setDraftFilters] = useState<VendasFilters>(emptyFilters);
-  const [appliedFilters, setAppliedFilters] = useState<VendasFilters>(emptyFilters);
+  const [draftFilters, setDraftFilters] = useState<SalesFilters>(emptyFilters);
+  const [appliedFilters, setAppliedFilters] = useState<SalesFilters>(emptyFilters);
   const [loadingPrint, setLoadingPrint] = useState<string | null>(null);
 
   const generationRef = useRef(0);
@@ -167,7 +167,7 @@ export default function HistoricoScreen() {
     }
   };
 
-  const loadLocalPage = useCallback(async (filters: VendasFilters, page: number, generation: number) => {
+  const loadLocalPage = useCallback(async (filters: SalesFilters, page: number, generation: number) => {
     if (!beginRequest('device', page, generation)) return;
     if (generationRef.current !== generation) {
       finishRequest('device', page, generation);
@@ -182,15 +182,15 @@ export default function HistoricoScreen() {
     }));
 
     try {
-      const response = await listVendasRecentes(withPage(filters, page));
+      const response = await listRecentSales(withPage(filters, page));
       if (generationRef.current !== generation) return;
 
-      const incoming = response.vendas.map((venda) => mapLocalVendaToRender(venda as LocalVendaPageItem));
+      const incoming = response.sales.map((venda) => mapLocalVendaToRender(venda as LocalVendaPageItem));
       setLocalState((state) => ({
         ...state,
-        items: mergeVendasPage(state.items, incoming, response.pagination.page),
+        items: mergeSalesPage(state.items, incoming, response.pagination.page),
         total: response.pagination.total,
-        fechamento: Number(response.fechamento ?? 0),
+        fechamento: Number(response.closing ?? 0),
         page: response.pagination.page,
         hasNextPage: response.pagination.hasNextPage,
         loadingInitial: false,
@@ -216,7 +216,7 @@ export default function HistoricoScreen() {
     }
   }, []);
 
-  const loadRemotePage = useCallback(async (filters: VendasFilters, page: number, generation: number) => {
+  const loadRemotePage = useCallback(async (filters: SalesFilters, page: number, generation: number) => {
     if (!token || !beginRequest('establishment', page, generation)) return;
     if (generationRef.current !== generation) {
       finishRequest('establishment', page, generation);
@@ -234,12 +234,12 @@ export default function HistoricoScreen() {
       const response = await api.listVendas(token, withPage(filters, page));
       if (generationRef.current !== generation) return;
 
-      const incoming = (response.vendas ?? []).map(mapVendaApiToRender);
+      const incoming = (response.sales ?? []).map(mapSaleApiToRender);
       setRemoteState((state) => ({
         ...state,
-        items: mergeVendasPage(state.items, incoming, response.pagination.page),
+        items: mergeSalesPage(state.items, incoming, response.pagination.page),
         total: response.pagination.total,
-        fechamento: Number(response.fechamento ?? 0),
+        fechamento: Number(response.closing ?? 0),
         page: response.pagination.page,
         hasNextPage: response.pagination.hasNextPage,
         loadingInitial: false,
@@ -265,7 +265,7 @@ export default function HistoricoScreen() {
     }
   }, [token]);
 
-  const beginSectionQuery = useCallback((targetSection: SalesSection, filters: VendasFilters) => {
+  const beginSectionQuery = useCallback((targetSection: SalesSection, filters: SalesFilters) => {
     const generation = resetSectionState(targetSection);
     if (targetSection === 'device') void loadLocalPage(filters, 1, generation);
     else void loadRemotePage(filters, 1, generation);
@@ -353,16 +353,16 @@ export default function HistoricoScreen() {
     else void loadRemotePage(appliedFilters, nextPage, generation);
   }, [activeState, appliedFilters, loadLocalPage, loadRemotePage, section]);
 
-  const handlePrint = async (vendaId: string) => {
-    setLoadingPrint(vendaId);
+  const handlePrint = async (saleId: string) => {
+    setLoadingPrint(saleId);
     try {
-      const venda = await getVendaById(vendaId);
-      if (!venda) return;
-      const produtos: Produto[] = await Promise.all(venda.produtos.map(async (produto) => {
-        const product = await showAdd(produto.produtoId);
-        return { nome: product?.nome ?? 'Produto desconhecido', quantidade: produto.quantidade, preco: product?.preco ?? 0 };
+      const sale = await getSaleById(saleId);
+      if (!sale) return;
+      const products: Produto[] = await Promise.all((sale.items ?? []).map(async (item) => {
+        const product = await showAdd(item.productId);
+        return { name: product?.name ?? 'Produto desconhecido', quantity: item.quantity, price: product?.price ?? 0 };
       }));
-      await sendMessageToDevice(formatarVendaParaImpressao(venda, produtos), await getPrinter());
+      await sendMessageToDevice(formatarVendaParaImpressao(sale, products), await getPrinter());
       Alert.alert('Sucesso', 'Conta enviada para impressão.');
     } catch (error) {
       console.error('Erro ao imprimir venda:', error);
@@ -372,18 +372,18 @@ export default function HistoricoScreen() {
     }
   };
 
-  const handleDelete = (vendaId: string) => {
+  const handleDelete = (saleId: string) => {
     Alert.alert('Confirmar exclusão', 'Tem certeza de que deseja excluir esta venda?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Excluir', style: 'destructive', onPress: async () => {
         try {
-          await removeVenda(vendaId);
+          await removeSale(saleId);
           setLocalState((state) => {
-            const sale = state.items.find((item) => item.id === vendaId);
-            if (!sale || sale.excluida) return state;
+            const sale = state.items.find((item) => item.id === saleId);
+            if (!sale || sale.isCancelled) return state;
             return {
               ...state,
-              items: state.items.map((item) => item.id === vendaId ? { ...item, excluida: true } : item),
+              items: state.items.map((item) => item.id === saleId ? { ...item, isCancelled: true } : item),
               total: Math.max(0, state.total - 1),
               fechamento: Math.max(0, state.fechamento - Number(sale.total || 0)),
             };
@@ -396,9 +396,9 @@ export default function HistoricoScreen() {
     ]);
   };
 
-  const handleOpenSale = (sale: VendaRenderizavel) => {
+  const handleOpenSale = (sale: SaleRenderable) => {
     if (section === 'establishment') setVendaDetalhes(sale);
-    router.push(`/modais/contaHistoricoModal?vendaId=${encodeURIComponent(sale.id)}&origem=${section}`);
+    router.push(`/modais/contaHistoricoModal?saleId=${encodeURIComponent(sale.id)}&origem=${section}`);
   };
 
   return (

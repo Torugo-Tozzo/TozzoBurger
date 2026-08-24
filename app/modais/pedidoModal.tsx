@@ -3,10 +3,10 @@ import { StyleSheet, View as RNView, TextInput, TouchableOpacity, Alert, FlatLis
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { View, Text } from '@/components/Themed';
 import { useLocalSearchParams, router } from 'expo-router';
-import { usePedidosDatabase } from '@/database/usePedidoDatabase';
+import { useOrderDatabase } from '@/database/useOrderDatabase';
 import { useProductDatabase } from '@/database/useProductDatabase';
-import { useVendasDatabase } from '@/database/useVendaDatabse';
-import { STATUS_PEDIDO } from '@/database/types/Pedido';
+import { useSaleDatabase } from '@/database/useSaleDatabase';
+import { ORDER_STATUS } from '@/database/types/Order';
 import { useAuth } from '@/context/AuthContext';
 import { useAutoSync } from '@/context/AutoSyncContext';
 import Colors from '@/constants/Colors';
@@ -14,29 +14,29 @@ import { Button } from '@/components/ui/Button';
 import { ListItem } from '@/components/ui/ListItem';
 import { spacing } from '@/constants/theme';
 
-type PedidoStatus = typeof STATUS_PEDIDO[keyof typeof STATUS_PEDIDO];
+type OrderStatus = typeof ORDER_STATUS[keyof typeof ORDER_STATUS];
 
 export default function PedidoModal() {
   const params = useLocalSearchParams();
-  const pedidoId = String((params as any)?.pedidoId ?? '');
-  const { getPedidoById, updatePedido, removePedido } = usePedidosDatabase();
+  const orderId = String((params as any)?.orderId ?? '');
+  const { getOrderById, updateOrder, removeOrder } = useOrderDatabase();
   const { showAdd, show: showProduto, searchByName } = useProductDatabase();
-  const { createVenda } = useVendasDatabase();
+  const { createSale } = useSaleDatabase();
 
   const [pedido, setPedido] = useState<any | null>(null);
-  const [cliente, setCliente] = useState('');
-  const [status, setStatus] = useState<PedidoStatus>(STATUS_PEDIDO.ABERTO);
+  const [customerName, setCliente] = useState('');
+  const [status, setStatus] = useState<OrderStatus>(ORDER_STATUS.OPEN);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const { user } = useAuth();
-  const isCliente = user?.role === 'CLIENTE';
+  const isCliente = user?.role === 'CUSTOMER';
   const { triggerSync } = useAutoSync();
   const colorScheme = useColorScheme() ?? 'light';
   const isDarkMode = colorScheme === 'dark';
   const colors = Colors[colorScheme];
 
-  const pedidoAceito = status !== STATUS_PEDIDO.ABERTO;
+  const orderAccepted = status !== ORDER_STATUS.OPEN;
   const clienteBloqueado = isCliente;
 
   const surface = colors.surface;
@@ -46,33 +46,31 @@ export default function PedidoModal() {
 
   useEffect(() => {
     async function load() {
-      if (!pedidoId) return;
+      if (!orderId) return;
       try {
-        const p = await getPedidoById(String(pedidoId));
-        // enrich produtos with names from TB_PRODUTOS
-        const produtos = Array.isArray(p.produtos) ? p.produtos : [];
-        const produtosEnriquecidos = await Promise.all(
-          produtos.map(async (pr: any) => {
+        const order = await getOrderById(String(orderId));
+        const items = Array.isArray(order.items) ? order.items : [];
+        const enrichedItems = await Promise.all(
+          items.map(async (item: any) => {
             try {
-              const info = await showAdd(pr.produtoId);
-              return { ...pr, nome: info?.nome ?? pr.produtoId, preco: info?.preco ?? 0 };
+              const info = await showAdd(item.productId);
+              return { ...item, name: info?.name ?? item.productId, price: info?.price ?? 0 };
             } catch (e) {
-              return { ...pr, nome: pr.produtoId, preco: 0 };
+              return { ...item, name: item.productId, price: 0 };
             }
           })
         );
 
-        setPedido({ ...p, produtos: produtosEnriquecidos });
-        setCliente(p.cliente ?? '');
-        // ensure status from DB matches PedidoStatus union
-        const isValidStatus = (v: any): v is PedidoStatus => Object.values(STATUS_PEDIDO).includes(v);
-        setStatus(isValidStatus(p.status) ? p.status : STATUS_PEDIDO.ABERTO);
+        setPedido({ ...order, items: enrichedItems });
+        setCliente(order.customerName ?? '');
+        const isValidStatus = (v: any): v is OrderStatus => Object.values(ORDER_STATUS).includes(v);
+        setStatus(isValidStatus(order.status) ? order.status : ORDER_STATUS.OPEN);
       } catch (err) {
         console.error('Erro ao carregar pedido:', err);
       }
     }
     load();
-  }, [pedidoId]);
+  }, [orderId]);
 
   async function searchProducts(q: string) {
     try {
@@ -86,8 +84,8 @@ export default function PedidoModal() {
   const handleSave = async () => {
     if (!pedido) return;
     try {
-      const produtosPayload = (pedido.produtos || []).map((p: any) => ({ produtoId: p.produtoId, quantidade: p.quantidade }));
-      await updatePedido(pedido.id, produtosPayload, cliente, status);
+      const itemsPayload = (pedido.items || []).map((item: any) => ({ productId: item.productId, quantity: item.quantity }));
+      await updateOrder(pedido.id, itemsPayload, customerName, status);
       triggerSync().catch((e) => console.warn('[sync] trigger failed', e));
       Alert.alert('Salvo', 'Pedido atualizado.');
       router.back();
@@ -101,7 +99,7 @@ export default function PedidoModal() {
     if (!pedido) return;
     Alert.alert('Confirmar', 'Deseja excluir este pedido?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Excluir', style: 'destructive', onPress: async () => { await removePedido(pedido.id); router.back(); } },
+      { text: 'Excluir', style: 'destructive', onPress: async () => { await removeOrder(pedido.id); router.back(); } },
     ]);
   };
 
@@ -116,10 +114,10 @@ export default function PedidoModal() {
   const handleGerarVenda = async () => {
     if (!pedido) return;
     try {
-      const produtos = (pedido.produtos || []).map((p: any) => ({ produtoId: p.produtoId, quantidade: p.quantidade }));
-      const { vendaId } = await createVenda(produtos, cliente ?? '', user?.id, user?.nome ?? null);
-      await updatePedido(pedido.id, undefined, undefined, STATUS_PEDIDO.FECHADO);
-      Alert.alert('Venda Gerada', `Venda ${vendaId} gerada a partir do pedido.`);
+      const items = (pedido.items || []).map((item: any) => ({ productId: item.productId, quantity: item.quantity }));
+      const { saleId } = await createSale(items, customerName ?? '', user?.id, user?.name ?? null);
+      await updateOrder(pedido.id, undefined, undefined, ORDER_STATUS.CLOSED);
+      Alert.alert('Venda Gerada', `Venda ${saleId} gerada a partir do pedido.`);
       router.back();
     } catch (err) {
       console.error(err);
@@ -129,18 +127,18 @@ export default function PedidoModal() {
 
   const renderProduto = ({ item }: { item: any }) => (
     <ListItem
-      title={item.nome ?? item.produtoId}
-      subtitle={`R$ ${Number(item.preco ?? 0).toFixed(2)} / un.`}
+      title={item.name ?? item.productId}
+      subtitle={`R$ ${Number(item.price ?? 0).toFixed(2)} / un.`}
       trailing={
         clienteBloqueado ? (
-          <Text style={[styles.qtyText, { color: textColor }]}>{item.quantidade}</Text>
+          <Text style={[styles.qtyText, { color: textColor }]}>{item.quantity}</Text>
         ) : (
           <RNView style={styles.quantityRow}>
-            <TouchableOpacity onPress={() => changeQuantidade(item.produtoId, -1)} style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}>
+            <TouchableOpacity onPress={() => changeQuantidade(item.productId, -1)} style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}>
               <Text style={[styles.qtyBtnText, { color: colors.background }]}>-</Text>
             </TouchableOpacity>
-            <Text style={[styles.qtyText, { color: textColor }]}>{item.quantidade}</Text>
-            <TouchableOpacity onPress={() => changeQuantidade(item.produtoId, 1)} style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}>
+            <Text style={[styles.qtyText, { color: textColor }]}>{item.quantity}</Text>
+            <TouchableOpacity onPress={() => changeQuantidade(item.productId, 1)} style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}>
               <Text style={[styles.qtyBtnText, { color: colors.background }]}>+</Text>
             </TouchableOpacity>
           </RNView>
@@ -150,39 +148,39 @@ export default function PedidoModal() {
   );
 
   const itensTotal = (() => {
-    if (!pedido || !Array.isArray(pedido.produtos)) return 0;
-    return pedido.produtos.reduce((acc: number, p: any) => {
-      const preco = Number(p.preco ?? 0);
-      const qtd = Number(p.quantidade ?? 0);
-      return acc + preco * qtd;
+    if (!pedido || !Array.isArray(pedido.items)) return 0;
+    return pedido.items.reduce((acc: number, item: any) => {
+      const price = Number(item.price ?? 0);
+      const quantity = Number(item.quantity ?? 0);
+      return acc + price * quantity;
     }, 0);
   })();
 
-  function changeQuantidade(produtoId: string, delta: number) {
+  function changeQuantidade(productId: string, delta: number) {
     if (!pedido) return;
-    const produtos = Array.isArray(pedido.produtos) ? [...pedido.produtos] : [];
-    const idx = produtos.findIndex((p: any) => p.produtoId === produtoId);
+    const items = Array.isArray(pedido.items) ? [...pedido.items] : [];
+    const idx = items.findIndex((item: any) => item.productId === productId);
     if (idx === -1) return;
-    const novo = { ...produtos[idx] };
-    novo.quantidade = Math.max(0, (novo.quantidade || 0) + delta);
-    if (novo.quantidade <= 0) {
-      produtos.splice(idx, 1);
+    const nextItem = { ...items[idx] };
+    nextItem.quantity = Math.max(0, (nextItem.quantity || 0) + delta);
+    if (nextItem.quantity <= 0) {
+      items.splice(idx, 1);
     } else {
-      produtos[idx] = novo;
+      items[idx] = nextItem;
     }
-    setPedido({ ...pedido, produtos });
+    setPedido({ ...pedido, items });
   }
 
   function addProdutoToPedido(prod: any) {
     if (!pedido) return;
-    const produtos = Array.isArray(pedido.produtos) ? [...pedido.produtos] : [];
-    const idx = produtos.findIndex((p: any) => p.produtoId === prod.id);
+    const items = Array.isArray(pedido.items) ? [...pedido.items] : [];
+    const idx = items.findIndex((item: any) => item.productId === prod.id);
     if (idx === -1) {
-      produtos.push({ produtoId: prod.id, quantidade: 1, nome: prod.nome, preco: prod.preco ?? 0 });
+      items.push({ productId: prod.id, quantity: 1, name: prod.name, price: prod.price ?? 0 });
     } else {
-      produtos[idx] = { ...produtos[idx], quantidade: (produtos[idx].quantidade || 0) + 1 };
+      items[idx] = { ...items[idx], quantity: (items[idx].quantity || 0) + 1 };
     }
-    setPedido({ ...pedido, produtos });
+    setPedido({ ...pedido, items });
     setPickerVisible(false);
   }
 
@@ -191,7 +189,7 @@ export default function PedidoModal() {
       <Text style={[styles.title, { color: textColor }]}>Pedido</Text>
 
       <Text style={[styles.label, { color: textColor }]}>Cliente</Text>
-      <TextInput style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} value={cliente} onChangeText={setCliente} placeholder='Nome do cliente' placeholderTextColor={subText} editable={!clienteBloqueado} />
+      <TextInput style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} value={customerName} onChangeText={setCliente} placeholder='Nome do customerName' placeholderTextColor={subText} editable={!clienteBloqueado} />
 
       <Text style={[styles.label, { color: textColor }]}>Status</Text>
       {isCliente ? (
@@ -202,7 +200,7 @@ export default function PedidoModal() {
         </RNView>
       ) : (
         <RNView style={styles.statusRow}>
-          {([STATUS_PEDIDO.ABERTO, STATUS_PEDIDO.EM_PREPARO, STATUS_PEDIDO.ENTREGANDO, STATUS_PEDIDO.FECHADO] as const).map((s) => {
+          {([ORDER_STATUS.OPEN, ORDER_STATUS.IN_PREPARATION, ORDER_STATUS.DELIVERING, ORDER_STATUS.CLOSED] as const).map((s) => {
             const active = status === s;
             return (
               <TouchableOpacity
@@ -219,8 +217,8 @@ export default function PedidoModal() {
 
       <Text style={[styles.label, { color: textColor }]}>Itens</Text>
       <FlatList
-        data={pedido?.produtos ?? []}
-        keyExtractor={(it: any, i: number) => it.produtoId + i}
+        data={pedido?.items ?? []}
+        keyExtractor={(it: any, i: number) => it.productId + i}
         renderItem={renderProduto}
         style={{ backgroundColor: 'transparent' }}
       />
@@ -244,8 +242,8 @@ export default function PedidoModal() {
           <TextInput value={searchText} onChangeText={(t) => { setSearchText(t); searchProducts(t); }} placeholder="Buscar produto" style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} placeholderTextColor={subText} />
           <FlatList data={searchResults} keyExtractor={(it: any) => it.id} renderItem={({ item }) => (
             <ListItem
-              title={item.nome}
-              subtitle={`R$ ${Number(item.preco || 0).toFixed(2)}`}
+              title={item.name}
+              subtitle={`R$ ${Number(item.price || 0).toFixed(2)}`}
               onPress={() => addProdutoToPedido(item)}
             />
           )} />

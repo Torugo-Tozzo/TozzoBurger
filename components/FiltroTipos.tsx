@@ -6,7 +6,7 @@ import { spacing, type } from '@/constants/theme';
 
 type TipoProduto = {
   id: number;
-  descricao: string;
+  description: string;
 };
 
 type FiltroTiposProps = {
@@ -61,7 +61,7 @@ export function FiltroTipos({ data, selectedId, onSelect }: FiltroTiposProps) {
               style={[styles.button, selected && styles.selectedButton]}
             >
               <Text style={[{ fontSize: type.body, fontWeight: "bold" }, selected && styles.selectedText]}>
-                {item.descricao}
+                {item.description}
               </Text>
             </TouchableOpacity>
           );

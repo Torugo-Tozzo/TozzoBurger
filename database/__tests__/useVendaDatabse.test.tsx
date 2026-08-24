@@ -1,4 +1,4 @@
-// database/__tests__/useVendaDatabse.test.tsx
+// database/__tests__/useSaleDatabase.test.tsx
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
@@ -16,8 +16,8 @@ jest.mock('../tableWatermark', () => ({
 
 import { useSQLiteContext } from 'expo-sqlite';
 import { markChanged } from '../tableWatermark';
-import { useVendasDatabase } from '../useVendaDatabse';
-import { buildLocalVendasQuery } from '../vendasQuery';
+import { useSaleDatabase } from '../useSaleDatabase';
+import { buildLocalVendasQuery } from '../salesQuery';
 
 const mockUseSQLiteContext = useSQLiteContext as jest.Mock;
 const mockMarkChanged = markChanged as jest.Mock;
@@ -30,9 +30,9 @@ function makeStatement() {
 }
 
 function renderVendasDbHook() {
-  let result!: ReturnType<typeof useVendasDatabase>;
+  let result!: ReturnType<typeof useSaleDatabase>;
   function Harness() {
-    result = useVendasDatabase();
+    result = useSaleDatabase();
     return null;
   }
   act(() => {
@@ -50,7 +50,7 @@ describe('buildLocalVendasQuery', () => {
       dataFinal: '2026-08-21',
       horaInicial: '08:30',
       horaFinal: '22:15',
-      cliente: "Ana' OR 1=1 --",
+      customerName: "Ana' OR 1=1 --",
       totalMin: '10,50',
       totalMax: 99.9,
     });
@@ -77,8 +77,8 @@ describe('buildLocalVendasQuery', () => {
       totalMin: '10,50',
     });
 
-    expect(query.select).toContain("strftime('%H:%M', horario, ?) >= ?");
-    expect(query.select).toContain("strftime('%H:%M', horario, ?) <= ?");
+    expect(query.select).toContain("strftime('%H:%M', soldAt, ?) >= ?");
+    expect(query.select).toContain("strftime('%H:%M', soldAt, ?) <= ?");
     expect(query.select).not.toContain('-03:00');
     expect(query.params.filter((param) => param === '-03:00')).toHaveLength(2);
     expect(query.params).toEqual(expect.arrayContaining(['20:00', '22:00', 10.5]));
@@ -105,57 +105,57 @@ describe('buildLocalVendasQuery', () => {
   });
 });
 
-describe('useVendasDatabase — table watermark', () => {
+describe('useSaleDatabase — table watermark', () => {
   beforeEach(() => {
     mockMarkChanged.mockReset();
   });
 
-  it('createVenda() marks vendas changed', async () => {
+  it('createVenda() marks sales changed', async () => {
     const db = {
       prepareAsync: jest.fn(async () => makeStatement()),
-      getFirstAsync: jest.fn(async () => ({ preco: 10 })),
+      getFirstAsync: jest.fn(async () => ({ price: 10 })),
     };
     mockUseSQLiteContext.mockReturnValue(db);
 
     const { createVenda } = renderVendasDbHook();
-    await createVenda([{ produtoId: 'p1', quantidade: 1 }], 'Cliente Y');
+    await createVenda([{ productId: 'p1', quantity: 1 }], 'Cliente Y');
 
-    expect(mockMarkChanged).toHaveBeenCalledWith('vendas');
+    expect(mockMarkChanged).toHaveBeenCalledWith('sales');
   });
 
-  it('createFromSync() marks vendas changed', async () => {
+  it('createFromSync() marks sales changed', async () => {
     const db = { prepareAsync: jest.fn(async () => makeStatement()) };
     mockUseSQLiteContext.mockReturnValue(db);
 
     const { createFromSync } = renderVendasDbHook();
-    await createFromSync({ id: 'ven-1', total: 10, horario: new Date().toISOString() } as any);
+    await createFromSync({ id: 'ven-1', total: 10, soldAt: new Date().toISOString() } as any);
 
-    expect(mockMarkChanged).toHaveBeenCalledWith('vendas');
+    expect(mockMarkChanged).toHaveBeenCalledWith('sales');
   });
 
-  it('removeVenda() marks vendas changed', async () => {
+  it('removeVenda() marks sales changed', async () => {
     const db = { prepareAsync: jest.fn(async () => makeStatement()) };
     mockUseSQLiteContext.mockReturnValue(db);
 
     const { removeVenda } = renderVendasDbHook();
     await removeVenda('ven-1');
 
-    expect(mockMarkChanged).toHaveBeenCalledWith('vendas');
+    expect(mockMarkChanged).toHaveBeenCalledWith('sales');
   });
 
   it('listVendasRecentes() pagina, consulta totais e não agrupa a resposta', async () => {
     const venda = {
       id: 'ven-2',
       total: 25,
-      horario: '2026-08-21T12:00:00.000Z',
-      cliente: 'Ana',
-      excluida: false,
+      soldAt: '2026-08-21T12:00:00.000Z',
+      customerName: 'Ana',
+      isCancelled: false,
       updated_at: 1,
     };
     const db = {
       getAllAsync: jest.fn(async (sql: string, _params: unknown[]) => {
-        if (sql.includes('FROM TB_VENDAS')) return [venda];
-        return [{ nome: 'X-Burger', quantidade: 2 }];
+        if (sql.includes('FROM TB_SALES')) return [venda];
+        return [{ name: 'X-Burger', quantity: 2 }];
       }),
       getFirstAsync: jest.fn(async (sql: string) => {
         if (sql.includes('COUNT(*)')) return { total: 5 };
@@ -166,10 +166,10 @@ describe('useVendasDatabase — table watermark', () => {
     mockUseSQLiteContext.mockReturnValue(db);
 
     const { listVendasRecentes } = renderVendasDbHook();
-    const result = await listVendasRecentes({ page: 2, limit: 2, cliente: 'Ana' });
+    const result = await listVendasRecentes({ page: 2, limit: 2, customerName: 'Ana' });
 
     const [pageSql, pageParams] = db.getAllAsync.mock.calls[0];
-    expect(pageSql).toContain('ORDER BY horario DESC, id DESC LIMIT ? OFFSET ?');
+    expect(pageSql).toContain('ORDER BY soldAt DESC, id DESC LIMIT ? OFFSET ?');
     expect(pageParams).toEqual(expect.arrayContaining(['%Ana%', 2]));
     expect(pageParams.filter((param: unknown) => param === 2)).toHaveLength(2);
     expect(db.getFirstAsync).toHaveBeenCalledWith(
@@ -181,8 +181,8 @@ describe('useVendasDatabase — table watermark', () => {
       expect.arrayContaining(['%Ana%']),
     );
     expect(result).toEqual({
-      vendas: [{ ...venda, produtos: ['( 2x ) X-Burger'] }],
-      fechamento: 125,
+      sales: [{ ...venda, products: ['( 2x ) X-Burger'] }],
+      closing: 125,
       pagination: {
         page: 2,
         limit: 2,

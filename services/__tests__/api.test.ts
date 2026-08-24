@@ -14,8 +14,10 @@ describe('listVendas', () => {
       pagination: { page: 2, limit: 50, total: 101, totalPages: 3, hasNextPage: true },
     };
     fetchMock.mockResolvedValue({ ok: true, text: jest.fn(async () => JSON.stringify(payload)) } as unknown as Response);
-    const result = await listVendas('token-123', { page: 2, limit: 10, dataInicial: '2026-08-20', cliente: 'Ana' });
-    expect(result).toEqual(payload);
+    const result = await listVendas('token-123', { page: 2, limit: 10, dataInicial: '2026-08-20', customerName: 'Ana' });
+    expect(result.sales).toHaveLength(1);
+    expect(result.sales[0]).toMatchObject({ id: 'venda-1', total: 25 });
+    expect(result.closing).toBe(50);
     expect(result.pagination).toEqual(payload.pagination);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [requestUrl, requestOptions] = fetchMock.mock.calls[0];
@@ -23,7 +25,7 @@ describe('listVendas', () => {
     expect(parsedUrl.pathname).toBe('/vendas');
     expect(parsedUrl.searchParams.get('page')).toBe('2');
     expect(parsedUrl.searchParams.get('limit')).toBe('10');
-    expect(parsedUrl.searchParams.get('cliente')).toBe('Ana');
+    expect(parsedUrl.searchParams.get('customerName')).toBe('Ana');
     expect(requestOptions).toEqual({ method: 'GET', headers: expect.objectContaining({ Authorization: 'Bearer token-123', Accept: 'application/json' }) });
   });
 

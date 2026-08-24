@@ -1,4 +1,5 @@
-import { buildVendasQueryParams, DEFAULT_VENDAS_LIMIT, DEFAULT_VENDAS_PAGE, VendasFilters, VendasListResponse, VendasPagination } from './vendas';
+import { buildSalesQueryParams, DEFAULT_SALES_LIMIT, DEFAULT_SALES_PAGE, SalesFilters, SalesListResponse, SalesPagination } from './sales';
+import { fromLegacySyncResponse, fromLegacyUser, toLegacySyncPayload } from './legacyWire';
 
 // Fallback = produção. Para dev/homolog, defina EXPO_PUBLIC_API_URL no .env (ver .env.example).
 export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.tozzo.uk';
@@ -29,9 +30,9 @@ function nonNegativeInteger(value: unknown): number | undefined {
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
-function validPagination(value: unknown): VendasPagination | undefined {
+function validPagination(value: unknown): SalesPagination | undefined {
   if (!value || typeof value !== 'object') return undefined;
-  const pagination = value as Partial<Record<keyof VendasPagination, unknown>>;
+  const pagination = value as Partial<Record<keyof SalesPagination, unknown>>;
   const page = integerAtLeast(pagination.page, 1);
   const limit = integerAtLeast(pagination.limit, 1);
   const total = integerAtLeast(pagination.total, 0);
@@ -51,21 +52,21 @@ function readTotalCountHeader(res: Response): number | undefined {
   return nonNegativeInteger(value);
 }
 
-function fallbackVendasPagination(res: Response, filters: VendasFilters, receivedCount: number): VendasPagination {
-  const page = positiveInteger(filters.page, DEFAULT_VENDAS_PAGE);
-  const limit = positiveInteger(filters.limit, DEFAULT_VENDAS_LIMIT);
+function fallbackSalesPagination(res: Response, filters: SalesFilters, receivedCount: number): SalesPagination {
+  const page = positiveInteger(filters.page, DEFAULT_SALES_PAGE);
+  const limit = positiveInteger(filters.limit, DEFAULT_SALES_LIMIT);
   const total = readTotalCountHeader(res) ?? receivedCount;
   const totalPages = Math.ceil(total / limit);
   return { page, limit, total, totalPages, hasNextPage: page < totalPages };
 }
 
-export async function login(email: string, senha: string) {
+export async function login(email: string, password: string) {
   const url = `${BASE_URL}/auth/login`;
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...NGROK_HEADERS },
-      body: JSON.stringify({ email, senha }),
+      body: JSON.stringify({ email, senha: password }),
     });
 
     if (!res.ok) {
@@ -75,7 +76,8 @@ export async function login(email: string, senha: string) {
       throw new Error(message);
     }
 
-    return handleJsonResponse(res);
+    const body = await handleJsonResponse(res);
+    return body && typeof body === 'object' ? { ...body, user: body.user ? fromLegacyUser(body.user) : body.user } : body;
   } catch (err: any) {
     console.error('Network/login request failed', url, err?.message ?? err);
     throw err;
@@ -97,20 +99,20 @@ export async function getMe(token: string) {
       throw new Error(message);
     }
 
-    return handleJsonResponse(res);
+    return fromLegacyUser(await handleJsonResponse(res));
   } catch (err: any) {
     console.error('Network/getMe request failed', url, err?.message ?? err);
     throw err;
   }
 }
 
-export async function sincronizar(token: string, payload: any) {
+export async function synchronize(token: string, payload: any) {
   const url = `${BASE_URL}/sincronizacao/push`;
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(toLegacySyncPayload(payload)),
     });
 
     if (!res.ok) {
@@ -120,9 +122,9 @@ export async function sincronizar(token: string, payload: any) {
       throw new Error(message);
     }
 
-    return handleJsonResponse(res);
+    return fromLegacySyncResponse(await handleJsonResponse(res));
   } catch (err: any) {
-    console.error('Network/sincronizar request failed', url, err?.message ?? err);
+    console.error('Network/synchronize request failed', url, err?.message ?? err);
     throw err;
   }
 }
@@ -146,16 +148,16 @@ export async function getChanges(token: string, since?: string | null) {
       throw new Error(message);
     }
 
-    return handleJsonResponse(res);
+    return fromLegacySyncResponse(await handleJsonResponse(res));
   } catch (err: any) {
     console.error('Network/getChanges request failed', url, err?.message ?? err);
     throw err;
   }
 }
 
-export async function listVendas(token: string, filters: VendasFilters = {}): Promise<VendasListResponse> {
+export async function listSales(token: string, filters: SalesFilters = {}): Promise<SalesListResponse> {
   const url = new URL('/vendas', BASE_URL);
-  url.search = buildVendasQueryParams(filters).toString();
+  url.search = buildSalesQueryParams(filters).toString();
 
   try {
     const res = await fetch(url.toString(), {
@@ -171,15 +173,22 @@ export async function listVendas(token: string, filters: VendasFilters = {}): Pr
     }
 
     const body = await handleJsonResponse(res);
-    const vendas = Array.isArray(body?.vendas) ? body.vendas : [];
+    const normalized = fromLegacySyncResponse({ vendas: Array.isArray(body?.sales) ? body.sales : body?.vendas ?? [] });
+    const sales = normalized.sales ?? [];
     const pagination = validPagination(body?.pagination);
     return {
-      vendas,
-      fechamento: body?.fechamento ?? 0,
-      pagination: pagination ?? fallbackVendasPagination(res, filters, vendas.length),
+      sales,
+      closing: body?.closing ?? body?.fechamento ?? 0,
+      pagination: pagination ?? fallbackSalesPagination(res, filters, sales.length),
     };
   } catch (err: any) {
     console.error('Network/listVendas request failed', url.toString(), err?.message ?? err);
     throw err;
   }
 }
+
+/** @deprecated Use listSales; the public URL remains /vendas. */
+export const listVendas = listSales;
+
+/** @deprecated Use synchronize; kept for clients compiled against the old service name. */
+export const sincronizar = synchronize;

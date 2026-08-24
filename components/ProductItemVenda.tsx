@@ -5,16 +5,16 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/IconButton";
 import { IngredientesModal } from "@/components/ui/IngredientesModal";
-import { ProductDatabase } from "@/database/types/Produto";
+import { Product } from "@/database/types/Product";
 import { FontAwesome } from "@expo/vector-icons";
 import Colors from "@/constants/Colors";
 import { tipoColors, spacing, type, radius } from "@/constants/theme";
 
 type Props = {
-  data: ProductDatabase;
+  data: Product;
   tipoNome?: string;
-  onAddToCart: (product: ProductDatabase) => void;
-  onAdicionaltoCart: (product: ProductDatabase, ehAdd: boolean) => void;
+  onAddToCart: (product: Product) => void;
+  onAdicionaltoCart: (product: Product, ehAdd: boolean) => void;
 };
 
 function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome }: Props) {
@@ -32,17 +32,17 @@ function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome 
     ]).start();
   };
 
-  const tipoLabel = tipoNome ?? (data as any).tipoNome ?? `Tipo ${data.tipoProdutoId}`;
+  const tipoLabel = tipoNome ?? (data as any).tipoNome ?? `Tipo ${data.productTypeId}`;
 
   return (
     <Card bordered={false} style={styles.container}>
       <View style={styles.info}>
-        <Text style={styles.nome}>{data.nome}</Text>
-        <Text style={styles.preco}>Preço: R$ {data.preco.toFixed(2)}</Text>
+        <Text style={styles.name}>{data.name}</Text>
+        <Text style={styles.price}>Preço: R$ {data.price.toFixed(2)}</Text>
       </View>
 
       <Pressable onPress={() => setModalVisible(true)}>
-        <Badge label={tipoLabel} color={tipoColors[data.tipoProdutoId] ?? '#888'} />
+        <Badge label={tipoLabel} color={tipoColors[data.productTypeId] ?? '#888'} />
       </Pressable>
 
       <Animated.View style={{ transform: [{ scale: iconScaleAnim }] }}>
@@ -69,8 +69,8 @@ function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome 
       <IngredientesModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        nomeProduto={data.nome}
-        ingredientes={data.ingredientes}
+        nomeProduto={data.name}
+        ingredients={data.ingredients}
       />
     </Card>
   );
@@ -79,8 +79,8 @@ function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome 
 const styles = StyleSheet.create({
   container: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   info: { flex: 1 },
-  nome: { fontSize: type.body, fontWeight: "bold" },
-  preco: { fontSize: type.bodySm },
+  name: { fontSize: type.body, fontWeight: "bold" },
+  price: { fontSize: type.bodySm },
   addButton: { width: 44, height: 44, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', marginLeft: spacing.sm },
 });
 

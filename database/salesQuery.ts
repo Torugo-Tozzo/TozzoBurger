@@ -1,21 +1,21 @@
 import {
-  DEFAULT_VENDAS_LIMIT,
-  DEFAULT_VENDAS_PAGE,
-  MAX_VENDAS_LIMIT,
+  DEFAULT_SALES_LIMIT,
+  DEFAULT_SALES_PAGE,
+  MAX_SALES_LIMIT,
   parseTimezoneOffsetMinutes,
-  type VendasFilters,
+  type SalesFilters,
   timezoneOffsetToSqliteModifier,
-} from '../services/vendas';
+} from '../services/sales';
 
-export type LocalVendasQueryParam = string | number;
+export type LocalSalesQueryParam = string | number;
 
-export type LocalVendasQuery = {
+export type LocalSalesQuery = {
   select: string;
   count: string;
   sum: string;
-  params: LocalVendasQueryParam[];
-  countParams: LocalVendasQueryParam[];
-  sumParams: LocalVendasQueryParam[];
+  params: LocalSalesQueryParam[];
+  countParams: LocalSalesQueryParam[];
+  sumParams: LocalSalesQueryParam[];
   page: number;
   limit: number;
 };
@@ -122,14 +122,14 @@ function optionalNumber(
   return parsed;
 }
 
-export function buildLocalVendasQuery(filters: VendasFilters = {}): LocalVendasQuery {
-  const page = positiveInteger(filters.page, DEFAULT_VENDAS_PAGE, 'page');
-  const limit = positiveInteger(filters.limit, DEFAULT_VENDAS_LIMIT, 'limit', MAX_VENDAS_LIMIT);
+export function buildLocalSalesQuery(filters: SalesFilters = {}): LocalSalesQuery {
+  const page = positiveInteger(filters.page, DEFAULT_SALES_PAGE, 'page');
+  const limit = positiveInteger(filters.limit, DEFAULT_SALES_LIMIT, 'limit', MAX_SALES_LIMIT);
   const dataInicialValue = optionalText(filters.dataInicial);
   const dataFinalValue = optionalText(filters.dataFinal);
   const horaInicialValue = optionalText(filters.horaInicial);
   const horaFinalValue = optionalText(filters.horaFinal);
-  const cliente = optionalText(filters.cliente);
+  const customerName = optionalText(filters.customerName);
   const dataInicial = dataInicialValue ? parseDate(dataInicialValue, 'dataInicial') : undefined;
   const dataFinal = dataFinalValue ? parseDate(dataFinalValue, 'dataFinal') : undefined;
   const horaInicial = horaInicialValue ? parseTime(horaInicialValue, 'horaInicial') : undefined;
@@ -143,23 +143,23 @@ export function buildLocalVendasQuery(filters: VendasFilters = {}): LocalVendasQ
 
   const clauses = [
     'deleted_at IS NULL',
-    '(excluida IS NULL OR excluida = 0)',
+    '(isCancelled IS NULL OR isCancelled = 0)',
   ];
-  const filterParams: LocalVendasQueryParam[] = [];
+  const filterParams: LocalSalesQueryParam[] = [];
 
   const addClause = (clause: string, ...parameters: LocalVendasQueryParam[]) => {
     clauses.push(clause);
     filterParams.push(...parameters);
   };
 
-  if (dataInicial) addClause('horario >= ?', dateBoundary(dataInicial, horaInicial, false));
-  if (dataFinal) addClause('horario <= ?', dateBoundary(dataFinal, horaFinal, true));
+  if (dataInicial) addClause('soldAt >= ?', dateBoundary(dataInicial, horaInicial, false));
+  if (dataFinal) addClause('soldAt <= ?', dateBoundary(dataFinal, horaFinal, true));
   const timezoneModifier = horaInicial || horaFinal
     ? timezoneOffsetToSqliteModifier(parseTimezoneOffsetMinutes(filters.timezoneOffsetMinutes))
     : undefined;
-  if (horaInicial) addClause("strftime('%H:%M', horario, ?) >= ?", timezoneModifier!, horaInicial.sqliteValue);
-  if (horaFinal) addClause("strftime('%H:%M', horario, ?) <= ?", timezoneModifier!, horaFinal.sqliteValue);
-  if (cliente) addClause("LOWER(COALESCE(cliente, '')) LIKE LOWER(?)", `%${cliente}%`);
+  if (horaInicial) addClause("strftime('%H:%M', soldAt, ?) >= ?", timezoneModifier!, horaInicial.sqliteValue);
+  if (horaFinal) addClause("strftime('%H:%M', soldAt, ?) <= ?", timezoneModifier!, horaFinal.sqliteValue);
+  if (customerName) addClause("LOWER(COALESCE(customerName, '')) LIKE LOWER(?)", `%${customerName}%`);
   if (totalMin != null) addClause('total >= ?', totalMin);
   if (totalMax != null) addClause('total <= ?', totalMax);
 
@@ -169,9 +169,9 @@ export function buildLocalVendasQuery(filters: VendasFilters = {}): LocalVendasQ
   const params = [...filterParams, limit, (page - 1) * limit];
 
   return {
-    select: `SELECT * FROM TB_VENDAS ${where} ORDER BY horario DESC, id DESC LIMIT ? OFFSET ?`,
-    count: `SELECT COUNT(*) AS total FROM TB_VENDAS ${where}`,
-    sum: `SELECT COALESCE(SUM(total), 0) AS fechamento FROM TB_VENDAS ${where}`,
+    select: `SELECT * FROM TB_SALES ${where} ORDER BY soldAt DESC, id DESC LIMIT ? OFFSET ?`,
+    count: `SELECT COUNT(*) AS total FROM TB_SALES ${where}`,
+    sum: `SELECT COALESCE(SUM(total), 0) AS fechamento FROM TB_SALES ${where}`,
     params,
     countParams,
     sumParams,
@@ -179,3 +179,10 @@ export function buildLocalVendasQuery(filters: VendasFilters = {}): LocalVendasQ
     limit,
   };
 }
+
+/** @deprecated Use the English query names. */
+export type LocalVendasQueryParam = LocalSalesQueryParam;
+/** @deprecated Use LocalSalesQuery. */
+export type LocalVendasQuery = LocalSalesQuery;
+/** @deprecated Use buildLocalSalesQuery. */
+export const buildLocalVendasQuery = buildLocalSalesQuery;
