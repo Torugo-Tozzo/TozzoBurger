@@ -8,6 +8,8 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { spacing, radius, type } from '@/constants/theme';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { getProductTypeLabel } from '@/components/productTypeLabel';
 
 export default function ProdutoModalScreen() {
   const { productId } = useLocalSearchParams();
@@ -21,6 +23,7 @@ export default function ProdutoModalScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
 
   useEffect(() => {
     async function fetchTiposProdutos() {
@@ -59,7 +62,7 @@ export default function ProdutoModalScreen() {
   async function handleSave() {
     try {
       if (!name || !price || !productTypeId) {
-        Alert.alert('Erro', 'Por favor, preencha os campos obrigatórios: \nnome, preço e tipo.');
+        Alert.alert(t('common.error'), t('errors.required'));
         return;
       }
 
@@ -71,47 +74,47 @@ export default function ProdutoModalScreen() {
       router.back();
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
-      Alert.alert('Erro', 'Houve um erro ao salvar o produto.');
+      Alert.alert(t('common.error'), t('errors.saveFailed'));
     }
   }
 
   return (
     <View style={{ flex: 1, padding: spacing.xl, borderColor: 'black', borderWidth: 1 }}>
       <Text style={{ fontSize: type.heading, fontWeight: 'bold' }}>
-        {productId ? 'Editar Produto' : 'Cadastrar Produto'}
+        {productId ? t('products.editProduct') : t('products.registerTitle')}
       </Text>
       <View style={{ marginVertical: spacing.xl, height: 1, backgroundColor: colors.border }} />
 
-      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>Nome do Produto</Text>
+      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>{t('products.name')}</Text>
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
-        placeholder="Digite o Nome..."
+        placeholder={t('products.namePlaceholder')}
         value={name}
         onChangeText={setNome}
         placeholderTextColor={colors.textMuted}
       />
 
-      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>Preço do Produto</Text>
+      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>{t('products.price')}</Text>
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
-        placeholder="Digite o Preço.."
+        placeholder={t('products.pricePlaceholder')}
         value={price}
         keyboardType="numeric"
         onChangeText={setPreco}
         placeholderTextColor={colors.textMuted}
       />
 
-      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>Ingredientes do Produto</Text>
+      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>{t('products.ingredients')}</Text>
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text, height: 100, textAlignVertical: 'top' }}
-        placeholder="Digite os Ingredientes.."
+        placeholder={t('products.ingredientsPlaceholder')}
         value={ingredients}
         onChangeText={setIngredientes}
         placeholderTextColor={colors.textMuted}
         multiline
       />
 
-      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>Tipo do Produto</Text>
+      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>{t('products.productType')}</Text>
       <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, marginBottom: spacing.md }}>
         <Picker
           selectedValue={productTypeId}
@@ -119,14 +122,14 @@ export default function ProdutoModalScreen() {
           style={{ color: colors.textMuted }}
           dropdownIconColor={colors.text}
         >
-          <Picker.Item label="Selecione um tipo" value={undefined} />
+          <Picker.Item label={t('products.selectType')} value={undefined} />
           {tiposProdutos.map((tipo) => (
-            <Picker.Item key={tipo.id} label={tipo.description} value={tipo.id} />
+            <Picker.Item key={tipo.id} label={getProductTypeLabel(tipo.id, tipo.description, t)} value={tipo.id} />
           ))}
         </Picker>
       </View>
 
-      <Button title="Salvar" onPress={handleSave} />
+      <Button title={t('common.save')} onPress={handleSave} />
     </View>
   );
 }

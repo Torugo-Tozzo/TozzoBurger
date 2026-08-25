@@ -12,5 +12,11 @@
   "delete": "Eliminar producto",
   "deleteConfirm": "¿Seguro que quieres eliminar este producto?",
   "removeTitle": "Confirmar eliminación",
-  "remove": "Eliminar"
+  "remove": "Eliminar",
+  "addOnTitle": "Producto adicional",
+  "registerTitle": "Registrar producto",
+  "namePlaceholder": "Introduce el nombre…",
+  "pricePlaceholder": "Introduce el precio…",
+  "ingredientsPlaceholder": "Introduce los ingredientes…",
+  "selectType": "Selecciona un tipo"
 }

@@ -19,6 +19,7 @@ import { ListFrame } from '@/components/ui/ListFrame';
 import { getVendaDetalhes } from '@/services/salesDetails';
 import type { VendaRenderizavel } from '@/services/sales';
 import { spacing, type } from '@/constants/theme';
+import { useTranslation } from 'react-i18next';
 
 type VendaDetalheItem = { name: string; quantity: number; price: number; subtotal: number };
 
@@ -43,6 +44,8 @@ export default function ContaHistoricoModal() {
   const { showAdd: getProductById } = useProductDatabase();
   const { getPrinter } = usePrinterDatabase();
   const router = useRouter();
+  const { t, i18n } = useTranslation();
+  const formatCurrency = (value: number) => new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(value);
 
   const [venda, setVenda] = useState<Sale | null>(null);
   const [produtos, setProdutos] = useState<VendaDetalheItem[]>([]);
@@ -65,7 +68,7 @@ export default function ContaHistoricoModal() {
       async function fetchVenda() {
         try {
           if (!saleId) {
-            Alert.alert('Erro', 'ID da venda não fornecido.');
+            Alert.alert(t('common.error'), t('sales.idMissing'));
             router.back();
             return;
           }
@@ -73,7 +76,7 @@ export default function ContaHistoricoModal() {
           if (origem === 'establishment') {
           const remoteVenda = getVendaDetalhes(String(saleId));
             if (!remoteVenda) {
-              Alert.alert('Erro', 'Detalhes da venda não estão mais disponíveis.');
+              Alert.alert(t('common.error'), t('sales.notAvailable'));
               router.back();
               return;
             }
@@ -87,7 +90,7 @@ export default function ContaHistoricoModal() {
           } else {
             const saleData = await getSaleById(String(saleId));
             if (!saleData) {
-              Alert.alert('Erro', 'Venda não encontrada.');
+              Alert.alert(t('common.error'), t('sales.notFound'));
               router.back();
               return;
             }
@@ -98,7 +101,7 @@ export default function ContaHistoricoModal() {
               saleData.items.map(async (item) => {
                 const productData = await getProductById(item.productId);
                 return {
-                  name: productData?.name || 'Produto não encontrado',
+                  name: productData?.name || t('common.unknownProduct'),
                   quantity: item.quantity,
                   price: productData?.price || 0,
                   subtotal: item.quantity * (productData?.price || 0),
@@ -110,7 +113,7 @@ export default function ContaHistoricoModal() {
           }
         } catch (error) {
           console.error('Erro ao carregar a venda:', error);
-          Alert.alert('Erro', 'Não foi possível carregar os detalhes da venda.');
+          Alert.alert(t('common.error'), t('sales.loadDetailsFailed'));
           router.back();
         } finally {
           setIsLoading(false);
@@ -135,12 +138,12 @@ export default function ContaHistoricoModal() {
     try {
       await sendMessageToDevice(printContent, await getPrinter());
     } catch (error) {
-      Alert.alert('Erro', `${error}`);
+      Alert.alert(t('common.error'), t('printer.printFailed'));
       return;
     } finally {
       setLoadingPrint(null); // Desativar carregamento ao finalizar
     }
-    Alert.alert('Sucesso', 'Conta enviada para impressão.');
+    Alert.alert(t('common.success'), t('sales.sentToPrinter'));
   };
 
   const handleShare = async () => {
@@ -159,8 +162,8 @@ export default function ContaHistoricoModal() {
   const renderItem = ({ item }: { item: VendaDetalheItem }) => (
     <ListItem
       title={item.name}
-      subtitle={`${item.quantity}x · R$ ${item.price.toFixed(2)} un.`}
-      trailing={<Text style={styles.itemTextRight}>R$ {item.subtotal.toFixed(2)}</Text>}
+      subtitle={`${item.quantity}x · ${formatCurrency(item.price)} / ${t('charts.units')}`}
+      trailing={<Text style={styles.itemTextRight}>{formatCurrency(item.subtotal)}</Text>}
     />
   );
 
@@ -168,7 +171,7 @@ export default function ContaHistoricoModal() {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text>Carregando...</Text>
+        <Text>{t('common.loading')}</Text>
       </View>
     );
   }
@@ -176,27 +179,27 @@ export default function ContaHistoricoModal() {
   if (!venda) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Carregando detalhes da venda...</Text>
+        <Text style={styles.title}>{t('sales.loadingDetails')}</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Detalhes da venda</Text>
+      <Text style={styles.title}>{t('sales.detailsTitle')}</Text>
       <Text style={[styles.saleId, { color: colors.textMuted }]}>#{venda.id}</Text>
       <View style={[styles.separator, { backgroundColor: colors.border }]} />
 
       <Text style={styles.detailText}>
-        Data: {new Date(venda.soldAt).toLocaleDateString('pt-BR')}
+        {t('sales.date')}: {new Date(venda.soldAt).toLocaleDateString(i18n.language)}
       </Text>
       <Text style={styles.detailText}>
-        Horário: {new Date(venda.soldAt).toLocaleTimeString('pt-BR')}
+        {t('sales.time')}: {new Date(venda.soldAt).toLocaleTimeString(i18n.language)}
       </Text>
-      <Text style={styles.detailText}>Cliente: {venda.customerName?.trim() || 'Não informado'}</Text>
-      {venda.createdByName ? <Text style={styles.detailText}>Vendedor: {venda.createdByName}</Text> : null}
+      <Text style={styles.detailText}>{t('sales.customer')}: {venda.customerName?.trim() || t('sales.customerNotProvided')}</Text>
+      {venda.createdByName ? <Text style={styles.detailText}>{t('sales.seller')}: {venda.createdByName}</Text> : null}
       <View style={[styles.separator, { backgroundColor: colors.border }]} />
-      <Text style={styles.subtitle}>Produtos</Text>
+      <Text style={styles.subtitle}>{t('sales.products')}</Text>
 
       <ListFrame style={styles.itemsFrame}>
         <FlatList
@@ -205,13 +208,13 @@ export default function ContaHistoricoModal() {
           keyExtractor={(item, index) => String(item.name + index)}
         />
       </ListFrame>
-      <Text style={styles.title}>Total: R$ {venda.total.toFixed(2)}</Text>
+      <Text style={styles.title}>{t('sales.totalLabel', { amount: formatCurrency(venda.total) })}</Text>
       <View style={[styles.separator, { backgroundColor: colors.border }]} />
 
       <View style={styles.buttonContainer}>
-        <IconButton icon="share-alt" label="Compartilhar venda" onPress={handleShare} />
+        <IconButton icon="share-alt" label={t('sales.shareSale')} onPress={handleShare} />
         <Button
-          title="Imprimir conta"
+          title={t('sales.printAccount')}
           onPress={handlePrint}
           loading={Boolean(loadingPrint)}
           disabled={!isPrinterConnected}

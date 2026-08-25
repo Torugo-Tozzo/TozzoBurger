@@ -4,5 +4,21 @@
   "orders": "Commandes",
   "revenue": "Chiffre d’affaires",
   "noData": "Aucune donnée pour cette période.",
-  "period": "Période"
+  "period": "Période",
+  "allTypes": "Tous les types",
+  "pie": "Secteurs",
+  "progress": "Progression",
+  "mostSold": "Produits les plus vendus",
+  "loading": "Chargement des données…",
+  "emptyPeriod": "Aucun produit vendu pendant la période sélectionnée.",
+  "listTitle": "Produits vendus du {{from}} au {{to}}",
+  "product": "Produit",
+  "numberSales": "Ventes",
+  "total": "Total",
+  "other": "Autres",
+  "units": "unités",
+  "grandTotal": "Total général",
+  "share": "Partager le rapport",
+  "reportTitle": "Rapport des ventes",
+  "until": "au"
 }

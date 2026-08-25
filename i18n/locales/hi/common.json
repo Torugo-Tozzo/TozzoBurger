@@ -24,5 +24,17 @@
   "deleteSale": "बिक्री हटाएँ",
   "customerUnknown": "ग्राहक उपलब्ध नहीं",
   "createdBy": "द्वारा बनाया गया: {{name}} · ",
-  "typeLabel": "प्रकार {{id}}"
+  "typeLabel": "प्रकार {{id}}",
+  "confirmation": "पुष्टि",
+  "clear": "साफ़ करें",
+  "removeItem": "आइटम हटाएँ",
+  "decreaseQuantity": "मात्रा घटाएँ",
+  "increaseQuantity": "मात्रा बढ़ाएँ",
+  "error": "त्रुटि",
+  "success": "सफलता",
+  "notProvided": "उपलब्ध नहीं",
+  "unknownProduct": "उत्पाद नहीं मिला",
+  "share": "साझा करें",
+  "addItem": "आइटम जोड़ें",
+  "clearCartConfirm": "क्या आप वाकई कार्ट खाली करना चाहते हैं?"
 }

@@ -24,5 +24,17 @@
   "deleteSale": "Delete sale",
   "customerUnknown": "Customer not provided",
   "createdBy": "Created by {{name}} · ",
-  "typeLabel": "Type {{id}}"
+  "typeLabel": "Type {{id}}",
+  "confirmation": "Confirmation",
+  "clear": "Clear",
+  "removeItem": "Remove item",
+  "decreaseQuantity": "Decrease quantity",
+  "increaseQuantity": "Increase quantity",
+  "error": "Error",
+  "success": "Success",
+  "notProvided": "Not provided",
+  "unknownProduct": "Product not found",
+  "share": "Share",
+  "addItem": "Add item",
+  "clearCartConfirm": "Do you really want to clear the cart?"
 }

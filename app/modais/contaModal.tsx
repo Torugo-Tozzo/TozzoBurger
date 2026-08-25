@@ -20,6 +20,7 @@ import { ListFrame } from '@/components/ui/ListFrame';
 import { ListDivider } from '@/components/ui/ListDivider';
 import Colors from '@/constants/Colors';
 import { spacing, radius, type } from '@/constants/theme';
+import { useTranslation } from 'react-i18next';
 
 export default function ContaModalScreen() {
   const { cart, customerName, clearCart, updateCartItem, addToCart, setCliente } = useCart();
@@ -29,6 +30,7 @@ export default function ContaModalScreen() {
   const { user } = useAuth();
   const isCliente = user?.role === 'CUSTOMER';
   const { triggerSync } = useAutoSync();
+  const { t, i18n } = useTranslation();
 
   useEffect(() => {
     if (isCliente && !customerName && user?.name) setCliente(user.name);
@@ -44,12 +46,13 @@ export default function ContaModalScreen() {
   }, 0);
 
   const isCartEmpty = cart.length === 0 || total === 0;
+  const formatCurrency = (value: number) => new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(value);
 
   const limparConta = () => {
-    Alert.alert("Confirmação", "Deseja realmente limpar o carrinho?", [
-      { text: "Cancelar", style: "cancel" },
+    Alert.alert(t('common.confirmation'), t('common.clearCartConfirm'), [
+      { text: t('common.cancel'), style: "cancel" },
       {
-        text: "Limpar",
+        text: t('common.clear'),
         onPress: clearCart,
       },
     ]);
@@ -80,17 +83,17 @@ export default function ContaModalScreen() {
       await clearCart(); 
       router.back(); 
 
-      Alert.alert("Venda Realizada!", "Deseja imprimir a Conta?", [
-        { text: "Não", style: "cancel" },
+      Alert.alert(t('sales.completedTitle'), t('sales.printPrompt'), [
+        { text: t('common.no'), style: "cancel" },
         {
-          text: "Sim",
+          text: t('common.yes'),
           onPress: () => imprimeConta(saleId),
         },
       ]);
 
     } catch (error) {
       console.error(error);
-      Alert.alert("Erro", "Não foi possível finalizar a compra.");
+      Alert.alert(t('common.error'), t('errors.saveFailed'));
     }
   };
 
@@ -99,7 +102,7 @@ export default function ContaModalScreen() {
       if (isCliente) {
         const openOrders = await countOpenOrders(user?.id);
         if (openOrders >= 3) {
-          Alert.alert('Limite atingido', 'Você já possui 3 pedidos abertos. Aguarde um ser aceito ou fechado para criar outro.');
+          Alert.alert(t('orders.openLimitTitle'), t('orders.openLimitMessage', { count: 3 }));
           return;
         }
       }
@@ -113,10 +116,10 @@ export default function ContaModalScreen() {
       await clearCart();
       triggerSync().catch((e) => console.warn('[sync] trigger failed', e));
       router.back();
-      Alert.alert('Pedido Gerado!', `Pedido ${orderId} criado com sucesso.`);
+      Alert.alert(t('orders.createdTitle'), t('orders.createdMessage', { id: orderId }));
     } catch (error) {
       console.error('Erro ao gerar pedido:', error);
-      Alert.alert('Erro', 'Não foi possível gerar o pedido.');
+      Alert.alert(t('common.error'), t('errors.saveFailed'));
     }
   };
 
@@ -207,7 +210,7 @@ export default function ContaModalScreen() {
     <View style={styles.container}>
       <TextInput
         style={[styles.input, isCliente && { backgroundColor: colors.surface }]}
-        placeholder="Nome do Cliente"
+        placeholder={t('sales.customer')}
         value={customerName}
         onChangeText={setCliente}
         placeholderTextColor={placeholderColor}
@@ -225,13 +228,13 @@ export default function ContaModalScreen() {
               <Card bordered={false} style={styles.cartItem}>
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemNome}>{item.name}</Text>
-                  <Text style={styles.itemPreco}>R$ {((item.quantity ?? 0) * item.price).toFixed(2)}</Text>
+                  <Text style={styles.itemPreco}>{formatCurrency((item.quantity ?? 0) * item.price)}</Text>
                 </View>
 
                 <View style={styles.quantityControls}>
                   <IconButton
                     icon={isUltimo ? 'trash' : 'minus'}
-                    label={isUltimo ? 'Remover item' : 'Diminuir quantity'}
+                    label={isUltimo ? t('common.removeItem') : t('common.decreaseQuantity')}
                     destructive={isUltimo}
                     onPress={() => alterarQuantidade(item.id, 'decrementar')}
                   />
@@ -240,7 +243,7 @@ export default function ContaModalScreen() {
 
                   <IconButton
                     icon="plus"
-                    label="Aumentar quantity"
+                    label={t('common.increaseQuantity')}
                     onPress={() => alterarQuantidade(item.id, 'incrementar')}
                   />
                 </View>
@@ -251,7 +254,7 @@ export default function ContaModalScreen() {
       </ListFrame>
 
       <View style={styles.separator} />
-      <Text style={styles.totalText}>Total: R$ {total.toFixed(2)}</Text>
+      <Text style={styles.totalText}>{t('sales.totalLabel', { amount: formatCurrency(total) })}</Text>
 
       <View style={styles.topRow}>
         {!isCliente && (
@@ -264,7 +267,7 @@ export default function ContaModalScreen() {
           </TouchableOpacity>
         )}
 
-        <Button title="Gerar Pedido" onPress={gerarPedido} disabled={isCartEmpty} style={styles.ctaFlex} />
+        <Button title={t('orders.generate')} onPress={gerarPedido} disabled={isCartEmpty} style={styles.ctaFlex} />
       </View>
 
       <View style={styles.bottomRow}>
@@ -277,7 +280,7 @@ export default function ContaModalScreen() {
         </TouchableOpacity>
 
         {!isCliente && (
-          <Button title="Vender Direto" onPress={finalizarCompra} disabled={isCartEmpty} style={styles.ctaFlex} />
+          <Button title={t('sales.direct')} onPress={finalizarCompra} disabled={isCartEmpty} style={styles.ctaFlex} />
         )}
       </View>
 

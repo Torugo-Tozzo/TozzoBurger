@@ -13,5 +13,18 @@
   "recentEmpty": "Nenhum pedido recente",
   "recentMessage": "Os pedidos aparecem aqui assim que são criados.",
   "deleteConfirm": "Deseja excluir este pedido?",
-  "delete": "Excluir"
+  "delete": "Excluir",
+  "generate": "Gerar pedido",
+  "createdTitle": "Pedido gerado!",
+  "createdMessage": "Pedido {{id}} criado com sucesso.",
+  "openLimitTitle": "Limite atingido",
+  "openLimitMessage": "Você já possui {{count}} pedidos abertos. Aguarde um ser aceito ou fechado para criar outro.",
+  "updated": "Pedido atualizado.",
+  "readOnly": "Pedido enviado — sem edição",
+  "statusOpen": "Aberto",
+  "addItem": "Adicionar item",
+  "save": "Salvar pedido",
+  "generatedSaleTitle": "Venda gerada",
+  "generatedSaleMessage": "Venda {{id}} gerada a partir do pedido.",
+  "totalItems": "Total dos itens"
 }

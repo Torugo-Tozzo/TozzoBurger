@@ -13,5 +13,18 @@
   "recentEmpty": "No recent orders",
   "recentMessage": "Orders appear here as soon as they are created.",
   "deleteConfirm": "Do you want to delete this order?",
-  "delete": "Delete"
+  "delete": "Delete",
+  "generate": "Generate order",
+  "createdTitle": "Order created",
+  "createdMessage": "Order {{id}} was created successfully.",
+  "openLimitTitle": "Limit reached",
+  "openLimitMessage": "You already have {{count}} open orders. Wait for one to be accepted or closed before creating another.",
+  "updated": "Order updated.",
+  "readOnly": "Order sent — editing is unavailable",
+  "statusOpen": "Open",
+  "addItem": "Add item",
+  "save": "Save order",
+  "generatedSaleTitle": "Sale created",
+  "generatedSaleMessage": "Sale {{id}} was created from the order.",
+  "totalItems": "Items total"
 }

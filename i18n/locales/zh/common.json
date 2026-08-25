@@ -24,5 +24,17 @@
   "deleteSale": "删除销售记录",
   "customerUnknown": "未提供客户",
   "createdBy": "创建者：{{name}} · ",
-  "typeLabel": "类型 {{id}}"
+  "typeLabel": "类型 {{id}}",
+  "confirmation": "确认",
+  "clear": "清空",
+  "removeItem": "移除项目",
+  "decreaseQuantity": "减少数量",
+  "increaseQuantity": "增加数量",
+  "error": "错误",
+  "success": "成功",
+  "notProvided": "未提供",
+  "unknownProduct": "未找到产品",
+  "share": "分享",
+  "addItem": "添加项目",
+  "clearCartConfirm": "确定要清空购物车吗？"
 }

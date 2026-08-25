@@ -24,5 +24,17 @@
   "deleteSale": "Excluir venda",
   "customerUnknown": "Cliente não informado",
   "createdBy": "Criado por {{name}} · ",
-  "typeLabel": "Tipo {{id}}"
+  "typeLabel": "Tipo {{id}}",
+  "confirmation": "Confirmação",
+  "clear": "Limpar",
+  "removeItem": "Remover item",
+  "decreaseQuantity": "Diminuir quantidade",
+  "increaseQuantity": "Aumentar quantidade",
+  "error": "Erro",
+  "success": "Sucesso",
+  "notProvided": "Não informado",
+  "unknownProduct": "Produto não encontrado",
+  "share": "Compartilhar",
+  "addItem": "Adicionar item",
+  "clearCartConfirm": "Deseja realmente limpar o carrinho?"
 }

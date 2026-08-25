@@ -13,8 +13,19 @@ import Colors from '@/constants/Colors';
 import { Button } from '@/components/ui/Button';
 import { ListItem } from '@/components/ui/ListItem';
 import { spacing } from '@/constants/theme';
+import { useTranslation } from 'react-i18next';
 
 type OrderStatus = typeof ORDER_STATUS[keyof typeof ORDER_STATUS];
+
+function translateStatus(status: OrderStatus, t: (key: string) => string): string {
+  switch (status) {
+    case ORDER_STATUS.OPEN: return t('status.open');
+    case ORDER_STATUS.IN_PREPARATION: return t('status.inPreparation');
+    case ORDER_STATUS.DELIVERING: return t('status.delivering');
+    case ORDER_STATUS.CLOSED: return t('status.closed');
+  }
+  return t('status.open');
+}
 
 export default function PedidoModal() {
   const params = useLocalSearchParams();
@@ -35,6 +46,8 @@ export default function PedidoModal() {
   const colorScheme = useColorScheme() ?? 'light';
   const isDarkMode = colorScheme === 'dark';
   const colors = Colors[colorScheme];
+  const { t, i18n } = useTranslation();
+  const formatCurrency = (value: number) => new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(value);
 
   const orderAccepted = status !== ORDER_STATUS.OPEN;
   const clienteBloqueado = isCliente;
@@ -87,19 +100,19 @@ export default function PedidoModal() {
       const itemsPayload = (pedido.items || []).map((item: any) => ({ productId: item.productId, quantity: item.quantity }));
       await updateOrder(pedido.id, itemsPayload, customerName, status);
       triggerSync().catch((e) => console.warn('[sync] trigger failed', e));
-      Alert.alert('Salvo', 'Pedido atualizado.');
+      Alert.alert(t('common.success'), t('orders.updated'));
       router.back();
     } catch (err) {
       console.error(err);
-      Alert.alert('Erro', 'Não foi possível salvar o pedido.');
+      Alert.alert(t('common.error'), t('errors.saveFailed'));
     }
   };
 
   const handleDelete = async () => {
     if (!pedido) return;
-    Alert.alert('Confirmar', 'Deseja excluir este pedido?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Excluir', style: 'destructive', onPress: async () => { await removeOrder(pedido.id); router.back(); } },
+    Alert.alert(t('common.confirm'), t('orders.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('orders.delete'), style: 'destructive', onPress: async () => { await removeOrder(pedido.id); router.back(); } },
     ]);
   };
 
@@ -117,18 +130,18 @@ export default function PedidoModal() {
       const items = (pedido.items || []).map((item: any) => ({ productId: item.productId, quantity: item.quantity }));
       const { saleId } = await createSale(items, customerName ?? '', user?.id, user?.name ?? null);
       await updateOrder(pedido.id, undefined, undefined, ORDER_STATUS.CLOSED);
-      Alert.alert('Venda Gerada', `Venda ${saleId} gerada a partir do pedido.`);
+      Alert.alert(t('orders.generatedSaleTitle'), t('orders.generatedSaleMessage', { id: saleId }));
       router.back();
     } catch (err) {
       console.error(err);
-      Alert.alert('Erro', 'Não foi possível gerar venda.');
+      Alert.alert(t('common.error'), t('errors.saveFailed'));
     }
   };
 
   const renderProduto = ({ item }: { item: any }) => (
     <ListItem
       title={item.name ?? item.productId}
-      subtitle={`R$ ${Number(item.price ?? 0).toFixed(2)} / un.`}
+      subtitle={`${formatCurrency(Number(item.price ?? 0))} / ${t('charts.units')}`}
       trailing={
         clienteBloqueado ? (
           <Text style={[styles.qtyText, { color: textColor }]}>{item.quantity}</Text>
@@ -186,16 +199,16 @@ export default function PedidoModal() {
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.title, { color: textColor }]}>Pedido</Text>
+      <Text style={[styles.title, { color: textColor }]}>{t('orders.title')}</Text>
 
-      <Text style={[styles.label, { color: textColor }]}>Cliente</Text>
-      <TextInput style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} value={customerName} onChangeText={setCliente} placeholder='Nome do customerName' placeholderTextColor={subText} editable={!clienteBloqueado} />
+      <Text style={[styles.label, { color: textColor }]}>{t('orders.customer')}</Text>
+      <TextInput style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} value={customerName} onChangeText={setCliente} placeholder={t('sales.customer')} placeholderTextColor={subText} editable={!clienteBloqueado} />
 
-      <Text style={[styles.label, { color: textColor }]}>Status</Text>
+      <Text style={[styles.label, { color: textColor }]}>{t('orders.status')}</Text>
       {isCliente ? (
         <RNView style={styles.statusRow}>
           <RNView style={[styles.statusBtn, { borderColor: inputBorder, backgroundColor: colors.primary }]}>
-            <Text style={{ color: colors.background }}>{status}</Text>
+            <Text style={{ color: colors.background }}>{translateStatus(status, t)}</Text>
           </RNView>
         </RNView>
       ) : (
@@ -208,14 +221,14 @@ export default function PedidoModal() {
                 onPress={() => setStatus(s)}
                 style={[styles.statusBtn, { borderColor: inputBorder }, active && { backgroundColor: colors.primary }]}
               >
-                <Text style={{ color: active ? colors.background : textColor }}>{s}</Text>
+                <Text style={{ color: active ? colors.background : textColor }}>{translateStatus(s, t)}</Text>
               </TouchableOpacity>
             );
           })}
         </RNView>
       )}
 
-      <Text style={[styles.label, { color: textColor }]}>Itens</Text>
+      <Text style={[styles.label, { color: textColor }]}>{t('orders.items')}</Text>
       <FlatList
         data={pedido?.items ?? []}
         keyExtractor={(it: any, i: number) => it.productId + i}
@@ -224,37 +237,37 @@ export default function PedidoModal() {
       />
 
       <RNView style={[styles.totalRow, { backgroundColor: 'transparent' }]}>
-        <Text style={[styles.totalLabel, { color: textColor }]}>Total itens:</Text>
-        <Text style={[styles.totalValue, { color: textColor }]}>{`R$ ${itensTotal.toFixed(2)}`}</Text>
+        <Text style={[styles.totalLabel, { color: textColor }]}>{t('orders.totalItems')}:</Text>
+        <Text style={[styles.totalValue, { color: textColor }]}>{formatCurrency(itensTotal)}</Text>
       </RNView>
 
       {!clienteBloqueado && (
         <RNView style={styles.buttonsRow}>
-          <Button title="Add Item" onPress={handleEditInConta} variant="outline" style={styles.btnSpacing} />
-          {!isCliente && <Button title="Gerar Venda" onPress={handleGerarVenda} style={{ flex: 1 }} />}
+          <Button title={t('orders.addItem')} onPress={handleEditInConta} variant="outline" style={styles.btnSpacing} />
+          {!isCliente && <Button title={t('sales.direct')} onPress={handleGerarVenda} style={{ flex: 1 }} />}
         </RNView>
       )}
 
       <Modal visible={pickerVisible} transparent animationType="slide">
         <Pressable style={[styles.modalOverlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.4)' }]} onPress={() => setPickerVisible(false)} />
         <RNView style={[styles.modalContainer, { backgroundColor: surface }] }>
-          <Text style={[styles.title, { color: textColor }]}>Adicionar Item</Text>
-          <TextInput value={searchText} onChangeText={(t) => { setSearchText(t); searchProducts(t); }} placeholder="Buscar produto" style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} placeholderTextColor={subText} />
+          <Text style={[styles.title, { color: textColor }]}>{t('orders.addItem')}</Text>
+          <TextInput value={searchText} onChangeText={(value) => { setSearchText(value); searchProducts(value); }} placeholder={t('common.search')} style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} placeholderTextColor={subText} />
           <FlatList data={searchResults} keyExtractor={(it: any) => it.id} renderItem={({ item }) => (
             <ListItem
               title={item.name}
-              subtitle={`R$ ${Number(item.price || 0).toFixed(2)}`}
+              subtitle={formatCurrency(Number(item.price || 0))}
               onPress={() => addProdutoToPedido(item)}
             />
           )} />
           <RNView style={{height:12}} />
-          <Button title="Fechar" onPress={() => setPickerVisible(false)} variant="outline" style={{ marginTop: spacing.sm }} />
+          <Button title={t('common.close')} onPress={() => setPickerVisible(false)} variant="outline" style={{ marginTop: spacing.sm }} />
         </RNView>
       </Modal>
 
       {clienteBloqueado ? (
         <RNView style={[styles.totalRow, { backgroundColor: 'transparent', marginTop: 12 }]}>
-          <Text style={{ color: subText, fontStyle: 'italic' }}>Pedido enviado — sem edição</Text>
+          <Text style={{ color: subText, fontStyle: 'italic' }}>{t('orders.readOnly')}</Text>
         </RNView>
       ) : (
         <RNView style={styles.buttonsRow}>
@@ -263,7 +276,7 @@ export default function PedidoModal() {
               <FontAwesome name="trash" size={18} color="#fff" />
             </TouchableOpacity>
           )}
-          <Button title="Salvar Pedido" onPress={handleSave} style={{ flex: 7 }} />
+          <Button title={t('orders.save')} onPress={handleSave} style={{ flex: 7 }} />
         </RNView>
       )}
     </View>

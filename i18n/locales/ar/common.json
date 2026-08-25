@@ -24,5 +24,17 @@
   "deleteSale": "حذف البيع",
   "customerUnknown": "لم يُحدد العميل",
   "createdBy": "أنشأه {{name}} · ",
-  "typeLabel": "النوع {{id}}"
+  "typeLabel": "النوع {{id}}",
+  "confirmation": "تأكيد",
+  "clear": "مسح",
+  "removeItem": "إزالة العنصر",
+  "decreaseQuantity": "تقليل الكمية",
+  "increaseQuantity": "زيادة الكمية",
+  "error": "خطأ",
+  "success": "نجاح",
+  "notProvided": "غير محدد",
+  "unknownProduct": "المنتج غير موجود",
+  "share": "مشاركة",
+  "addItem": "إضافة عنصر",
+  "clearCartConfirm": "هل تريد حقًا إفراغ السلة؟"
 }

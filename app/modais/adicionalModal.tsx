@@ -8,6 +8,7 @@ import { spacing, radius, type } from '@/constants/theme';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { useRouter } from 'expo-router';
 import { useCart } from '@/context/CartContext';
+import { useTranslation } from 'react-i18next';
 
 export default function AdicionalModalScreen() {
   const { create } = useProductDatabase();
@@ -17,11 +18,12 @@ export default function AdicionalModalScreen() {
   const { addToCart } = useCart();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
 
   async function handleSave() {
     try {
       if (!name || !price) {
-        Alert.alert('Erro', 'Por favor, preencha todos os campos.');
+        Alert.alert(t('common.error'), t('errors.required'));
         return;
       }
 
@@ -44,35 +46,35 @@ export default function AdicionalModalScreen() {
       router.back();
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
-      Alert.alert('Erro', 'Houve um erro ao salvar o produto.');
+      Alert.alert(t('common.error'), t('errors.saveFailed'));
     }
   }
 
   return (
     <View style={{ flex: 1, padding: spacing.xl, borderColor: 'black', borderWidth: 1 }}>
-      <Text style={{ fontSize: type.heading, fontWeight: 'bold' }}>Produto Adicional</Text>
+      <Text style={{ fontSize: type.heading, fontWeight: 'bold' }}>{t('products.addOnTitle')}</Text>
       <View style={{ marginVertical: spacing.xl, height: 1, backgroundColor: colors.border }} />
 
-      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>Nome do Produto</Text>
+      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>{t('products.name')}</Text>
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
-        placeholder="Digite o Nome..."
+        placeholder={t('products.namePlaceholder')}
         value={name}
         onChangeText={setNome}
         placeholderTextColor={colors.textMuted}
       />
 
-      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>Preço do Produto</Text>
+      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>{t('products.price')}</Text>
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
-        placeholder="Digite o Preço..."
+        placeholder={t('products.pricePlaceholder')}
         value={price}
         keyboardType="numeric"
         onChangeText={setPreco}
         placeholderTextColor={colors.textMuted}
       />
 
-      <Button title="Salvar" onPress={handleSave} />
+      <Button title={t('common.save')} onPress={handleSave} />
     </View>
   );
 }

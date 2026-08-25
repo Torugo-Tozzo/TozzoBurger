@@ -12,5 +12,11 @@
   "delete": "उत्पाद हटाएँ",
   "deleteConfirm": "क्या आप वाकई इस उत्पाद को हटाना चाहते हैं?",
   "removeTitle": "हटाने की पुष्टि करें",
-  "remove": "हटाएं"
+  "remove": "हटाएं",
+  "addOnTitle": "अतिरिक्त उत्पाद",
+  "registerTitle": "उत्पाद दर्ज करें",
+  "namePlaceholder": "नाम दर्ज करें…",
+  "pricePlaceholder": "कीमत दर्ज करें…",
+  "ingredientsPlaceholder": "सामग्री दर्ज करें…",
+  "selectType": "प्रकार चुनें"
 }

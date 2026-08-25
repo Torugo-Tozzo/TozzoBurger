@@ -13,5 +13,18 @@
   "recentEmpty": "لا توجد طلبات حديثة",
   "recentMessage": "ستظهر الطلبات هنا فور إنشائها.",
   "deleteConfirm": "هل تريد حذف هذا الطلب؟",
-  "delete": "حذف"
+  "delete": "حذف",
+  "generate": "إنشاء الطلب",
+  "createdTitle": "تم إنشاء الطلب",
+  "createdMessage": "تم إنشاء الطلب {{id}} بنجاح.",
+  "openLimitTitle": "تم بلوغ الحد",
+  "openLimitMessage": "لديك بالفعل {{count}} طلبات مفتوحة. انتظر قبول أحدها أو إغلاقه قبل إنشاء طلب آخر.",
+  "updated": "تم تحديث الطلب.",
+  "readOnly": "تم إرسال الطلب — التعديل غير متاح",
+  "statusOpen": "مفتوح",
+  "addItem": "إضافة عنصر",
+  "save": "حفظ الطلب",
+  "generatedSaleTitle": "تم إنشاء البيع",
+  "generatedSaleMessage": "تم إنشاء البيع {{id}} من الطلب.",
+  "totalItems": "إجمالي العناصر"
 }
