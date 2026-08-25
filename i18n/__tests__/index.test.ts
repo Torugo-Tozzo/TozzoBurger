@@ -103,6 +103,13 @@ describe('mobile i18n foundation', () => {
     expect(i18n.t('common:appName')).toBe('TozzoBurger');
   });
 
+  it('keeps the runtime supported-language check closed to app locales', () => {
+    expect(i18n.services.languageUtils.supportedLngs).toEqual(SUPPORTED_LOCALES);
+    expect(i18n.services.languageUtils.isSupportedCode('en')).toBe(true);
+    expect(i18n.services.languageUtils.isSupportedCode('cimode')).toBe(false);
+    expect(i18n.services.languageUtils.isSupportedCode('de')).toBe(false);
+  });
+
   it('exposes every supported locale with every required namespace locally', () => {
     expect(Object.keys(resources)).toEqual(SUPPORTED_LOCALES);
     for (const locale of SUPPORTED_LOCALES) {

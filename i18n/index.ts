@@ -41,9 +41,16 @@ const i18nReady = i18n.init({
   fallbackNS: 'common',
   interpolation: { escapeValue: false },
 });
-// i18next adds its internal "cimode" to this list; keep the app language
-// contract closed to the seven locales exposed by this module.
-i18n.options.supportedLngs = [...SUPPORTED_LOCALES];
+
+function enforceClosedSupportedLocales(): void {
+  // i18next adds its internal "cimode" to both the public option and the
+  // language utility used by runtime supported-language checks.
+  const supportedLocales = [...SUPPORTED_LOCALES];
+  i18n.options.supportedLngs = [...supportedLocales];
+  i18n.services.languageUtils.supportedLngs = supportedLocales;
+}
+
+enforceClosedSupportedLocales();
 
 function getDeviceLocale(): AppLocale {
   try {

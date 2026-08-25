@@ -113,6 +113,18 @@ describe('strict i18n checker', () => {
     expect(runCheckerFailure(root)).toMatch(/extra: de/);
   });
 
+  it('rejects non-directory entries at the locale root', () => {
+    writeFileSync(join(root, 'README.md'), 'not a locale directory');
+
+    expect(runCheckerFailure(root)).toMatch(/Locale root.*directories.*extra: README\.md/);
+  });
+
+  it('rejects subdirectories inside a locale directory', () => {
+    mkdirSync(join(root, 'en', 'nested'));
+
+    expect(runCheckerFailure(root)).toMatch(/en: namespace entries must be files only.*nested/);
+  });
+
   it('rejects a namespace file outside the shared namespace set', () => {
     writeFileSync(join(root, 'en', 'unexpected.json'), JSON.stringify({ greeting: 'Extra' }));
 

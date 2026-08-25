@@ -139,6 +139,11 @@ function ensureExactDirectories(localesRoot) {
   }
 
   const entries = listDirectoryEntries(localesRoot);
+  const nonDirectories = entries.filter((entry) => !entry.isDirectory()).map((entry) => entry.name);
+  if (nonDirectories.length > 0) {
+    throw new Error(`Locale root must contain only locale directories (extra: ${nonDirectories.join(', ')})`);
+  }
+
   const directories = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
   const expected = new Set(SUPPORTED_LOCALES);
   const actual = new Set(directories);
@@ -155,6 +160,11 @@ function ensureExactDirectories(localesRoot) {
 
 function ensureExactNamespaceFiles(localesRoot, locale) {
   const entries = listDirectoryEntries(join(localesRoot, locale));
+  const nonFiles = entries.filter((entry) => !entry.isFile()).map((entry) => entry.name);
+  if (nonFiles.length > 0) {
+    throw new Error(`${locale}: namespace entries must be files only (extra: ${nonFiles.join(', ')})`);
+  }
+
   const files = entries.filter((entry) => entry.isFile()).map((entry) => entry.name);
   const expected = new Set(I18N_NAMESPACES.map((namespace) => `${namespace}.json`));
   const actual = new Set(files);
