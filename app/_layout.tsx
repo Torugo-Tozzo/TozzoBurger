@@ -67,21 +67,23 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
-  if (!loaded || !i18nInitialized) return <AppLoadingScreen stage="initializing" />;
-
   return (
     <I18nextProvider i18n={i18n}>
-      <Suspense fallback={<AppLoadingScreen stage="initializing" />}>
-        <SQLiteProvider databaseName="database.db" onInit={initializeDatabase} useSuspense>
-          <AuthProvider>
-            <AutoSyncProvider>
-              <CartProvider>
-                <RootLayoutNav />
-              </CartProvider>
-            </AutoSyncProvider>
-          </AuthProvider>
-        </SQLiteProvider>
-      </Suspense>
+      {!loaded || !i18nInitialized ? (
+        <AppLoadingScreen stage="initializing" />
+      ) : (
+        <Suspense fallback={<AppLoadingScreen stage="initializing" />}>
+          <SQLiteProvider databaseName="database.db" onInit={initializeDatabase} useSuspense>
+            <AuthProvider>
+              <AutoSyncProvider>
+                <CartProvider>
+                  <RootLayoutNav />
+                </CartProvider>
+              </AutoSyncProvider>
+            </AuthProvider>
+          </SQLiteProvider>
+        </Suspense>
+      )}
     </I18nextProvider>
   );
 }

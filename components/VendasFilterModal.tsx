@@ -44,6 +44,7 @@ export function VendasFilterModal({ visible, filters, onChange, onApply, onClear
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const { t, i18n } = useTranslation();
+  const zeroCurrency = new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(0);
   const [calendarField, setCalendarField] = useState<CalendarField>(null);
 
   const update = (field: keyof VendasFilters, value: string | null) => {
@@ -134,7 +135,7 @@ export function VendasFilterModal({ visible, filters, onChange, onApply, onClear
                 <TextInput
                   value={filters.totalMin == null ? '' : String(filters.totalMin)}
                   onChangeText={(value) => update('totalMin', value)}
-                  placeholder="R$ 0,00"
+                  placeholder={zeroCurrency}
                   keyboardType="decimal-pad"
                   placeholderTextColor={colors.textMuted}
                   style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}

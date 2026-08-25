@@ -25,7 +25,7 @@ type AppLoadingScreenProps = { stage?: AppLoadingStage };
 export default function AppLoadingScreen({ stage = 'initializing' }: AppLoadingScreenProps) {
   const isDark = useColorScheme() === 'dark';
   const { t } = useTranslation();
-  const message = t(APP_LOADING_KEYS[stage]);
+  const message = t(APP_LOADING_KEYS[stage], { defaultValue: getAppLoadingMessage(stage) });
   return (
     <View accessibilityLabel={message} accessibilityRole="progressbar" style={[styles.container, { backgroundColor: isDark ? '#000' : '#fff' }]}>
       <ActivityIndicator size="large" color={isDark ? '#fff' : '#000'} />

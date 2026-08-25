@@ -190,8 +190,9 @@ describe('mobile i18n integration surfaces', () => {
     });
 
     expect(mockInitializeI18n).toHaveBeenCalledTimes(1);
-    expect(renderer!.root.findAll((node) => String(node.type) === 'i18next-provider')).toHaveLength(0);
+    expect(renderer!.root.findAll((node) => String(node.type) === 'i18next-provider')).toHaveLength(1);
     expect(renderer!.root.findAll((node) => String(node.type) === 'app-loading')).toHaveLength(1);
+    expect(renderer!.root.findAll((node) => String(node.type) === 'stack')).toHaveLength(0);
 
     warning.mockRestore();
   });

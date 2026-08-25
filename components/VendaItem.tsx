@@ -32,7 +32,7 @@ export function VendaItem({ data, index, onPress, onView, onPrint, onDelete, pri
       accentColor={getStatusColor('FECHADO')}
       title={(data.customerName && String(data.customerName).trim().length > 0) ? data.customerName : t('common.customerUnknown')}
       subtitle={data.products.length > 0 ? data.products.join(', ') : undefined}
-      meta={`Venda #${index + 1} · ${autorTrecho}${horaFormatada}`}
+      meta={`${t('sales.saleNumber', { number: index + 1 })} · ${autorTrecho}${horaFormatada}`}
       total={data.total ?? 0}
       strikethrough={isCancelled}
       actions={actions}

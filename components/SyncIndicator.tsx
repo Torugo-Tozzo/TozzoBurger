@@ -4,10 +4,12 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useAutoSync } from '@/context/AutoSyncContext';
 import Colors from '@/constants/Colors';
 import { i18n } from '@/i18n';
+import { useTranslation } from 'react-i18next';
 
 export default function SyncIndicator() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const { isSyncing, triggerSync } = useAutoSync();
   const { lastSyncResult } = useAutoSync();
   const lastHandledResultRef = useRef<number | null>(null);
@@ -98,10 +100,10 @@ export default function SyncIndicator() {
       onPress={handlePress}
       style={[styles.container, disabled ? styles.disabled : undefined]}
       accessibilityLabel={
-        (isSyncing || localLoading) ? i18n.t('sync.syncing')
-          : result === 'success' ? i18n.t('sync.synced')
-            : result === 'error' ? i18n.t('sync.syncFailedTitle')
-              : i18n.t('sync.accessibilityLabel')
+        (isSyncing || localLoading) ? t('sync.syncing')
+          : result === 'success' ? t('sync.synced')
+            : result === 'error' ? t('sync.syncFailedTitle')
+              : t('sync.accessibilityLabel')
       }
       disabled={disabled}
     >
