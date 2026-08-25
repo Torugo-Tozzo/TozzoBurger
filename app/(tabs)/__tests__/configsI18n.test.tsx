@@ -110,4 +110,22 @@ describe('Settings language selector', () => {
     );
     alert.mockRestore();
   });
+
+  it('does not show the restart warning when changing between LTR locales', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const renderer = create(
+      <I18nextProvider i18n={i18n}>
+        <BluetoothScreen />
+      </I18nextProvider>,
+    );
+    const picker = renderer.root.find((node) => (node.type as string) === 'Picker');
+
+    await act(async () => {
+      await picker.props.onValueChange('pt-BR');
+    });
+
+    expect(mockSetItem).toHaveBeenCalledWith(LOCALE_PREFERENCE_KEY, 'pt-BR');
+    expect(alert).not.toHaveBeenCalled();
+    alert.mockRestore();
+  });
 });

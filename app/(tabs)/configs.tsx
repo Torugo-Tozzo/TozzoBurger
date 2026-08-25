@@ -182,6 +182,7 @@ const BluetoothScreen = () => {
               <Text style={{ marginBottom: 8, color: colors.text }}>{t('offline.availableWhenOnline')}</Text>
               <TextInput
                 placeholder={t('auth.email')}
+                accessibilityLabel={t('auth.email')}
                 value={email}
                 onChangeText={setEmail}
                 style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
@@ -190,6 +191,7 @@ const BluetoothScreen = () => {
               />
               <TextInput
                 placeholder={t('auth.password')}
+                accessibilityLabel={t('auth.password')}
                 value={senha}
                 onChangeText={setSenha}
                 style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
@@ -211,6 +213,7 @@ const BluetoothScreen = () => {
             selectedValue={selectedLocale}
             onValueChange={(value) => handleLocaleChange(value as AppLocale)}
             enabled={!localeChanging}
+            accessibilityLabel={t('settings.selectLanguage')}
             style={{ color: colors.text }}
             dropdownIconColor={colors.text}
           >
@@ -247,7 +250,7 @@ const BluetoothScreen = () => {
       )}
 
       {!isCliente && (isScanning ? (
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary} accessibilityLabel={t('common.loading')} />
       ) : (
         devices.map((item) => (
           <View key={item.id} style={{ marginVertical: 10 }}>
