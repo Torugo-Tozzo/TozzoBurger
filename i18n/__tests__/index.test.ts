@@ -100,7 +100,7 @@ describe('mobile i18n foundation', () => {
     expect(i18n.options.fallbackLng).toEqual(['en']);
     expect(i18n.options.load).toBe('currentOnly');
     expect(i18n.options.supportedLngs).toEqual(SUPPORTED_LOCALES);
-    expect(i18n.t('common:appName')).toBe('TozzoBurger');
+    expect(i18n.t('common.appName')).toBe('TozzoBurger');
   });
 
   it('keeps the runtime supported-language check closed to app locales', () => {
