@@ -36,5 +36,8 @@
   "unknownProduct": "المنتج غير موجود",
   "share": "مشاركة",
   "addItem": "إضافة عنصر",
-  "clearCartConfirm": "هل تريد حقًا إفراغ السلة؟"
+  "clearCartConfirm": "هل تريد حقًا إفراغ السلة؟",
+  "notFoundTitle": "عذرًا!",
+  "notFoundMessage": "هذه الشاشة غير موجودة.",
+  "goHome": "الانتقال إلى الشاشة الرئيسية!"
 }

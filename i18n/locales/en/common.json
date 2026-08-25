@@ -36,5 +36,8 @@
   "unknownProduct": "Product not found",
   "share": "Share",
   "addItem": "Add item",
-  "clearCartConfirm": "Do you really want to clear the cart?"
+  "clearCartConfirm": "Do you really want to clear the cart?",
+  "notFoundTitle": "Oops!",
+  "notFoundMessage": "This screen doesn't exist.",
+  "goHome": "Go to home screen!"
 }

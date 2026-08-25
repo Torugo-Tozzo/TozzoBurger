@@ -36,5 +36,8 @@
   "unknownProduct": "未找到产品",
   "share": "分享",
   "addItem": "添加项目",
-  "clearCartConfirm": "确定要清空购物车吗？"
+  "clearCartConfirm": "确定要清空购物车吗？",
+  "notFoundTitle": "糟糕！",
+  "notFoundMessage": "此页面不存在。",
+  "goHome": "返回主页！"
 }

@@ -36,5 +36,8 @@
   "unknownProduct": "Produto não encontrado",
   "share": "Compartilhar",
   "addItem": "Adicionar item",
-  "clearCartConfirm": "Deseja realmente limpar o carrinho?"
+  "clearCartConfirm": "Deseja realmente limpar o carrinho?",
+  "notFoundTitle": "Ops!",
+  "notFoundMessage": "Esta tela não existe.",
+  "goHome": "Ir para a tela inicial!"
 }

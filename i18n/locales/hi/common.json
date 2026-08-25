@@ -36,5 +36,8 @@
   "unknownProduct": "उत्पाद नहीं मिला",
   "share": "साझा करें",
   "addItem": "आइटम जोड़ें",
-  "clearCartConfirm": "क्या आप वाकई कार्ट खाली करना चाहते हैं?"
+  "clearCartConfirm": "क्या आप वाकई कार्ट खाली करना चाहते हैं?",
+  "notFoundTitle": "ओह!",
+  "notFoundMessage": "यह स्क्रीन मौजूद नहीं है।",
+  "goHome": "होम स्क्रीन पर जाएँ!"
 }

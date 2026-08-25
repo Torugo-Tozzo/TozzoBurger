@@ -36,5 +36,8 @@
   "unknownProduct": "Produit introuvable",
   "share": "Partager",
   "addItem": "Ajouter un article",
-  "clearCartConfirm": "Voulez-vous vraiment vider le panier ?"
+  "clearCartConfirm": "Voulez-vous vraiment vider le panier ?",
+  "notFoundTitle": "Oups !",
+  "notFoundMessage": "Cet écran n’existe pas.",
+  "goHome": "Retour à l’accueil !"
 }
