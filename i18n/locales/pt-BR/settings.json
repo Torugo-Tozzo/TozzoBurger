@@ -6,14 +6,10 @@
   "currentLanguage": "Idioma atual",
   "printer": "Impressora",
   "sync": "Sincronização",
-  "restartRequired": "Reinicie o aplicativo para aplicar mudanças nativas de direção e layout.",
-  "directionChangeTitle": "Reinício necessário",
-  "directionChangeMessage": "A troca entre idiomas da esquerda para a direita e da direita para a esquerda só terá efeito após o próximo reinício do aplicativo.",
   "languageEnglish": "Inglês",
   "languagePortugueseBrazil": "Português (Brasil)",
   "languageSpanish": "Espanhol",
   "languageFrench": "Francês",
   "languageChinese": "Chinês",
-  "languageHindi": "Hindi",
-  "languageArabic": "Árabe"
+  "languageHindi": "Hindi"
 }

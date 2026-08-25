@@ -5,7 +5,6 @@ import {
   LOCALE_PREFERENCE_KEY,
   I18N_NAMESPACES,
   SUPPORTED_LOCALES,
-  getLocaleDirection,
   i18n,
   initializeI18n,
   normalizeLocale,
@@ -40,14 +39,13 @@ describe('mobile i18n foundation', () => {
   });
 
   it('exposes exactly the supported locales and normalizes locale families', () => {
-    expect(SUPPORTED_LOCALES).toEqual(['en', 'pt-BR', 'es', 'fr', 'zh', 'hi', 'ar']);
+    expect(SUPPORTED_LOCALES).toEqual(['en', 'pt-BR', 'es', 'fr', 'zh', 'hi']);
     expect(normalizeLocale('en-GB')).toBe('en');
     expect(normalizeLocale('pt-PT')).toBe('pt-BR');
     expect(normalizeLocale('es-MX')).toBe('es');
     expect(normalizeLocale('fr-CA')).toBe('fr');
     expect(normalizeLocale('zh-Hans-CN')).toBe('zh');
     expect(normalizeLocale('hi-IN')).toBe('hi');
-    expect(normalizeLocale('ar-SA')).toBe('ar');
     expect(normalizeLocale('xx-YY')).toBe('en');
     expect(normalizeLocale(undefined)).toBe('en');
   });
@@ -86,14 +84,6 @@ describe('mobile i18n foundation', () => {
     expect(i18n.language).toBe('pt-BR');
     expect(setItem).toHaveBeenCalledTimes(1);
     expect(setItem).toHaveBeenCalledWith(LOCALE_PREFERENCE_KEY, 'pt-BR');
-  });
-
-  it('returns rtl only for Arabic', () => {
-    expect(getLocaleDirection('ar')).toBe('rtl');
-    expect(getLocaleDirection('ar-SA')).toBe('rtl');
-    expect(getLocaleDirection('en')).toBe('ltr');
-    expect(getLocaleDirection('pt-BR')).toBe('ltr');
-    expect(getLocaleDirection('unknown')).toBe('ltr');
   });
 
   it('configures local resources with a closed fallback language set', () => {

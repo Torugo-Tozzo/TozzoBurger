@@ -4,9 +4,8 @@ import { createInstance } from 'i18next';
 
 import { I18N_NAMESPACES, resources } from './resources';
 
-export const SUPPORTED_LOCALES = ['en', 'pt-BR', 'es', 'fr', 'zh', 'hi', 'ar'] as const;
+export const SUPPORTED_LOCALES = ['en', 'pt-BR', 'es', 'fr', 'zh', 'hi'] as const;
 export type AppLocale = (typeof SUPPORTED_LOCALES)[number];
-export type LocaleDirection = 'ltr' | 'rtl';
 
 export const LOCALE_PREFERENCE_KEY = '@tozzoburger/locale';
 
@@ -20,7 +19,6 @@ function recognizeLocale(input: unknown): AppLocale | undefined {
   if (locale === 'fr' || locale.startsWith('fr-')) return 'fr';
   if (locale === 'zh' || locale.startsWith('zh-')) return 'zh';
   if (locale === 'hi' || locale.startsWith('hi-')) return 'hi';
-  if (locale === 'ar' || locale.startsWith('ar-')) return 'ar';
   return undefined;
 }
 
@@ -86,10 +84,6 @@ export async function setLocale(input: unknown): Promise<AppLocale> {
   await i18n.changeLanguage(locale);
   await AsyncStorage.setItem(LOCALE_PREFERENCE_KEY, locale);
   return locale;
-}
-
-export function getLocaleDirection(locale: unknown): LocaleDirection {
-  return normalizeLocale(locale) === 'ar' ? 'rtl' : 'ltr';
 }
 
 export { I18N_NAMESPACES, resources };

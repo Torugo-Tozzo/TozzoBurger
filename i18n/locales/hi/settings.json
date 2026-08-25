@@ -6,14 +6,10 @@
   "currentLanguage": "वर्तमान भाषा",
   "printer": "प्रिंटर",
   "sync": "सिंक्रोनाइज़ेशन",
-  "restartRequired": "मूल दिशा और लेआउट बदलाव लागू करने के लिए ऐप को पुनः आरंभ करें।",
-  "directionChangeTitle": "पुनः आरंभ आवश्यक है",
-  "directionChangeMessage": "बाएँ-से-दाएँ और दाएँ-से-बाएँ भाषाओं के बीच बदलाव अगले ऐप पुनः आरंभ के बाद लागू होगा।",
   "languageEnglish": "अंग्रेज़ी",
   "languagePortugueseBrazil": "पुर्तगाली (ब्राज़ील)",
   "languageSpanish": "स्पेनिश",
   "languageFrench": "फ़्रेंच",
   "languageChinese": "चीनी",
-  "languageHindi": "हिन्दी",
-  "languageArabic": "अरबी"
+  "languageHindi": "हिन्दी"
 }

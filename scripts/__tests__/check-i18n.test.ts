@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-const LOCALES = ['en', 'pt-BR', 'es', 'fr', 'zh', 'hi', 'ar'];
+const LOCALES = ['en', 'pt-BR', 'es', 'fr', 'zh', 'hi'];
 const NAMESPACES = [
   'common',
   'auth',
@@ -132,11 +132,11 @@ describe('strict i18n checker', () => {
   });
 
   it('rejects an empty string value with locale, namespace, and key context', () => {
-    const file = join(root, 'ar', 'common.json');
+    const file = join(root, 'zh', 'common.json');
     writeFileSync(file, JSON.stringify({ greeting: '' }));
 
     const failure = runCheckerFailure(root);
-    expect(failure).toContain('ar/common/greeting');
+    expect(failure).toContain('zh/common/greeting');
     expect(failure).toMatch(/non-empty/i);
   });
 });

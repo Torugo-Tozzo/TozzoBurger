@@ -14,7 +14,6 @@ import { useSyncRefresh } from '@/hooks/useSyncRefresh';
 import { useTranslation } from 'react-i18next';
 import {
   AppLocale,
-  getLocaleDirection,
   normalizeLocale,
   setLocale,
   SUPPORTED_LOCALES,
@@ -27,7 +26,6 @@ const LOCALE_LABEL_KEYS: Record<AppLocale, string> = {
   fr: 'settings.languageFrench',
   zh: 'settings.languageChinese',
   hi: 'settings.languageHindi',
-  ar: 'settings.languageArabic',
 };
 
 const BluetoothScreen = () => {
@@ -57,15 +55,10 @@ const BluetoothScreen = () => {
     const currentLocale = normalizeLocale(i18n.language);
     if (nextLocale === currentLocale) return;
 
-    const warningTitle = t('settings.directionChangeTitle');
-    const warningMessage = t('settings.directionChangeMessage');
     setLocaleChanging(true);
     try {
       const appliedLocale = await setLocale(nextLocale);
       setSelectedLocale(appliedLocale);
-      if (getLocaleDirection(currentLocale) !== getLocaleDirection(appliedLocale)) {
-        Alert.alert(warningTitle, warningMessage);
-      }
     } catch (error) {
       console.error('Failed to save language preference:', error);
       setSelectedLocale(normalizeLocale(i18n.language));

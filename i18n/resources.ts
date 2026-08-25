@@ -88,21 +88,6 @@ import zhSales from './locales/zh/sales.json';
 import zhSettings from './locales/zh/settings.json';
 import zhStatus from './locales/zh/status.json';
 import zhSync from './locales/zh/sync.json';
-import arAuth from './locales/ar/auth.json';
-import arCatalog from './locales/ar/catalog.json';
-import arCharts from './locales/ar/charts.json';
-import arCommon from './locales/ar/common.json';
-import arEmployees from './locales/ar/employees.json';
-import arErrors from './locales/ar/errors.json';
-import arNavigation from './locales/ar/navigation.json';
-import arOffline from './locales/ar/offline.json';
-import arOrders from './locales/ar/orders.json';
-import arPrinter from './locales/ar/printer.json';
-import arProducts from './locales/ar/products.json';
-import arSales from './locales/ar/sales.json';
-import arSettings from './locales/ar/settings.json';
-import arStatus from './locales/ar/status.json';
-import arSync from './locales/ar/sync.json';
 
 export const I18N_NAMESPACES = [
   'common',
@@ -129,5 +114,4 @@ export const resources = {
   fr: { auth: frAuth, catalog: frCatalog, charts: frCharts, common: frCommon, employees: frEmployees, errors: frErrors, navigation: frNavigation, offline: frOffline, orders: frOrders, printer: frPrinter, products: frProducts, sales: frSales, settings: frSettings, status: frStatus, sync: frSync },
   zh: { auth: zhAuth, catalog: zhCatalog, charts: zhCharts, common: zhCommon, employees: zhEmployees, errors: zhErrors, navigation: zhNavigation, offline: zhOffline, orders: zhOrders, printer: zhPrinter, products: zhProducts, sales: zhSales, settings: zhSettings, status: zhStatus, sync: zhSync },
   hi: { auth: hiAuth, catalog: hiCatalog, charts: hiCharts, common: hiCommon, employees: hiEmployees, errors: hiErrors, navigation: hiNavigation, offline: hiOffline, orders: hiOrders, printer: hiPrinter, products: hiProducts, sales: hiSales, settings: hiSettings, status: hiStatus, sync: hiSync },
-  ar: { auth: arAuth, catalog: arCatalog, charts: arCharts, common: arCommon, employees: arEmployees, errors: arErrors, navigation: arNavigation, offline: arOffline, orders: arOrders, printer: arPrinter, products: arProducts, sales: arSales, settings: arSettings, status: arStatus, sync: arSync },
 } as const;

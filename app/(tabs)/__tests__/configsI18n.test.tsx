@@ -79,7 +79,7 @@ describe('Settings language selector', () => {
     });
   });
 
-  it('offers exactly the seven supported locales', () => {
+  it('offers exactly the six supported locales', () => {
     const renderer = create(
       <I18nextProvider i18n={i18n}>
         <BluetoothScreen />
@@ -90,28 +90,7 @@ describe('Settings language selector', () => {
     expect(items.map((item) => item.props.value)).toEqual([...SUPPORTED_LOCALES]);
   });
 
-  it('persists Arabic and warns that the direction change waits for restart', async () => {
-    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
-    const renderer = create(
-      <I18nextProvider i18n={i18n}>
-        <BluetoothScreen />
-      </I18nextProvider>,
-    );
-    const picker = renderer.root.find((node) => (node.type as string) === 'Picker');
-
-    await act(async () => {
-      await picker.props.onValueChange('ar');
-    });
-
-    expect(mockSetItem).toHaveBeenCalledWith(LOCALE_PREFERENCE_KEY, 'ar');
-    expect(alert).toHaveBeenCalledWith(
-      'Restart required',
-      'Changing between left-to-right and right-to-left languages will take effect after the next app restart.',
-    );
-    alert.mockRestore();
-  });
-
-  it('does not show the restart warning when changing between LTR locales', async () => {
+  it('does not show a restart warning when changing locale', async () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     const renderer = create(
       <I18nextProvider i18n={i18n}>
