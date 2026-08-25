@@ -195,6 +195,7 @@ export default function RelatorioModal() {
                 onValueChange={(itemValue) => setTipoGrafico(itemValue)}
                 style={{ color: colors.text }}
                 dropdownIconColor={colors.text}
+                accessibilityLabel={t('charts.title')}
               >
                 <Picker.Item label={t('charts.pie')} value="pizza" />
                 <Picker.Item label={t('charts.progress')} value="progresso" />
@@ -210,6 +211,7 @@ export default function RelatorioModal() {
                 onValueChange={(itemValue) => setTipoProdutoId(itemValue)}
                 style={{ color: colors.text }}
                 dropdownIconColor={colors.text}
+                accessibilityLabel={t('products.productType')}
               >
                 <Picker.Item label={t('charts.allTypes')} value={100} />
                 {tiposProdutos.map((tipo) => (
@@ -333,6 +335,8 @@ export default function RelatorioModal() {
             <TouchableOpacity
               style={[styles.shareButton, { backgroundColor: colors.text }]}
               onPress={() => compartilharRelatorio(relatorioData, dataInicial, dataFinal)}
+              accessibilityRole="button"
+              accessibilityLabel={t('charts.share')}
             >
               <Ionicons name="share-outline" size={20} color={colors.background} />
               <Text style={[styles.shareButtonText, { color: colors.background }]}>{t('charts.share')}</Text>

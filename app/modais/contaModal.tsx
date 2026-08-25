@@ -211,6 +211,7 @@ export default function ContaModalScreen() {
       <TextInput
         style={[styles.input, isCliente && { backgroundColor: colors.surface }]}
         placeholder={t('sales.customer')}
+        accessibilityLabel={t('sales.customer')}
         value={customerName}
         onChangeText={setCliente}
         placeholderTextColor={placeholderColor}

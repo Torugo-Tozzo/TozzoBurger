@@ -66,7 +66,7 @@ export function VendasFilterModal({ visible, filters, onChange, onApply, onClear
         >
           <View style={styles.header}>
             <Text style={styles.title}>{t('sales.filters')}</Text>
-            <Pressable onPress={onClose} accessibilityLabel={t('sales.closeFilters')} hitSlop={10}>
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t('sales.closeFilters')} hitSlop={10}>
               <FontAwesome name="times" size={18} color={colors.text} />
             </Pressable>
           </View>
@@ -79,6 +79,8 @@ export function VendasFilterModal({ visible, filters, onChange, onApply, onClear
                 <TouchableOpacity
                   style={[styles.dateButton, { borderColor: colors.border, backgroundColor: colors.surface }]}
                   onPress={() => setCalendarField('dataInicial')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('sales.initialDate')}
                 >
                   <Text>{formatDate(filters.dataInicial, i18n.language, t('sales.initialDate'))}</Text>
                 </TouchableOpacity>
@@ -88,6 +90,8 @@ export function VendasFilterModal({ visible, filters, onChange, onApply, onClear
                 <TouchableOpacity
                   style={[styles.dateButton, { borderColor: colors.border, backgroundColor: colors.surface }]}
                   onPress={() => setCalendarField('dataFinal')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('sales.finalDate')}
                 >
                   <Text>{formatDate(filters.dataFinal, i18n.language, t('sales.finalDate'))}</Text>
                 </TouchableOpacity>
@@ -101,6 +105,7 @@ export function VendasFilterModal({ visible, filters, onChange, onApply, onClear
                   value={filters.horaInicial ?? ''}
                   onChangeText={(value) => update('horaInicial', value)}
                   placeholder="00:00"
+                  accessibilityLabel={t('sales.initialTime')}
                   keyboardType="numbers-and-punctuation"
                   placeholderTextColor={colors.textMuted}
                   style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
@@ -112,6 +117,7 @@ export function VendasFilterModal({ visible, filters, onChange, onApply, onClear
                   value={filters.horaFinal ?? ''}
                   onChangeText={(value) => update('horaFinal', value)}
                   placeholder="23:59"
+                  accessibilityLabel={t('sales.finalTime')}
                   keyboardType="numbers-and-punctuation"
                   placeholderTextColor={colors.textMuted}
                   style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
@@ -125,6 +131,7 @@ export function VendasFilterModal({ visible, filters, onChange, onApply, onClear
               value={filters.customerName ?? ''}
               onChangeText={(value) => update('customerName', value)}
               placeholder={t('sales.allCustomers')}
+              accessibilityLabel={t('sales.customerName')}
               placeholderTextColor={colors.textMuted}
               style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             />
@@ -136,6 +143,7 @@ export function VendasFilterModal({ visible, filters, onChange, onApply, onClear
                   value={filters.totalMin == null ? '' : String(filters.totalMin)}
                   onChangeText={(value) => update('totalMin', value)}
                   placeholder={zeroCurrency}
+                  accessibilityLabel={t('sales.minimumTotal')}
                   keyboardType="decimal-pad"
                   placeholderTextColor={colors.textMuted}
                   style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
@@ -147,6 +155,7 @@ export function VendasFilterModal({ visible, filters, onChange, onApply, onClear
                   value={filters.totalMax == null ? '' : String(filters.totalMax)}
                   onChangeText={(value) => update('totalMax', value)}
                   placeholder={t('sales.noLimit')}
+                  accessibilityLabel={t('sales.maximumTotal')}
                   keyboardType="decimal-pad"
                   placeholderTextColor={colors.textMuted}
                   style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}

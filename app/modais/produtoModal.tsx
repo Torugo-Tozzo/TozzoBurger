@@ -89,6 +89,7 @@ export default function ProdutoModalScreen() {
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
         placeholder={t('products.namePlaceholder')}
+        accessibilityLabel={t('products.name')}
         value={name}
         onChangeText={setNome}
         placeholderTextColor={colors.textMuted}
@@ -98,6 +99,7 @@ export default function ProdutoModalScreen() {
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
         placeholder={t('products.pricePlaceholder')}
+        accessibilityLabel={t('products.price')}
         value={price}
         keyboardType="numeric"
         onChangeText={setPreco}
@@ -108,6 +110,7 @@ export default function ProdutoModalScreen() {
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text, height: 100, textAlignVertical: 'top' }}
         placeholder={t('products.ingredientsPlaceholder')}
+        accessibilityLabel={t('products.ingredients')}
         value={ingredients}
         onChangeText={setIngredientes}
         placeholderTextColor={colors.textMuted}
@@ -121,6 +124,7 @@ export default function ProdutoModalScreen() {
           onValueChange={(itemValue) => setTipoProdutoId(Number(itemValue))}
           style={{ color: colors.textMuted }}
           dropdownIconColor={colors.text}
+          accessibilityLabel={t('products.productType')}
         >
           <Picker.Item label={t('products.selectType')} value={undefined} />
           {tiposProdutos.map((tipo) => (

@@ -59,6 +59,7 @@ export default function AdicionalModalScreen() {
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
         placeholder={t('products.namePlaceholder')}
+        accessibilityLabel={t('products.name')}
         value={name}
         onChangeText={setNome}
         placeholderTextColor={colors.textMuted}
@@ -68,6 +69,7 @@ export default function AdicionalModalScreen() {
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
         placeholder={t('products.pricePlaceholder')}
+        accessibilityLabel={t('products.price')}
         value={price}
         keyboardType="numeric"
         onChangeText={setPreco}

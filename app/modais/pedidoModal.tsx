@@ -212,7 +212,7 @@ export default function PedidoModal() {
       <Text style={[styles.title, { color: textColor }]}>{t('orders.title')}</Text>
 
       <Text style={[styles.label, { color: textColor }]}>{t('orders.customer')}</Text>
-      <TextInput style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} value={customerName} onChangeText={setCliente} placeholder={t('sales.customer')} placeholderTextColor={subText} editable={!clienteBloqueado} />
+      <TextInput style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} value={customerName} onChangeText={setCliente} placeholder={t('sales.customer')} accessibilityLabel={t('sales.customer')} placeholderTextColor={subText} editable={!clienteBloqueado} />
 
       <Text style={[styles.label, { color: textColor }]}>{t('orders.status')}</Text>
       {isCliente ? (
@@ -262,7 +262,7 @@ export default function PedidoModal() {
         <Pressable style={[styles.modalOverlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.4)' }]} onPress={() => setPickerVisible(false)} />
         <RNView style={[styles.modalContainer, { backgroundColor: surface }] }>
           <Text style={[styles.title, { color: textColor }]}>{t('orders.addItem')}</Text>
-          <TextInput value={searchText} onChangeText={(value) => { setSearchText(value); searchProducts(value); }} placeholder={t('common.search')} style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} placeholderTextColor={subText} />
+          <TextInput value={searchText} onChangeText={(value) => { setSearchText(value); searchProducts(value); }} placeholder={t('common.search')} accessibilityLabel={t('common.search')} style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} placeholderTextColor={subText} />
           <FlatList data={searchResults} keyExtractor={(it: any) => it.id} renderItem={({ item }) => (
             <ListItem
               title={item.name}
