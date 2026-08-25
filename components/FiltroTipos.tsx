@@ -3,6 +3,8 @@ import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { View, Text } from "@/components/Themed";
 import { spacing, type } from '@/constants/theme';
+import { useTranslation } from 'react-i18next';
+import { getProductTypeLabel } from '@/components/productTypeLabel';
 
 type TipoProduto = {
   id: number;
@@ -24,6 +26,7 @@ function Divider({ color }: { color: string }) {
 export function FiltroTipos({ data, selectedId, onSelect }: FiltroTiposProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -61,7 +64,7 @@ export function FiltroTipos({ data, selectedId, onSelect }: FiltroTiposProps) {
               style={[styles.button, selected && styles.selectedButton]}
             >
               <Text style={[{ fontSize: type.body, fontWeight: "bold" }, selected && styles.selectedText]}>
-                {item.description}
+                {getProductTypeLabel(item.id, item.description, t)}
               </Text>
             </TouchableOpacity>
           );

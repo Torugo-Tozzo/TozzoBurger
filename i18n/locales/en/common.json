@@ -10,5 +10,19 @@
   "search": "Search",
   "noResults": "No results found",
   "yes": "Yes",
-  "no": "No"
+  "no": "No",
+  "initializing": "Preparing the app…",
+  "authenticating": "Checking your session…",
+  "preparing": "Preparing your data…",
+  "editOrder": "Edit order",
+  "deleteOrder": "Delete order",
+  "editProduct": "Edit product",
+  "deleteProduct": "Delete product",
+  "addToOrder": "Add to order",
+  "viewDetails": "View details",
+  "print": "Print",
+  "deleteSale": "Delete sale",
+  "customerUnknown": "Customer not provided",
+  "createdBy": "Created by {{name}} · ",
+  "typeLabel": "Type {{id}}"
 }

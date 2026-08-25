@@ -26,5 +26,20 @@
   "deleteConfirmTitle": "Confirm deletion",
   "deleteConfirmMessage": "Are you sure you want to delete this sale?",
   "deleteErrorMessage": "Could not delete the sale.",
-  "delete": "Delete"
+  "delete": "Delete",
+  "period": "Period",
+  "initialDate": "Start date",
+  "finalDate": "End date",
+  "initialTime": "Start time",
+  "finalTime": "End time",
+  "customerName": "Customer name",
+  "allCustomers": "All customers",
+  "minimumTotal": "Minimum total",
+  "maximumTotal": "Maximum total",
+  "noLimit": "No limit",
+  "clearFilters": "Clear",
+  "applyFilters": "Apply filters",
+  "backToFilters": "Back to filters",
+  "closeFilters": "Close filters",
+  "sale": "Sale"
 }

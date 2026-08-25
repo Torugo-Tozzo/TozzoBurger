@@ -26,5 +26,20 @@
   "deleteConfirmTitle": "确认删除",
   "deleteConfirmMessage": "确定要删除此销售记录吗？",
   "deleteErrorMessage": "无法删除销售记录。",
-  "delete": "删除"
+  "delete": "删除",
+  "period": "期间",
+  "initialDate": "开始日期",
+  "finalDate": "结束日期",
+  "initialTime": "开始时间",
+  "finalTime": "结束时间",
+  "customerName": "客户姓名",
+  "allCustomers": "所有客户",
+  "minimumTotal": "最低总额",
+  "maximumTotal": "最高总额",
+  "noLimit": "不限",
+  "clearFilters": "清除",
+  "applyFilters": "应用筛选",
+  "backToFilters": "返回筛选",
+  "closeFilters": "关闭筛选",
+  "sale": "销售记录"
 }

@@ -6,5 +6,9 @@
   "lastSync": "Última sincronização",
   "pending": "Alterações pendentes",
   "noConnection": "Sem conexão com a internet.",
-  "retry": "Tentar sincronizar novamente"
+  "retry": "Tentar sincronizar novamente",
+  "syncFailedTitle": "Falha na sincronização",
+  "noConnectionMessage": "Sem internet. Verifique sua conexão.",
+  "genericError": "Não foi possível sincronizar.",
+  "accessibilityLabel": "Sincronizar dados"
 }

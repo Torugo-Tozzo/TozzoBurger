@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/IconButton';
 import Colors from '@/constants/Colors';
 import { spacing, type } from '@/constants/theme';
+import { useTranslation } from 'react-i18next';
 
 export type RecordCardAction = {
   icon: React.ComponentProps<typeof FontAwesome>['name'];
@@ -31,6 +32,8 @@ type Props = {
 export function RecordCard({ accentColor, title, subtitle, meta, total, badge, strikethrough, actions = [], onPress }: Props) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { i18n } = useTranslation();
+  const formattedTotal = new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(total);
   const strike = strikethrough ? { textDecorationLine: 'line-through' as const, color: colors.textMuted } : null;
 
   return (
@@ -53,7 +56,7 @@ export function RecordCard({ accentColor, title, subtitle, meta, total, badge, s
             ) : null}
           </View>
           <View style={styles.trailing}>
-            <Text style={[styles.total, { color: colors.text }, strike]}>R$ {total.toFixed(2)}</Text>
+            <Text style={[styles.total, { color: colors.text }, strike]}>{formattedTotal}</Text>
             {badge ? <Badge label={badge.label} color={badge.color} /> : null}
           </View>
         </Pressable>

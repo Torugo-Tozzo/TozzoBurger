@@ -1,5 +1,6 @@
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useTranslation } from 'react-i18next';
 
 export type AppLoadingStage = 'initializing' | 'authenticating' | 'preparing';
 
@@ -7,6 +8,12 @@ const APP_LOADING_MESSAGES: Record<AppLoadingStage, string> = {
   initializing: 'Preparando o aplicativo...',
   authenticating: 'Verificando sua sessão...',
   preparing: 'Preparando seus dados...',
+};
+
+const APP_LOADING_KEYS: Record<AppLoadingStage, string> = {
+  initializing: 'common.initializing',
+  authenticating: 'common.authenticating',
+  preparing: 'common.preparing',
 };
 
 export function getAppLoadingMessage(stage: AppLoadingStage): string {
@@ -17,7 +24,8 @@ type AppLoadingScreenProps = { stage?: AppLoadingStage };
 
 export default function AppLoadingScreen({ stage = 'initializing' }: AppLoadingScreenProps) {
   const isDark = useColorScheme() === 'dark';
-  const message = getAppLoadingMessage(stage);
+  const { t } = useTranslation();
+  const message = t(APP_LOADING_KEYS[stage]);
   return (
     <View accessibilityLabel={message} accessibilityRole="progressbar" style={[styles.container, { backgroundColor: isDark ? '#000' : '#fff' }]}>
       <ActivityIndicator size="large" color={isDark ? '#fff' : '#000'} />

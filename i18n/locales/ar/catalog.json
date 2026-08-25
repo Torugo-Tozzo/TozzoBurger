@@ -8,5 +8,8 @@
   "extra": "إضافة",
   "other": "أخرى",
   "pizza": "بيتزا",
-  "sushi": "سوشي"
+  "sushi": "سوشي",
+  "ingredientsFor": "مكونات {{name}}:",
+  "ingredientsMissing": "لم يتم إدخال مكونات هذا المنتج.",
+  "typeLabel": "النوع {{id}}"
 }

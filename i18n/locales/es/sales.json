@@ -26,5 +26,20 @@
   "deleteConfirmTitle": "Confirmar eliminación",
   "deleteConfirmMessage": "¿Seguro que quieres eliminar esta venta?",
   "deleteErrorMessage": "No se pudo eliminar la venta.",
-  "delete": "Eliminar"
+  "delete": "Eliminar",
+  "period": "Período",
+  "initialDate": "Fecha inicial",
+  "finalDate": "Fecha final",
+  "initialTime": "Hora inicial",
+  "finalTime": "Hora final",
+  "customerName": "Nombre del cliente",
+  "allCustomers": "Todos los clientes",
+  "minimumTotal": "Total mínimo",
+  "maximumTotal": "Total máximo",
+  "noLimit": "Sin límite",
+  "clearFilters": "Limpiar",
+  "applyFilters": "Aplicar filtros",
+  "backToFilters": "Volver a los filtros",
+  "closeFilters": "Cerrar filtros",
+  "sale": "Venta"
 }

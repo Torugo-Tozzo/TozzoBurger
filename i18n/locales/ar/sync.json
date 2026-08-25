@@ -6,5 +6,9 @@
   "lastSync": "آخر مزامنة",
   "pending": "تغييرات معلّقة",
   "noConnection": "لا يوجد اتصال بالإنترنت.",
-  "retry": "إعادة محاولة المزامنة"
+  "retry": "إعادة محاولة المزامنة",
+  "syncFailedTitle": "فشلت المزامنة",
+  "noConnectionMessage": "لا يوجد اتصال بالإنترنت. تحقق من اتصالك.",
+  "genericError": "تعذرت المزامنة.",
+  "accessibilityLabel": "مزامنة البيانات"
 }

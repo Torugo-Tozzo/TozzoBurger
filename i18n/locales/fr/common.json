@@ -10,5 +10,19 @@
   "search": "Rechercher",
   "noResults": "Aucun résultat trouvé",
   "yes": "Oui",
-  "no": "Non"
+  "no": "Non",
+  "initializing": "Préparation de l’application…",
+  "authenticating": "Vérification de votre session…",
+  "preparing": "Préparation de vos données…",
+  "editOrder": "Modifier la commande",
+  "deleteOrder": "Supprimer la commande",
+  "editProduct": "Modifier le produit",
+  "deleteProduct": "Supprimer le produit",
+  "addToOrder": "Ajouter à la commande",
+  "viewDetails": "Voir les détails",
+  "print": "Imprimer",
+  "deleteSale": "Supprimer la vente",
+  "customerUnknown": "Client non renseigné",
+  "createdBy": "Créé par {{name}} · ",
+  "typeLabel": "Type {{id}}"
 }

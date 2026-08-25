@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Tab bar 100% custom. As props nativas da lib (tabBarActiveBackgroundColor +
@@ -20,6 +21,7 @@ import { useColorScheme } from '@/components/useColorScheme';
 export function CustomTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { t } = useTranslation();
 
   // `href` e opcao especifica do expo-router (esconde a tab quando null),
   // nao existe no tipo BottomTabNavigationOptions da lib base.
@@ -37,7 +39,7 @@ export function CustomTabBar({ state, descriptors, navigation, insets }: BottomT
         const routeIndex = state.routes.findIndex((r) => r.key === route.key);
         const focused = state.index === routeIndex;
         const color = focused ? colors.background : colors.text;
-        const label = typeof options.title === 'string' ? options.title : route.name;
+        const label = typeof options.title === 'string' ? options.title : t('navigation.tab');
 
         const onPress = () => {
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });

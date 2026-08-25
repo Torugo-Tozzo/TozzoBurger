@@ -26,5 +26,20 @@
   "deleteConfirmTitle": "تأكيد الحذف",
   "deleteConfirmMessage": "هل أنت متأكد من حذف هذا البيع؟",
   "deleteErrorMessage": "تعذّر حذف البيع.",
-  "delete": "حذف"
+  "delete": "حذف",
+  "period": "الفترة",
+  "initialDate": "تاريخ البداية",
+  "finalDate": "تاريخ النهاية",
+  "initialTime": "وقت البداية",
+  "finalTime": "وقت النهاية",
+  "customerName": "اسم العميل",
+  "allCustomers": "كل العملاء",
+  "minimumTotal": "الحد الأدنى للإجمالي",
+  "maximumTotal": "الحد الأقصى للإجمالي",
+  "noLimit": "بلا حد",
+  "clearFilters": "مسح",
+  "applyFilters": "تطبيق الفلاتر",
+  "backToFilters": "العودة إلى الفلاتر",
+  "closeFilters": "إغلاق الفلاتر",
+  "sale": "بيع"
 }

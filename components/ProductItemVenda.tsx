@@ -9,6 +9,8 @@ import { Product } from "@/database/types/Product";
 import { FontAwesome } from "@expo/vector-icons";
 import Colors from "@/constants/Colors";
 import { tipoColors, spacing, type, radius } from "@/constants/theme";
+import { useTranslation } from 'react-i18next';
+import { getProductTypeLabel } from '@/components/productTypeLabel';
 
 type Props = {
   data: Product;
@@ -19,6 +21,7 @@ type Props = {
 
 function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome }: Props) {
   const [modalVisible, setModalVisible] = useState(false);
+  const { t, i18n } = useTranslation();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -32,13 +35,14 @@ function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome 
     ]).start();
   };
 
-  const tipoLabel = tipoNome ?? (data as any).tipoNome ?? `Tipo ${data.productTypeId}`;
+  const tipoLabel = getProductTypeLabel(data.productTypeId, tipoNome ?? (data as any).tipoNome, t);
+  const price = new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(data.price);
 
   return (
     <Card bordered={false} style={styles.container}>
       <View style={styles.info}>
         <Text style={styles.name}>{data.name}</Text>
-        <Text style={styles.price}>Preço: R$ {data.price.toFixed(2)}</Text>
+        <Text style={styles.price}>{t('products.price')}: {price}</Text>
       </View>
 
       <Pressable onPress={() => setModalVisible(true)}>
@@ -58,7 +62,7 @@ function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome 
         <View style={[styles.addButton, { backgroundColor: colors.primary }]}>
           <IconButton
             icon="plus"
-            label="Adicionar à conta"
+            label={t('common.addToOrder')}
             onPress={() => { triggerAnimation(buttonScaleAnim); onAddToCart(data); }}
             size={20}
             color={colors.background}

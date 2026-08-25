@@ -10,5 +10,19 @@
   "search": "खोजें",
   "noResults": "कोई परिणाम नहीं मिला",
   "yes": "हाँ",
-  "no": "नहीं"
+  "no": "नहीं",
+  "initializing": "ऐप तैयार हो रहा है…",
+  "authenticating": "आपका सत्र जाँचा जा रहा है…",
+  "preparing": "आपका डेटा तैयार हो रहा है…",
+  "editOrder": "ऑर्डर संपादित करें",
+  "deleteOrder": "ऑर्डर हटाएँ",
+  "editProduct": "उत्पाद संपादित करें",
+  "deleteProduct": "उत्पाद हटाएँ",
+  "addToOrder": "ऑर्डर में जोड़ें",
+  "viewDetails": "विवरण देखें",
+  "print": "प्रिंट करें",
+  "deleteSale": "बिक्री हटाएँ",
+  "customerUnknown": "ग्राहक उपलब्ध नहीं",
+  "createdBy": "द्वारा बनाया गया: {{name}} · ",
+  "typeLabel": "प्रकार {{id}}"
 }

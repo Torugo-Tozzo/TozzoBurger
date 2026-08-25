@@ -8,5 +8,8 @@
   "extra": "额外配料",
   "other": "其他",
   "pizza": "披萨",
-  "sushi": "寿司"
+  "sushi": "寿司",
+  "ingredientsFor": "{{name}}的配料：",
+  "ingredientsMissing": "未提供此产品的配料信息。",
+  "typeLabel": "类型 {{id}}"
 }

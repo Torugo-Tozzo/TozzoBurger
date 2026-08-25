@@ -10,5 +10,19 @@
   "search": "Buscar",
   "noResults": "No se encontraron resultados",
   "yes": "Sí",
-  "no": "No"
+  "no": "No",
+  "initializing": "Preparando la aplicación…",
+  "authenticating": "Verificando tu sesión…",
+  "preparing": "Preparando tus datos…",
+  "editOrder": "Editar pedido",
+  "deleteOrder": "Eliminar pedido",
+  "editProduct": "Editar producto",
+  "deleteProduct": "Eliminar producto",
+  "addToOrder": "Añadir al pedido",
+  "viewDetails": "Ver detalles",
+  "print": "Imprimir",
+  "deleteSale": "Eliminar venta",
+  "customerUnknown": "Cliente no informado",
+  "createdBy": "Creado por {{name}} · ",
+  "typeLabel": "Tipo {{id}}"
 }

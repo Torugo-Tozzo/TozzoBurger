@@ -8,5 +8,8 @@
   "extra": "अतिरिक्त",
   "other": "अन्य",
   "pizza": "पिज़्ज़ा",
-  "sushi": "सुशी"
+  "sushi": "सुशी",
+  "ingredientsFor": "{{name}} की सामग्री:",
+  "ingredientsMissing": "इस उत्पाद की सामग्री उपलब्ध नहीं है।",
+  "typeLabel": "प्रकार {{id}}"
 }

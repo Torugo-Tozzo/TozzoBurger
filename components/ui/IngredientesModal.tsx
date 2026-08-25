@@ -3,6 +3,7 @@ import { Modal, View, Text, StyleSheet, useColorScheme } from 'react-native';
 import Colors from '@/constants/Colors';
 import { Button } from './Button';
 import { radius, spacing, type } from '@/constants/theme';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   visible: boolean;
@@ -14,16 +15,17 @@ type Props = {
 export function IngredientesModal({ visible, onClose, nomeProduto, ingredients }: Props) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={[styles.box, { backgroundColor: colors.background, borderColor: colors.border }]}>
-          <Text style={[styles.title, { color: colors.text }]}>Ingredientes do {nomeProduto}:</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{t('catalog.ingredientsFor', { name: nomeProduto })}</Text>
           <Text style={[styles.body, { color: colors.text }]}>
-            {ingredients ?? 'Os ingredients não foram informados no cadastro deste produto'}
+            {ingredients ?? t('catalog.ingredientsMissing')}
           </Text>
-          <Button title="Fechar" onPress={onClose} variant="outline" />
+          <Button title={t('common.close')} onPress={onClose} variant="outline" />
         </View>
       </View>
     </Modal>

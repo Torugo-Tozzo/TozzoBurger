@@ -8,5 +8,8 @@
   "extra": "Extra",
   "other": "Other",
   "pizza": "Pizza",
-  "sushi": "Sushi"
+  "sushi": "Sushi",
+  "ingredientsFor": "Ingredients for {{name}}:",
+  "ingredientsMissing": "Ingredients were not provided for this product.",
+  "typeLabel": "Type {{id}}"
 }

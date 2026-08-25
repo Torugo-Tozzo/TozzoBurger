@@ -26,5 +26,20 @@
   "deleteConfirmTitle": "हटाने की पुष्टि करें",
   "deleteConfirmMessage": "क्या आप वाकई यह बिक्री हटाना चाहते हैं?",
   "deleteErrorMessage": "बिक्री हटाई नहीं जा सकी।",
-  "delete": "हटाएं"
+  "delete": "हटाएं",
+  "period": "अवधि",
+  "initialDate": "प्रारंभ तिथि",
+  "finalDate": "अंतिम तिथि",
+  "initialTime": "प्रारंभ समय",
+  "finalTime": "अंतिम समय",
+  "customerName": "ग्राहक का नाम",
+  "allCustomers": "सभी ग्राहक",
+  "minimumTotal": "न्यूनतम कुल",
+  "maximumTotal": "अधिकतम कुल",
+  "noLimit": "कोई सीमा नहीं",
+  "clearFilters": "साफ़ करें",
+  "applyFilters": "फ़िल्टर लागू करें",
+  "backToFilters": "फ़िल्टर पर वापस जाएँ",
+  "closeFilters": "फ़िल्टर बंद करें",
+  "sale": "बिक्री"
 }

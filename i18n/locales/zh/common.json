@@ -10,5 +10,19 @@
   "search": "搜索",
   "noResults": "未找到结果",
   "yes": "是",
-  "no": "否"
+  "no": "否",
+  "initializing": "正在准备应用…",
+  "authenticating": "正在检查会话…",
+  "preparing": "正在准备数据…",
+  "editOrder": "编辑订单",
+  "deleteOrder": "删除订单",
+  "editProduct": "编辑产品",
+  "deleteProduct": "删除产品",
+  "addToOrder": "添加到订单",
+  "viewDetails": "查看详情",
+  "print": "打印",
+  "deleteSale": "删除销售记录",
+  "customerUnknown": "未提供客户",
+  "createdBy": "创建者：{{name}} · ",
+  "typeLabel": "类型 {{id}}"
 }

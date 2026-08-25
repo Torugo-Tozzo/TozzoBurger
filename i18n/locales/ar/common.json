@@ -10,5 +10,19 @@
   "search": "بحث",
   "noResults": "لم يتم العثور على نتائج",
   "yes": "نعم",
-  "no": "لا"
+  "no": "لا",
+  "initializing": "جارٍ تجهيز التطبيق…",
+  "authenticating": "جارٍ التحقق من جلستك…",
+  "preparing": "جارٍ تجهيز بياناتك…",
+  "editOrder": "تعديل الطلب",
+  "deleteOrder": "حذف الطلب",
+  "editProduct": "تعديل المنتج",
+  "deleteProduct": "حذف المنتج",
+  "addToOrder": "إضافة إلى الطلب",
+  "viewDetails": "عرض التفاصيل",
+  "print": "طباعة",
+  "deleteSale": "حذف البيع",
+  "customerUnknown": "لم يُحدد العميل",
+  "createdBy": "أنشأه {{name}} · ",
+  "typeLabel": "النوع {{id}}"
 }
