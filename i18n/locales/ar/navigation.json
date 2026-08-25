@@ -1,8 +1,16 @@
 {
   "home": "الرئيسية",
+  "menu": "القائمة",
+  "sell": "بيع",
   "orders": "الطلبات",
   "sales": "المبيعات",
   "products": "المنتجات",
+  "catalog": "الكتالوج",
+  "account": "الحساب",
+  "product": "المنتج",
+  "closedAccount": "الحساب المغلق",
+  "addOn": "إضافة",
+  "report": "التقرير",
   "employees": "الموظفون",
   "charts": "الرسوم البيانية",
   "settings": "الإعدادات"

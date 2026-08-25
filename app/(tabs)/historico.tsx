@@ -30,6 +30,7 @@ import {
 import { setVendaDetalhes } from '@/services/salesDetails';
 import Colors from '@/constants/Colors';
 import { spacing, type } from '@/constants/theme';
+import { useTranslation } from 'react-i18next';
 
 export const PAGE_SIZE = 50;
 
@@ -69,9 +70,9 @@ export function canLoadNextPage(
     && inFlight?.generation !== generation;
 }
 
-function groupByDate(vendas: SaleRenderable[]): GroupedSales {
+function groupByDate(vendas: SaleRenderable[], locale: string): GroupedSales {
   return vendas.reduce<GroupedSales>((groups, venda) => {
-    const date = new Date(venda.soldAt).toLocaleDateString('pt-BR');
+    const date = new Date(venda.soldAt).toLocaleDateString(locale);
     groups[date] = groups[date] ? [...groups[date], venda] : [venda];
     return groups;
   }, {});
@@ -120,6 +121,7 @@ function errorMessage(error: unknown, fallback: string): string {
 export default function HistoricoScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const { token } = useAuth();
   const { lastSync } = useAutoSync();
@@ -209,12 +211,12 @@ export default function HistoricoScreen() {
         hasNextPage: false,
         loadingInitial: false,
         loadingMore: false,
-        error: errorMessage(error, 'Não foi possível carregar as vendas deste aparelho.'),
+        error: errorMessage(error, t('sales.localLoadFailed')),
       }));
     } finally {
       finishRequest('device', page, generation);
     }
-  }, []);
+  }, [t]);
 
   const loadRemotePage = useCallback(async (filters: SalesFilters, page: number, generation: number) => {
     if (!token || !beginRequest('establishment', page, generation)) return;
@@ -258,12 +260,12 @@ export default function HistoricoScreen() {
         hasNextPage: false,
         loadingInitial: false,
         loadingMore: false,
-        error: errorMessage(error, 'Não foi possível carregar as vendas do estabelecimento.'),
+        error: errorMessage(error, t('sales.remoteLoadFailed')),
       }));
     } finally {
       finishRequest('establishment', page, generation);
     }
-  }, [token]);
+  }, [t, token]);
 
   const beginSectionQuery = useCallback((targetSection: SalesSection, filters: SalesFilters) => {
     const generation = resetSectionState(targetSection);
@@ -343,7 +345,7 @@ export default function HistoricoScreen() {
   };
 
   const activeState = section === 'device' ? localState : remoteState;
-  const groupedSales = useMemo(() => groupByDate(activeState.items), [activeState.items]);
+  const groupedSales = useMemo(() => groupByDate(activeState.items, i18n.language), [activeState.items, i18n.language]);
 
   const handleEndReached = useCallback(() => {
     const generation = generationRef.current;
@@ -360,22 +362,22 @@ export default function HistoricoScreen() {
       if (!sale) return;
       const products: Produto[] = await Promise.all((sale.items ?? []).map(async (item) => {
         const product = await showAdd(item.productId);
-        return { name: product?.name ?? 'Produto desconhecido', quantity: item.quantity, price: product?.price ?? 0 };
+        return { name: product?.name ?? t('sales.unknownProduct'), quantity: item.quantity, price: product?.price ?? 0 };
       }));
       await sendMessageToDevice(formatarVendaParaImpressao(sale, products), await getPrinter());
-      Alert.alert('Sucesso', 'Conta enviada para impressão.');
+      Alert.alert(t('sales.printSuccessTitle'), t('sales.printSuccessMessage'));
     } catch (error) {
       console.error('Erro ao imprimir venda:', error);
-      Alert.alert('Erro', 'Não foi possível imprimir a venda.');
+      Alert.alert(t('sales.printErrorTitle'), t('sales.printErrorMessage'));
     } finally {
       setLoadingPrint(null);
     }
   };
 
   const handleDelete = (saleId: string) => {
-    Alert.alert('Confirmar exclusão', 'Tem certeza de que deseja excluir esta venda?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Excluir', style: 'destructive', onPress: async () => {
+    Alert.alert(t('sales.deleteConfirmTitle'), t('sales.deleteConfirmMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('sales.delete'), style: 'destructive', onPress: async () => {
         try {
           await removeSale(saleId);
           setLocalState((state) => {
@@ -390,7 +392,7 @@ export default function HistoricoScreen() {
           });
         } catch (error) {
           console.error('Erro ao excluir venda:', error);
-          Alert.alert('Erro', 'Não foi possível excluir a venda.');
+          Alert.alert(t('sales.printErrorTitle'), t('sales.deleteErrorMessage'));
         }
       } },
     ]);
@@ -403,16 +405,18 @@ export default function HistoricoScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Vendas</Text>
+      <Text style={styles.title}>{t('sales.title')}</Text>
       <View style={styles.sectionTabs}>
         {([
-          ['device', 'Neste aparelho'],
-          ['establishment', 'Estabelecimento'],
+          ['device', t('sales.onThisDevice')],
+          ['establishment', t('sales.establishment')],
         ] as const).map(([value, label]) => (
           <TouchableOpacity
             key={value}
             style={[styles.sectionTab, { borderColor: colors.border }, section === value && { backgroundColor: colors.text }]}
             onPress={() => handleSectionChange(value)}
+            accessibilityRole="button"
+            accessibilityLabel={label}
           >
             <Text style={[styles.sectionTabText, section === value && { color: colors.background }]}>{label}</Text>
           </TouchableOpacity>
@@ -420,13 +424,17 @@ export default function HistoricoScreen() {
       </View>
 
       <View style={styles.toolbar}>
-        <Text style={styles.sectionTitle}>{section === 'device' ? 'Vendas feitas neste aparelho' : 'Vendas do estabelecimento'}</Text>
-        <TouchableOpacity style={[styles.filterButton, { borderColor: colors.border, backgroundColor: colors.surface }]} onPress={() => setShowFilters(true)} accessibilityLabel="Abrir filtros de vendas">
+        <Text style={styles.sectionTitle}>{section === 'device' ? t('sales.deviceTitle') : t('sales.establishmentTitle')}</Text>
+        <TouchableOpacity style={[styles.filterButton, { borderColor: colors.border, backgroundColor: colors.surface }]} onPress={() => setShowFilters(true)} accessibilityRole="button" accessibilityLabel={t('sales.openFilters')}>
           <FontAwesome name="filter" size={16} color={colors.text} />
-          <Text style={styles.filterText}>Filtros</Text>
+          <Text style={styles.filterText}>{t('sales.filters')}</Text>
         </TouchableOpacity>
       </View>
-      <Text style={[styles.total, { color: colors.textMuted }]}>Total do período: R$ {activeState.fechamento.toFixed(2)}</Text>
+      <Text style={[styles.total, { color: colors.textMuted }]}>
+        {t('sales.periodTotal', {
+          amount: new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(activeState.fechamento),
+        })}
+      </Text>
 
       {activeState.loadingInitial ? (
         <ListFrame style={styles.skeletonFrame}>
@@ -464,7 +472,7 @@ export default function HistoricoScreen() {
           onEndReachedThreshold={0.5}
           ListHeaderComponent={activeState.error && activeState.items.length > 0 ? <Text style={[styles.error, { color: colors.textMuted }]}>{activeState.error}</Text> : null}
           ListFooterComponent={activeState.loadingMore ? <ActivityIndicator style={styles.footerLoader} color={colors.text} /> : null}
-          ListEmptyComponent={<EmptyState icon="clock-o" title="Nenhuma venda encontrada" message={activeState.error ?? 'Ajuste os filtros ou aguarde novas vendas.'} />}
+          ListEmptyComponent={<EmptyState icon="clock-o" title={t('sales.empty')} message={activeState.error ?? t('sales.adjustFilters')} />}
           showsVerticalScrollIndicator={false}
         />
       )}

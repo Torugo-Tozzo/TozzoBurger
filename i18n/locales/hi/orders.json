@@ -7,5 +7,11 @@
   "customer": "ग्राहक",
   "items": "आइटम",
   "orderNumber": "ऑर्डर #{{number}}",
-  "closeOrder": "ऑर्डर बंद करें"
+  "closeOrder": "ऑर्डर बंद करें",
+  "viewAccount": "खाता देखें ({{count}})",
+  "recentTitle": "हाल के ऑर्डर",
+  "recentEmpty": "कोई हाल का ऑर्डर नहीं है",
+  "recentMessage": "ऑर्डर बनते ही यहां दिखाई देंगे।",
+  "deleteConfirm": "क्या आप यह ऑर्डर हटाना चाहते हैं?",
+  "delete": "हटाएं"
 }

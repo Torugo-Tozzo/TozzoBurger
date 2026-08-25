@@ -1,8 +1,16 @@
 {
   "home": "होम",
+  "menu": "मेनू",
+  "sell": "बेचें",
   "orders": "ऑर्डर",
   "sales": "बिक्री",
   "products": "उत्पाद",
+  "catalog": "कैटलॉग",
+  "account": "खाता",
+  "product": "उत्पाद",
+  "closedAccount": "बंद खाता",
+  "addOn": "अतिरिक्त आइटम",
+  "report": "रिपोर्ट",
   "employees": "कर्मचारी",
   "charts": "चार्ट",
   "settings": "सेटिंग्स"

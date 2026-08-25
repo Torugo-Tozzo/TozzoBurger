@@ -7,5 +7,11 @@
   "customer": "Cliente",
   "items": "Artículos",
   "orderNumber": "Pedido n.º {{number}}",
-  "closeOrder": "Cerrar pedido"
+  "closeOrder": "Cerrar pedido",
+  "viewAccount": "Ver cuenta ({{count}})",
+  "recentTitle": "Pedidos recientes",
+  "recentEmpty": "No hay pedidos recientes",
+  "recentMessage": "Los pedidos aparecen aquí en cuanto se crean.",
+  "deleteConfirm": "¿Quieres eliminar este pedido?",
+  "delete": "Eliminar"
 }

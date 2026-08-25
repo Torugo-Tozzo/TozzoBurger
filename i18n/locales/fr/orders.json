@@ -7,5 +7,11 @@
   "customer": "Client",
   "items": "Articles",
   "orderNumber": "Commande n° {{number}}",
-  "closeOrder": "Fermer la commande"
+  "closeOrder": "Fermer la commande",
+  "viewAccount": "Voir le compte ({{count}})",
+  "recentTitle": "Commandes récentes",
+  "recentEmpty": "Aucune commande récente",
+  "recentMessage": "Les commandes apparaissent ici dès leur création.",
+  "deleteConfirm": "Voulez-vous supprimer cette commande ?",
+  "delete": "Supprimer"
 }

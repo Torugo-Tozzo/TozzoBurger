@@ -7,5 +7,11 @@
   "customer": "العميل",
   "items": "العناصر",
   "orderNumber": "الطلب رقم {{number}}",
-  "closeOrder": "إغلاق الطلب"
+  "closeOrder": "إغلاق الطلب",
+  "viewAccount": "عرض الحساب ({{count}})",
+  "recentTitle": "الطلبات الأخيرة",
+  "recentEmpty": "لا توجد طلبات حديثة",
+  "recentMessage": "ستظهر الطلبات هنا فور إنشائها.",
+  "deleteConfirm": "هل تريد حذف هذا الطلب؟",
+  "delete": "حذف"
 }

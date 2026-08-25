@@ -14,8 +14,10 @@ import { ProductCardSkeleton } from "@/components/ui/ProductCardSkeleton";
 import { ListFrame } from "@/components/ui/ListFrame";
 import { ListDivider } from "@/components/ui/ListDivider";
 import { useMinLoadingDuration } from "@/hooks/useMinLoadingDuration";
+import { useTranslation } from 'react-i18next';
 
 export default function ProdutosScreen() {
+  const { t } = useTranslation();
   const { remove } = useProductDatabase();
   const { products, productTypes, productTypeId, filterByProductType, setSearch, isLoading, isLoadingMore, loadMore } = useProductList()
   const { refreshing, onRefresh } = useSyncRefresh();
@@ -39,7 +41,7 @@ export default function ProdutosScreen() {
       data={products}
       keyExtractor={(item) => String(item.id)}
       refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
-      ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto cadastrado" message="Toque no + pra adicionar o primeiro item." />}
+      ListEmptyComponent={<EmptyState icon="cutlery" title={t('products.empty')} message={t('products.addFirst')} />}
       onEndReached={loadMore}
       onEndReachedThreshold={0.5}
       ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
@@ -53,12 +55,12 @@ export default function ProdutosScreen() {
             tipoNome={productType}
             onDelete={() => {
               Alert.alert(
-                'Confirmar Remoção',
-                'Tem certeza que deseja remover este produto?',
+                t('products.removeTitle'),
+                t('products.deleteConfirm'),
                 [
-                  { text: 'Cancelar', style: 'cancel' },
+                  { text: t('common.cancel'), style: 'cancel' },
                   {
-                    text: 'Remover',
+                    text: t('products.remove'),
                     onPress: () => {
                       remove(item.id);
                       filterByProductType(Number(productTypeId));
@@ -77,7 +79,7 @@ export default function ProdutosScreen() {
 
   return (
     <View style={styles.container}>
-      <Input placeholder="Pesquisar" onChangeText={setSearch} style={styles.input} />
+      <Input placeholder={t('common.search')} accessibilityLabel={t('common.search')} onChangeText={setSearch} style={styles.input} />
       <FiltroTipos
         data={productTypes}
         selectedId={Number(productTypeId)}

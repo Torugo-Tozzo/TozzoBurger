@@ -17,15 +17,18 @@ import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback } from 'react';
 import { useCart, useCartActions } from '@/context/CartContext';
 import { useSyncRefresh } from '@/hooks/useSyncRefresh';
+import { useTranslation } from 'react-i18next';
 
 /** Componente isolado — só ele re-renderiza quando o cart muda */
 function CartButton() {
   const { cart } = useCart();
+  const { t } = useTranslation();
   const total = cart.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
   if (total <= 0) return null;
   return (
     <Button
-      title={`Ver Conta (${total})`}
+      title={t('orders.viewAccount', { count: total })}
+      accessibilityLabel={t('orders.viewAccount', { count: total })}
       onPress={() => router.push('/modais/contaModal')}
       style={styles.buttonWrap}
     />
@@ -33,6 +36,7 @@ function CartButton() {
 }
 
 export default function VendaScreen() {
+  const { t } = useTranslation();
   const { products, productTypes, productTypeId, filterByProductType, setSearch, search, isLoading, isLoadingMore, loadMore } = useProductList();
   const { searchBySourceProductId, create, showAdd } = useProductDatabase();
   // Apenas funções estáveis — NÃO lê `cart`, então não re-renderiza quando cart muda
@@ -94,7 +98,7 @@ export default function VendaScreen() {
       keyExtractor={keyExtractor}
       renderItem={renderItem}
       refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
-      ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto encontrado" message="Ajuste a busca ou o filtro de tipo." />}
+      ListEmptyComponent={<EmptyState icon="cutlery" title={t('products.empty')} message={t('products.adjustSearch')} />}
       onEndReached={loadMore}
       onEndReachedThreshold={0.5}
       ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
@@ -104,7 +108,7 @@ export default function VendaScreen() {
 
   return (
     <View style={styles.container}>
-      <Input placeholder="Pesquisar" onChangeText={setSearch} value={search} style={styles.input} />
+      <Input placeholder={t('common.search')} accessibilityLabel={t('common.search')} onChangeText={setSearch} value={search} style={styles.input} />
 
       <FiltroTipos
         data={productTypes}

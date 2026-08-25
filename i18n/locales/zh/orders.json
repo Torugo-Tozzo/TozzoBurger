@@ -7,5 +7,11 @@
   "customer": "客户",
   "items": "商品",
   "orderNumber": "订单号 #{{number}}",
-  "closeOrder": "关闭订单"
+  "closeOrder": "关闭订单",
+  "viewAccount": "查看账户（{{count}}）",
+  "recentTitle": "最近订单",
+  "recentEmpty": "暂无最近订单",
+  "recentMessage": "订单创建后会显示在这里。",
+  "deleteConfirm": "要删除此订单吗？",
+  "delete": "删除"
 }

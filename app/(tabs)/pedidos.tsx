@@ -15,6 +15,7 @@ import { useMinLoadingDuration } from '@/hooks/useMinLoadingDuration';
 import { useShouldReload } from '@/hooks/useShouldReload';
 import { spacing, type } from '@/constants/theme';
 import { Order } from '@/database/types/Order';
+import { useTranslation } from 'react-i18next';
 
 type OrderWithProducts = Order & { products: string[] };
 
@@ -40,6 +41,7 @@ function isPedidosPorDataEqual(
 }
 
 export default function Pedidos() {
+  const { t } = useTranslation();
   const { listRecentOrders, listRecentOrdersByUser, removeOrder } = useOrderDatabase();
   const { lastSync } = useAutoSync();
   const { user } = useAuth();
@@ -78,9 +80,9 @@ export default function Pedidos() {
   };
 
   const handleDelete = (orderId: string) => {
-    Alert.alert('Confirmação', 'Deseja excluir este pedido?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Excluir', style: 'destructive', onPress: async () => { await removeOrder(orderId); await load(); } },
+    Alert.alert(t('common.confirm'), t('orders.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('orders.delete'), style: 'destructive', onPress: async () => { await removeOrder(orderId); await load(); } },
     ]);
   };
 
@@ -104,7 +106,7 @@ export default function Pedidos() {
   if (showSkeleton) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Pedidos Recentes</Text>
+        <Text style={styles.title}>{t('orders.recentTitle')}</Text>
         <ListFrame>
           <RecordCardSkeleton />
           <ListDivider />
@@ -126,7 +128,7 @@ export default function Pedidos() {
         data={Object.keys(ordersByDate)}
         keyExtractor={(d) => d}
         refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
-        ListEmptyComponent={<EmptyState icon="list" title="Nenhum pedido recente" message="Pedidos aparecem aqui assim que forem criados." />}
+        ListEmptyComponent={<EmptyState icon="list" title={t('orders.recentEmpty')} message={t('orders.recentMessage')} />}
         renderItem={({ item: dataKey }) => (
           <View style={styles.group}>
             <Text style={styles.date}>{dataKey}</Text>

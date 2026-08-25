@@ -3,10 +3,14 @@
   "newProduct": "Nuevo producto",
   "editProduct": "Editar producto",
   "empty": "No se encontraron productos.",
+  "adjustSearch": "Ajusta tu búsqueda o el filtro de tipo de producto.",
+  "addFirst": "Toca + para añadir el primer artículo.",
   "name": "Nombre",
   "price": "Precio",
   "ingredients": "Ingredientes",
   "productType": "Tipo de producto",
   "delete": "Eliminar producto",
-  "deleteConfirm": "¿Seguro que quieres eliminar este producto?"
+  "deleteConfirm": "¿Seguro que quieres eliminar este producto?",
+  "removeTitle": "Confirmar eliminación",
+  "remove": "Eliminar"
 }
