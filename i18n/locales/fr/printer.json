@@ -26,5 +26,12 @@
   "itemsTitle": "Articles de la vente",
   "unitPrice": "Prix unitaire",
   "finalAccount": "Total du compte",
-  "total": "Total"
+  "total": "Total",
+  "scanEmptyTitle": "Aucune imprimante trouvée",
+  "scanEmptyMessage": "Le Bluetooth est-il activé ?",
+  "connectedMessage": "Imprimante connectée avec succès.",
+  "removed": "Imprimante supprimée.",
+  "connectedAs": "Imprimante connectée : {{name}}",
+  "unknownDevice": "Appareil inconnu",
+  "register": "Enregistrer l’imprimante"
 }

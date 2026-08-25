@@ -26,5 +26,12 @@
   "itemsTitle": "Sale items",
   "unitPrice": "Unit price",
   "finalAccount": "Account total",
-  "total": "Total"
+  "total": "Total",
+  "scanEmptyTitle": "No printers found",
+  "scanEmptyMessage": "Is Bluetooth turned on?",
+  "connectedMessage": "Printer connected successfully.",
+  "removed": "Printer removed.",
+  "connectedAs": "Connected printer: {{name}}",
+  "unknownDevice": "Unknown device",
+  "register": "Register printer"
 }

@@ -26,5 +26,12 @@
   "itemsTitle": "销售项目",
   "unitPrice": "单价",
   "finalAccount": "账单总额",
-  "total": "总计"
+  "total": "总计",
+  "scanEmptyTitle": "未找到打印机",
+  "scanEmptyMessage": "蓝牙是否已开启？",
+  "connectedMessage": "打印机已成功连接。",
+  "removed": "打印机已移除。",
+  "connectedAs": "已连接的打印机：{{name}}",
+  "unknownDevice": "未知设备",
+  "register": "注册打印机"
 }

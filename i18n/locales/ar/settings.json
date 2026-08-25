@@ -6,5 +6,14 @@
   "currentLanguage": "اللغة الحالية",
   "printer": "الطابعة",
   "sync": "المزامنة",
-  "restartRequired": "أعد تشغيل التطبيق لتطبيق تغييرات الاتجاه والتخطيط الأصلية."
+  "restartRequired": "أعد تشغيل التطبيق لتطبيق تغييرات الاتجاه والتخطيط الأصلية.",
+  "directionChangeTitle": "إعادة التشغيل مطلوبة",
+  "directionChangeMessage": "سيصبح التبديل بين اللغات من اليسار إلى اليمين ومن اليمين إلى اليسار فعالًا بعد إعادة تشغيل التطبيق في المرة القادمة.",
+  "languageEnglish": "الإنجليزية",
+  "languagePortugueseBrazil": "البرتغالية (البرازيل)",
+  "languageSpanish": "الإسبانية",
+  "languageFrench": "الفرنسية",
+  "languageChinese": "الصينية",
+  "languageHindi": "الهندية",
+  "languageArabic": "العربية"
 }

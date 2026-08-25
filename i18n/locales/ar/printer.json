@@ -26,5 +26,12 @@
   "itemsTitle": "عناصر البيع",
   "unitPrice": "سعر الوحدة",
   "finalAccount": "إجمالي الحساب",
-  "total": "الإجمالي"
+  "total": "الإجمالي",
+  "scanEmptyTitle": "لم يتم العثور على طابعات",
+  "scanEmptyMessage": "هل البلوتوث قيد التشغيل؟",
+  "connectedMessage": "تم الاتصال بالطابعة بنجاح.",
+  "removed": "تمت إزالة الطابعة.",
+  "connectedAs": "الطابعة المتصلة: {{name}}",
+  "unknownDevice": "جهاز غير معروف",
+  "register": "تسجيل الطابعة"
 }

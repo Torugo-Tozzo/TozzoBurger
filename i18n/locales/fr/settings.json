@@ -6,5 +6,14 @@
   "currentLanguage": "Langue actuelle",
   "printer": "Imprimante",
   "sync": "Synchronisation",
-  "restartRequired": "Redémarrez l’application pour appliquer les changements natifs de direction et de mise en page."
+  "restartRequired": "Redémarrez l’application pour appliquer les changements natifs de direction et de mise en page.",
+  "directionChangeTitle": "Redémarrage requis",
+  "directionChangeMessage": "Le changement entre les langues de gauche à droite et de droite à gauche prendra effet au prochain redémarrage de l’application.",
+  "languageEnglish": "Anglais",
+  "languagePortugueseBrazil": "Portugais (Brésil)",
+  "languageSpanish": "Espagnol",
+  "languageFrench": "Français",
+  "languageChinese": "Chinois",
+  "languageHindi": "Hindi",
+  "languageArabic": "Arabe"
 }

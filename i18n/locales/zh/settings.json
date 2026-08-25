@@ -6,5 +6,14 @@
   "currentLanguage": "当前语言",
   "printer": "打印机",
   "sync": "同步",
-  "restartRequired": "重启应用以应用原生方向和布局更改。"
+  "restartRequired": "重启应用以应用原生方向和布局更改。",
+  "directionChangeTitle": "需要重启",
+  "directionChangeMessage": "在从左到右和从右到左的语言之间切换后，方向和布局将在下次重启应用时生效。",
+  "languageEnglish": "英语",
+  "languagePortugueseBrazil": "葡萄牙语（巴西）",
+  "languageSpanish": "西班牙语",
+  "languageFrench": "法语",
+  "languageChinese": "中文",
+  "languageHindi": "印地语",
+  "languageArabic": "阿拉伯语"
 }

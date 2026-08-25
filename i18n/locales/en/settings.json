@@ -6,5 +6,14 @@
   "currentLanguage": "Current language",
   "printer": "Printer",
   "sync": "Synchronization",
-  "restartRequired": "Restart the app to apply native direction and layout changes."
+  "restartRequired": "Restart the app to apply native direction and layout changes.",
+  "directionChangeTitle": "Restart required",
+  "directionChangeMessage": "Changing between left-to-right and right-to-left languages will take effect after the next app restart.",
+  "languageEnglish": "English",
+  "languagePortugueseBrazil": "Portuguese (Brazil)",
+  "languageSpanish": "Spanish",
+  "languageFrench": "French",
+  "languageChinese": "Chinese",
+  "languageHindi": "Hindi",
+  "languageArabic": "Arabic"
 }
