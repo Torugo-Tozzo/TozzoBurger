@@ -1,0 +1,12 @@
+{
+  "title": "产品",
+  "newProduct": "新产品",
+  "editProduct": "编辑产品",
+  "empty": "未找到产品。",
+  "name": "名称",
+  "price": "价格",
+  "ingredients": "配料",
+  "productType": "产品类型",
+  "delete": "删除产品",
+  "deleteConfirm": "确定要删除此产品吗？"
+}

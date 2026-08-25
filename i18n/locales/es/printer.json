@@ -1,0 +1,12 @@
+{
+  "title": "Impresora",
+  "add": "Añadir impresora",
+  "scan": "Buscar impresoras",
+  "connect": "Conectar",
+  "connected": "Conectada",
+  "disconnected": "Desconectada",
+  "remove": "Eliminar impresora",
+  "print": "Imprimir",
+  "printFailed": "Error al imprimir.",
+  "noPrinter": "No hay ninguna impresora configurada."
+}

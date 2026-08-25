@@ -1,0 +1,9 @@
+{
+  "generic": "Une erreur s’est produite.",
+  "network": "Vérifiez votre connexion Internet et réessayez.",
+  "required": "Remplissez tous les champs obligatoires.",
+  "invalidEmail": "Saisissez une adresse e-mail valide.",
+  "loadFailed": "Impossible de charger les informations.",
+  "saveFailed": "Impossible d’enregistrer les modifications.",
+  "deleteFailed": "Impossible de supprimer l’élément."
+}

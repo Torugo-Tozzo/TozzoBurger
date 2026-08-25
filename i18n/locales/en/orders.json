@@ -1,0 +1,11 @@
+{
+  "title": "Orders",
+  "newOrder": "New order",
+  "empty": "No orders yet.",
+  "total": "Total",
+  "status": "Status",
+  "customer": "Customer",
+  "items": "Items",
+  "orderNumber": "Order #{{number}}",
+  "closeOrder": "Close order"
+}

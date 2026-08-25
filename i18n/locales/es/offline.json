@@ -1,0 +1,7 @@
+{
+  "title": "Modo sin conexión",
+  "offlineMessage": "No tienes conexión. Los cambios se sincronizarán cuando vuelvas a conectarte.",
+  "online": "En línea",
+  "queued": "En cola para sincronización",
+  "availableWhenOnline": "Disponible cuando tengas conexión."
+}

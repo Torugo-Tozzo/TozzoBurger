@@ -1,0 +1,12 @@
+{
+  "title": "Printer",
+  "add": "Add printer",
+  "scan": "Scan for printers",
+  "connect": "Connect",
+  "connected": "Connected",
+  "disconnected": "Disconnected",
+  "remove": "Remove printer",
+  "print": "Print",
+  "printFailed": "Printing failed.",
+  "noPrinter": "No printer configured."
+}

@@ -1,0 +1,11 @@
+{
+  "title": "Sales",
+  "empty": "No sales found.",
+  "total": "Total",
+  "customer": "Customer",
+  "saleNumber": "Sale #{{number}}",
+  "cancelled": "Cancelled",
+  "filter": "Filter",
+  "from": "From",
+  "to": "To"
+}

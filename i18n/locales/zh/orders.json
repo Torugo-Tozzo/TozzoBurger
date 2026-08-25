@@ -1,0 +1,11 @@
+{
+  "title": "订单",
+  "newOrder": "新订单",
+  "empty": "暂无订单。",
+  "total": "总计",
+  "status": "状态",
+  "customer": "客户",
+  "items": "商品",
+  "orderNumber": "订单号 #{{number}}",
+  "closeOrder": "关闭订单"
+}

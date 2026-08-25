@@ -1,0 +1,14 @@
+{
+  "appName": "TozzoBurger",
+  "loading": "加载中…",
+  "retry": "重试",
+  "cancel": "取消",
+  "confirm": "确认",
+  "save": "保存",
+  "close": "关闭",
+  "back": "返回",
+  "search": "搜索",
+  "noResults": "未找到结果",
+  "yes": "是",
+  "no": "否"
+}

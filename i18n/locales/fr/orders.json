@@ -1,0 +1,11 @@
+{
+  "title": "Commandes",
+  "newOrder": "Nouvelle commande",
+  "empty": "Aucune commande pour le moment.",
+  "total": "Total",
+  "status": "Statut",
+  "customer": "Client",
+  "items": "Articles",
+  "orderNumber": "Commande n° {{number}}",
+  "closeOrder": "Fermer la commande"
+}

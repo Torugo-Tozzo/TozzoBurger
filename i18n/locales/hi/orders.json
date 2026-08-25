@@ -1,0 +1,11 @@
+{
+  "title": "ऑर्डर",
+  "newOrder": "नया ऑर्डर",
+  "empty": "अभी तक कोई ऑर्डर नहीं है।",
+  "total": "कुल",
+  "status": "स्थिति",
+  "customer": "ग्राहक",
+  "items": "आइटम",
+  "orderNumber": "ऑर्डर #{{number}}",
+  "closeOrder": "ऑर्डर बंद करें"
+}

@@ -1,0 +1,7 @@
+{
+  "title": "Empleados",
+  "empty": "No se encontraron empleados.",
+  "owner": "Propietario",
+  "manager": "Gerente",
+  "employee": "Empleado"
+}

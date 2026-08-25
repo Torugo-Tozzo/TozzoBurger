@@ -1,0 +1,14 @@
+{
+  "appName": "TozzoBurger",
+  "loading": "Chargement…",
+  "retry": "Réessayer",
+  "cancel": "Annuler",
+  "confirm": "Confirmer",
+  "save": "Enregistrer",
+  "close": "Fermer",
+  "back": "Retour",
+  "search": "Rechercher",
+  "noResults": "Aucun résultat trouvé",
+  "yes": "Oui",
+  "no": "Non"
+}

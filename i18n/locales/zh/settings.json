@@ -1,0 +1,10 @@
+{
+  "title": "设置",
+  "account": "账户",
+  "language": "语言",
+  "selectLanguage": "选择语言",
+  "currentLanguage": "当前语言",
+  "printer": "打印机",
+  "sync": "同步",
+  "restartRequired": "重启应用以应用原生方向和布局更改。"
+}

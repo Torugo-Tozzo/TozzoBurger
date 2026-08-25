@@ -1,0 +1,9 @@
+{
+  "generic": "Algo salió mal.",
+  "network": "Comprueba tu conexión a Internet e inténtalo de nuevo.",
+  "required": "Completa todos los campos obligatorios.",
+  "invalidEmail": "Introduce una dirección de correo electrónico válida.",
+  "loadFailed": "No se pudo cargar la información.",
+  "saveFailed": "No se pudieron guardar los cambios.",
+  "deleteFailed": "No se pudo eliminar el elemento."
+}

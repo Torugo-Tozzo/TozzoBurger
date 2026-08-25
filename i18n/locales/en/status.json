@@ -1,0 +1,10 @@
+{
+  "open": "Open",
+  "inPreparation": "In preparation",
+  "delivering": "Delivering",
+  "closed": "Closed",
+  "cancelled": "Cancelled",
+  "pending": "Pending",
+  "active": "Active",
+  "inactive": "Inactive"
+}

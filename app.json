@@ -37,7 +37,8 @@
       "expo-router",
       "react-native-ble-plx",
       "expo-sqlite",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true

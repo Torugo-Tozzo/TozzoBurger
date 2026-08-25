@@ -1,0 +1,11 @@
+{
+  "title": "Pedidos",
+  "newOrder": "Novo pedido",
+  "empty": "Nenhum pedido ainda.",
+  "total": "Total",
+  "status": "Status",
+  "customer": "Cliente",
+  "items": "Itens",
+  "orderNumber": "Pedido nº {{number}}",
+  "closeOrder": "Fechar pedido"
+}

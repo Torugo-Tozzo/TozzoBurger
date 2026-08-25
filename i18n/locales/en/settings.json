@@ -1,0 +1,10 @@
+{
+  "title": "Settings",
+  "account": "Account",
+  "language": "Language",
+  "selectLanguage": "Select language",
+  "currentLanguage": "Current language",
+  "printer": "Printer",
+  "sync": "Synchronization",
+  "restartRequired": "Restart the app to apply native direction and layout changes."
+}

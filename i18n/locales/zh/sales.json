@@ -1,0 +1,11 @@
+{
+  "title": "销售",
+  "empty": "未找到销售记录。",
+  "total": "总计",
+  "customer": "客户",
+  "saleNumber": "销售单号 #{{number}}",
+  "cancelled": "已取消",
+  "filter": "筛选",
+  "from": "开始",
+  "to": "结束"
+}

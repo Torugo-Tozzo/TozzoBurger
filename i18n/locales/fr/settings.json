@@ -1,0 +1,10 @@
+{
+  "title": "Paramètres",
+  "account": "Compte",
+  "language": "Langue",
+  "selectLanguage": "Sélectionner la langue",
+  "currentLanguage": "Langue actuelle",
+  "printer": "Imprimante",
+  "sync": "Synchronisation",
+  "restartRequired": "Redémarrez l’application pour appliquer les changements natifs de direction et de mise en page."
+}

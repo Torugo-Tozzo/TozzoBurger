@@ -1,0 +1,12 @@
+{
+  "title": "Imprimante",
+  "add": "Ajouter une imprimante",
+  "scan": "Rechercher des imprimantes",
+  "connect": "Connecter",
+  "connected": "Connectée",
+  "disconnected": "Déconnectée",
+  "remove": "Supprimer l’imprimante",
+  "print": "Imprimer",
+  "printFailed": "Échec de l’impression.",
+  "noPrinter": "Aucune imprimante configurée."
+}

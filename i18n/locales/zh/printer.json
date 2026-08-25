@@ -1,0 +1,12 @@
+{
+  "title": "打印机",
+  "add": "添加打印机",
+  "scan": "扫描打印机",
+  "connect": "连接",
+  "connected": "已连接",
+  "disconnected": "已断开",
+  "remove": "移除打印机",
+  "print": "打印",
+  "printFailed": "打印失败。",
+  "noPrinter": "未配置打印机。"
+}

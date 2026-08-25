@@ -1,0 +1,10 @@
+{
+  "syncing": "Synchronizing…",
+  "synced": "Synchronized",
+  "syncNow": "Synchronize now",
+  "syncFailed": "Synchronization failed.",
+  "lastSync": "Last synchronization",
+  "pending": "Pending changes",
+  "noConnection": "No internet connection.",
+  "retry": "Retry synchronization"
+}

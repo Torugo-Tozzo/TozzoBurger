@@ -1,0 +1,10 @@
+{
+  "open": "Aberto",
+  "inPreparation": "Em preparo",
+  "delivering": "Entregando",
+  "closed": "Fechado",
+  "cancelled": "Cancelado",
+  "pending": "Pendente",
+  "active": "Ativo",
+  "inactive": "Inativo"
+}

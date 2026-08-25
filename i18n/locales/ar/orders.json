@@ -1,0 +1,11 @@
+{
+  "title": "الطلبات",
+  "newOrder": "طلب جديد",
+  "empty": "لا توجد طلبات بعد.",
+  "total": "الإجمالي",
+  "status": "الحالة",
+  "customer": "العميل",
+  "items": "العناصر",
+  "orderNumber": "الطلب رقم {{number}}",
+  "closeOrder": "إغلاق الطلب"
+}

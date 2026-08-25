@@ -1,0 +1,8 @@
+{
+  "title": "Charts",
+  "sales": "Sales",
+  "orders": "Orders",
+  "revenue": "Revenue",
+  "noData": "There is no data for this period.",
+  "period": "Period"
+}

@@ -1,0 +1,7 @@
+{
+  "title": "离线模式",
+  "offlineMessage": "你当前处于离线状态。重新连接后将同步更改。",
+  "online": "在线",
+  "queued": "等待同步",
+  "availableWhenOnline": "联网后可用。"
+}

@@ -1,0 +1,10 @@
+{
+  "open": "مفتوح",
+  "inPreparation": "قيد التحضير",
+  "delivering": "قيد التوصيل",
+  "closed": "مغلق",
+  "cancelled": "ملغى",
+  "pending": "قيد الانتظار",
+  "active": "نشط",
+  "inactive": "غير نشط"
+}

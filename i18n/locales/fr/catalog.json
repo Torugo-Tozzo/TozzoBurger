@@ -1,0 +1,12 @@
+{
+  "burger": "Hamburger",
+  "artisanalBurger": "Hamburger artisanal",
+  "chicken": "Poulet",
+  "hotDog": "Hot-dog",
+  "drink": "Boisson",
+  "fries": "Frites",
+  "extra": "Supplément",
+  "other": "Autre",
+  "pizza": "Pizza",
+  "sushi": "Sushi"
+}

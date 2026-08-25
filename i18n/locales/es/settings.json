@@ -1,0 +1,10 @@
+{
+  "title": "Configuración",
+  "account": "Cuenta",
+  "language": "Idioma",
+  "selectLanguage": "Seleccionar idioma",
+  "currentLanguage": "Idioma actual",
+  "printer": "Impresora",
+  "sync": "Sincronización",
+  "restartRequired": "Reinicia la aplicación para aplicar los cambios de dirección y diseño nativos."
+}

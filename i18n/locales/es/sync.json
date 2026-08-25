@@ -1,0 +1,10 @@
+{
+  "syncing": "Sincronizando…",
+  "synced": "Sincronizado",
+  "syncNow": "Sincronizar ahora",
+  "syncFailed": "Error de sincronización.",
+  "lastSync": "Última sincronización",
+  "pending": "Cambios pendientes",
+  "noConnection": "Sin conexión a Internet.",
+  "retry": "Reintentar sincronización"
+}

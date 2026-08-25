@@ -1,0 +1,11 @@
+{
+  "title": "Ventas",
+  "empty": "No se encontraron ventas.",
+  "total": "Total",
+  "customer": "Cliente",
+  "saleNumber": "Venta n.º {{number}}",
+  "cancelled": "Cancelada",
+  "filter": "Filtrar",
+  "from": "Desde",
+  "to": "Hasta"
+}

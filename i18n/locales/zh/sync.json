@@ -1,0 +1,10 @@
+{
+  "syncing": "正在同步…",
+  "synced": "已同步",
+  "syncNow": "立即同步",
+  "syncFailed": "同步失败。",
+  "lastSync": "上次同步",
+  "pending": "待处理的更改",
+  "noConnection": "无互联网连接。",
+  "retry": "重试同步"
+}

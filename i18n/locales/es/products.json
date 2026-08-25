@@ -1,0 +1,12 @@
+{
+  "title": "Productos",
+  "newProduct": "Nuevo producto",
+  "editProduct": "Editar producto",
+  "empty": "No se encontraron productos.",
+  "name": "Nombre",
+  "price": "Precio",
+  "ingredients": "Ingredientes",
+  "productType": "Tipo de producto",
+  "delete": "Eliminar producto",
+  "deleteConfirm": "¿Seguro que quieres eliminar este producto?"
+}
