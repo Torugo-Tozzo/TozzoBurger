@@ -45,7 +45,11 @@ function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome 
         <Text style={styles.price}>{t('products.price')}: {price}</Text>
       </View>
 
-      <Pressable onPress={() => setModalVisible(true)}>
+      <Pressable
+        onPress={() => setModalVisible(true)}
+        accessibilityRole="button"
+        accessibilityLabel={t('catalog.ingredientsFor', { name: data.name })}
+      >
         <Badge label={tipoLabel} color={tipoColors[data.productTypeId] ?? '#888'} />
       </Pressable>
 
@@ -53,6 +57,8 @@ function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome 
         <Pressable
           onPress={() => { triggerAnimation(iconScaleAnim); onAdicionaltoCart(data, true); }}
           style={{ flexDirection: "row" }}
+          accessibilityRole="button"
+          accessibilityLabel={t('navigation.addOn')}
         >
           <FontAwesome name="flash" size={25} color={colors.primary} style={{ marginRight: spacing.xl, marginLeft: spacing.md }} />
         </Pressable>

@@ -230,6 +230,9 @@ export default function PedidoModal() {
                 key={s}
                 onPress={() => setStatus(s)}
                 style={[styles.statusBtn, { borderColor: inputBorder }, active && { backgroundColor: colors.primary }]}
+                accessibilityRole="button"
+                accessibilityLabel={translateStatus(s, t)}
+                accessibilityState={{ selected: active }}
               >
                 <Text style={{ color: active ? colors.background : textColor }}>{translateStatus(s, t)}</Text>
               </TouchableOpacity>

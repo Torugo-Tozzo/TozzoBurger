@@ -62,6 +62,9 @@ export function FiltroTipos({ data, selectedId, onSelect }: FiltroTiposProps) {
             <TouchableOpacity
               onPress={() => onSelect(selected ? null : item.id)}
               style={[styles.button, selected && styles.selectedButton]}
+              accessibilityRole="button"
+              accessibilityLabel={getProductTypeLabel(item.id, item.description, t)}
+              accessibilityState={{ selected }}
             >
               <Text style={[{ fontSize: type.body, fontWeight: "bold" }, selected && styles.selectedText]}>
                 {getProductTypeLabel(item.id, item.description, t)}

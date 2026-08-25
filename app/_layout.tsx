@@ -122,6 +122,7 @@ function RootLayoutNav() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modais/contaModal" options={{ presentation: 'modal', title: t('navigation.account') }} />
         <Stack.Screen name="modais/produtoModal" options={{ presentation: 'modal', title: t('navigation.product') }} />
+        <Stack.Screen name="modais/pedidoModal" options={{ presentation: 'modal', title: t('navigation.orders') }} />
         <Stack.Screen name="modais/contaHistoricoModal" options={{ presentation: 'modal', title: t('navigation.closedAccount') }} />
         <Stack.Screen name="modais/adicionalModal" options={{ presentation: 'modal', title: t('navigation.addOn') }} />
         <Stack.Screen name="modais/relatorioModal" options={{ presentation: 'modal', title: t('navigation.report') }} />

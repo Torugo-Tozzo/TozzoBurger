@@ -5,9 +5,9 @@ import { useTranslation } from 'react-i18next';
 export type AppLoadingStage = 'initializing' | 'authenticating' | 'preparing';
 
 const APP_LOADING_MESSAGES: Record<AppLoadingStage, string> = {
-  initializing: 'Preparando o aplicativo...',
-  authenticating: 'Verificando sua sessão...',
-  preparing: 'Preparando seus dados...',
+  initializing: 'Preparing the app…',
+  authenticating: 'Checking your session…',
+  preparing: 'Preparing your data…',
 };
 
 const APP_LOADING_KEYS: Record<AppLoadingStage, string> = {

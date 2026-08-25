@@ -25,14 +25,22 @@ export function Product({ data, onDelete, onOpen, tipoNome, ...rest }: Props) {
   const price = new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(data.price);
 
   return (
-    <Pressable {...rest}>
+    <Pressable
+      {...rest}
+      accessibilityRole="button"
+      accessibilityLabel={rest.accessibilityLabel ?? t('common.editProduct')}
+    >
       <Card bordered={false} style={styles.container}>
         <View style={styles.leftInfo}>
           <Text style={styles.name}>{data.name}</Text>
           <Text style={styles.price}>{t('products.price')}: {price}</Text>
         </View>
 
-        <Pressable onPress={() => setModalVisible(true)}>
+        <Pressable
+          onPress={() => setModalVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel={t('catalog.ingredientsFor', { name: data.name })}
+        >
           <Badge label={tipoLabel} color={tipoColors[data.productTypeId] ?? '#888'} />
         </Pressable>
 
