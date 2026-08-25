@@ -117,6 +117,7 @@ describe('mobile i18n integration surfaces', () => {
   beforeEach(() => {
     mockT.mockClear();
     mockInitializeI18n.mockClear();
+    mockInitializeI18n.mockImplementation(() => Promise.resolve('en'));
     mockUseAuth.mockReturnValue({ user: null, loading: false, login: jest.fn() });
   });
 
@@ -175,5 +176,23 @@ describe('mobile i18n integration surfaces', () => {
     expect(screens.find((screen) => screen.props.name === 'historico')?.props.options.href).toBe('/historico');
     expect(screens.find((screen) => screen.props.name === 'produtos')?.props.options.href).toBe('/produtos');
     expect(mockT).toHaveBeenCalledWith('navigation.sell');
+  });
+
+  it('keeps the translated navigation tree gated when i18n bootstrap rejects', async () => {
+    const warning = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mockInitializeI18n.mockRejectedValueOnce(new Error('resource bootstrap failed'));
+    const { default: RootLayout } = require('@/app/_layout');
+    let renderer: ReturnType<typeof create>;
+
+    await act(async () => {
+      renderer = create(<RootLayout />);
+      await Promise.resolve();
+    });
+
+    expect(mockInitializeI18n).toHaveBeenCalledTimes(1);
+    expect(renderer!.root.findAll((node) => String(node.type) === 'i18next-provider')).toHaveLength(0);
+    expect(renderer!.root.findAll((node) => String(node.type) === 'app-loading')).toHaveLength(1);
+
+    warning.mockRestore();
   });
 });

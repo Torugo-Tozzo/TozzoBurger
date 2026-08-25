@@ -39,6 +39,11 @@ const i18nReady = i18n.init({
   ns: [...I18N_NAMESPACES],
   defaultNS: 'common',
   fallbackNS: 'common',
+  // The app keeps each namespace in its own local resource file and uses
+  // namespace.key IDs at call sites. Keep that contract explicit instead of
+  // relying on i18next's default ':' separator.
+  nsSeparator: '.',
+  keySeparator: false,
   interpolation: { escapeValue: false },
 });
 

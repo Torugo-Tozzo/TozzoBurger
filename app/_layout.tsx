@@ -49,7 +49,6 @@ export default function RootLayout() {
       })
       .catch((bootstrapError) => {
         console.warn('Failed to initialize local i18n resources', bootstrapError);
-        if (mounted) setI18nInitialized(true);
       });
 
     return () => {
