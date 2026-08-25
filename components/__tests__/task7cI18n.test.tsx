@@ -7,7 +7,7 @@ import { FiltroTipos } from '@/components/FiltroTipos';
 import PedidoItem from '@/components/PedidoItem';
 import SyncIndicator from '@/components/SyncIndicator';
 import { formatarVendaParaImpressao } from '@/hooks/formatarVendaImpressao';
-import { connectToDevice } from '@/useBLE';
+import { connectToDevice, sendMessageToDevice } from '@/useBLE';
 import { i18n } from '@/i18n';
 
 const mockUseAutoSync = jest.fn();
@@ -51,6 +51,7 @@ jest.mock('@expo/vector-icons/FontAwesome', () => {
 
 const mockBleManager = jest.requireMock('react-native-ble-plx').__mockManager as {
   connectToDevice: jest.Mock;
+  cancelDeviceConnection: jest.Mock;
 };
 
 const reactNative = require('react-native') as { useColorScheme?: () => 'light' };
@@ -142,13 +143,15 @@ describe('Task 7C presentation i18n', () => {
         isCancelled: false,
         updated_at: 1,
       },
-      [{ name: 'Pão Especial', quantity: 1, price: 12.5 }],
+      [{ name: 'Pão Especial', quantity: 2, price: 12.5 }],
     );
 
     expect(receipt).toContain('Número da venda: #sale-1');
     expect(receipt).toContain('Cliente Árvore');
     expect(receipt).toContain('Pão Especial');
     expect(receipt).toContain('12,50');
+    expect(receipt).toContain('Preço unitário');
+    expect(receipt).toContain('( 2 x )');
     expect(receipt).toContain('\u001b!');
     expect(receipt).not.toContain('Numero da Venda');
   });
@@ -184,6 +187,30 @@ describe('Task 7C presentation i18n', () => {
       'Synchronization failed',
       'No internet connection. Check your connection.',
     );
+    alert.mockRestore();
+  });
+
+  it('does not report a successful print when printer disconnection fails', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const characteristic = {
+      isWritableWithResponse: true,
+      isWritableWithoutResponse: false,
+      writeWithResponse: jest.fn().mockResolvedValue(undefined),
+    };
+    const device = {
+      id: 'printer-1',
+      discoverAllServicesAndCharacteristics: jest.fn().mockResolvedValue(undefined),
+      services: jest.fn().mockResolvedValue([
+        { characteristics: jest.fn().mockResolvedValue([characteristic]) },
+      ]),
+    };
+    mockBleManager.connectToDevice.mockResolvedValueOnce(device);
+    mockBleManager.cancelDeviceConnection.mockRejectedValueOnce(new Error('disconnect failed'));
+
+    await expect(sendMessageToDevice('receipt', { uuid: 'printer-1' })).rejects.toThrow(
+      'Could not disconnect from the printer.',
+    );
+    expect(alert).toHaveBeenCalledWith('Disconnection error', 'Could not disconnect from the printer.');
     alert.mockRestore();
   });
 });

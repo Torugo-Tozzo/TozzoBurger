@@ -66,18 +66,18 @@ const BluetoothScreen = () => {
       const connectedDevice = await connectToDevice(device.id); // Conecta ao dispositivo
 
       if (connectedDevice) {
+        const disconnected = await disconnectFromDevice(device.id);
+        if (!disconnected) return;
+
         // Quando o dispositivo for conectado, registra o UUID e o name
         await setPrinter(device.id, device.name); // Salva o UUID da impressora no banco de dados
         setConnectedPrinter(device.name || device.id); // Atualiza o estado com o name da impressora conectada
         setDevices([]); // Limpa a lista de dispositivos após conectar a impressora
         Alert.alert('Impressora conectada com sucesso!');
-      } else {
-        Alert.alert('Erro ao conectar ao dispositivo.');
       }
     } catch (error) {
       console.error('Erro ao conectar:', error);
     }
-    await disconnectFromDevice(device.id); // Desconecta do dispositivo
   };
 
   // Função para remover a impressora conectada

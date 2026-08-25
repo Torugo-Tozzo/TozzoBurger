@@ -17,7 +17,6 @@ const checkAndRequestPermissions = async (): Promise<boolean> => {
     const allGranted = Object.values(granted).every(value => value === PermissionsAndroid.RESULTS.GRANTED);
 
     if (!allGranted) {
-      Alert.alert(i18n.t('printer.permissionTitle'), i18n.t('printer.permissionMessage'));
       return false;
     }
   }
@@ -38,7 +37,6 @@ const listNearbyDevices = async (): Promise<Device[]> => {
     manager.startDeviceScan(null, null, (error, device) => {
       if (error) {
         console.error('Erro ao escanear:', error.message);
-        Alert.alert(i18n.t('printer.scanErrorTitle'), i18n.t('printer.scanErrorMessage'));
         manager.stopDeviceScan();
         resolve([]);
         return;
@@ -58,7 +56,7 @@ const listNearbyDevices = async (): Promise<Device[]> => {
 };
 
 // Conecta a um dispositivo Bluetooth e registra o UUID e o nome
-const connectToDevice = async (deviceId: string): Promise<Device | null> => {
+const connectToDevice = async (deviceId: string, options: { showAlert?: boolean } = {}): Promise<Device | null> => {
   try {
     console.log(`Conectando ao dispositivo: ${deviceId}`);
     const device = await manager.connectToDevice(deviceId);
@@ -68,19 +66,23 @@ const connectToDevice = async (deviceId: string): Promise<Device | null> => {
     return device;
   } catch (error) {
     console.error('Erro ao conectar ao dispositivo:', error);
-    Alert.alert(i18n.t('printer.connectionError'), i18n.t('printer.connectionFailed'));
+    if (options.showAlert !== false) {
+      Alert.alert(i18n.t('printer.connectionError'), i18n.t('printer.connectionFailed'));
+    }
     return null;
   }
 };
 
 // Função para desconectar de um dispositivo
-const disconnectFromDevice = async (deviceId: string): Promise<void> => {
+const disconnectFromDevice = async (deviceId: string): Promise<boolean> => {
   try {
     await manager.cancelDeviceConnection(deviceId);
     console.log('Desconectado do dispositivo:', deviceId);
+    return true;
   } catch (error) {
     console.error('Erro ao desconectar do dispositivo:', error);
     Alert.alert(i18n.t('printer.disconnectionError'), i18n.t('printer.disconnectionFailed'));
+    return false;
   }
 };
 
@@ -92,7 +94,7 @@ const sendMessageToDevice = async (message: string, printer: any): Promise<void>
   }
 
   // Conectar ao dispositivo com o UUID da impressora
-  const device: Device | null = await connectToDevice(printer.uuid);
+  const device: Device | null = await connectToDevice(printer.uuid, { showAlert: false });
   if (!device) {
     console.error('Falha ao conectar à impressora.');
     throw new Error(i18n.t('printer.connectionFailed'));
@@ -133,7 +135,10 @@ const sendMessageToDevice = async (message: string, printer: any): Promise<void>
   }
 
   // Desconectar do dispositivo
-  await disconnectFromDevice(printer.uuid);
+  const disconnected = await disconnectFromDevice(printer.uuid);
+  if (!disconnected) {
+    throw new Error(i18n.t('printer.disconnectionFailed'));
+  }
   console.log('Desconectado da impressora.');
 };
 

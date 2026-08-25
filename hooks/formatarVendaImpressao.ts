@@ -13,6 +13,9 @@ export function formatarVendaParaImpressao(venda: Sale, produtos: Produto[]): st
     style: 'currency',
     currency: 'BRL',
   }).format(value);
+  const formatQuantity = (value: number) => new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 0,
+  }).format(value);
   const soldAt = new Date(venda.soldAt);
   const formattedDate = new Intl.DateTimeFormat(locale).format(soldAt);
   const formattedTime = new Intl.DateTimeFormat(locale, {
@@ -41,7 +44,7 @@ export function formatarVendaParaImpressao(venda: Sale, produtos: Produto[]): st
     const numPontosLinha = 48 - (productName.length + totalPrice.length + 8);
     const pontos = ".".repeat(numPontosLinha > 0 ? numPontosLinha : 0);
 
-    printContent += `\x1bE1( ${produto.quantity} x ) ${productName}${pontos}${totalPrice}\x1bE0\n`;
+    printContent += `\x1bE1( ${formatQuantity(produto.quantity)} x ) ${productName}${pontos}${totalPrice}\x1bE0\n`;
     
     printContent += produto.quantity > 1
       ? `    \x1bE1${i18n.t('printer.unitPrice')}: ${formatCurrency(produto.price)}\x1bE0\n\n`
