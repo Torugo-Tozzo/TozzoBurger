@@ -15,6 +15,7 @@
   "deleteConfirm": "क्या आप यह ऑर्डर हटाना चाहते हैं?",
   "delete": "हटाएं",
   "generate": "ऑर्डर बनाएँ",
+  "generateSale": "बिक्री बनाएँ",
   "createdTitle": "ऑर्डर बनाया गया",
   "createdMessage": "ऑर्डर {{id}} सफलतापूर्वक बनाया गया।",
   "openLimitTitle": "सीमा पूरी हो गई",

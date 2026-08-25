@@ -15,6 +15,7 @@
   "deleteConfirm": "要删除此订单吗？",
   "delete": "删除",
   "generate": "生成订单",
+  "generateSale": "生成销售",
   "createdTitle": "订单已创建",
   "createdMessage": "订单 {{id}} 已成功创建。",
   "openLimitTitle": "已达到上限",

@@ -15,6 +15,7 @@
   "deleteConfirm": "هل تريد حذف هذا الطلب؟",
   "delete": "حذف",
   "generate": "إنشاء الطلب",
+  "generateSale": "إنشاء عملية بيع",
   "createdTitle": "تم إنشاء الطلب",
   "createdMessage": "تم إنشاء الطلب {{id}} بنجاح.",
   "openLimitTitle": "تم بلوغ الحد",

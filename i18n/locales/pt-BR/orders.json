@@ -15,6 +15,7 @@
   "deleteConfirm": "Deseja excluir este pedido?",
   "delete": "Excluir",
   "generate": "Gerar pedido",
+  "generateSale": "Gerar venda",
   "createdTitle": "Pedido gerado!",
   "createdMessage": "Pedido {{id}} criado com sucesso.",
   "openLimitTitle": "Limite atingido",

@@ -262,6 +262,8 @@ export default function ContaModalScreen() {
             style={[styles.iconBtn, isCartEmpty && styles.buttonDisabled]}
             onPress={handleShare}
             disabled={isCartEmpty}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.share')}
           >
             <Ionicons name="share-social" size={22} color={colors.background} />
           </TouchableOpacity>
@@ -275,6 +277,8 @@ export default function ContaModalScreen() {
           style={[styles.iconBtnDanger, isCartEmpty && styles.buttonDisabled]}
           onPress={limparConta}
           disabled={isCartEmpty}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.clear')}
         >
           <FontAwesome name="trash" size={20} color="#fff" />
         </TouchableOpacity>

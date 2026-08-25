@@ -15,6 +15,7 @@
   "deleteConfirm": "Voulez-vous supprimer cette commande ?",
   "delete": "Supprimer",
   "generate": "Créer la commande",
+  "generateSale": "Générer la vente",
   "createdTitle": "Commande créée",
   "createdMessage": "La commande {{id}} a été créée.",
   "openLimitTitle": "Limite atteinte",

@@ -147,11 +147,21 @@ export default function PedidoModal() {
           <Text style={[styles.qtyText, { color: textColor }]}>{item.quantity}</Text>
         ) : (
           <RNView style={styles.quantityRow}>
-            <TouchableOpacity onPress={() => changeQuantidade(item.productId, -1)} style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}>
+            <TouchableOpacity
+              onPress={() => changeQuantidade(item.productId, -1)}
+              style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.decreaseQuantity')}
+            >
               <Text style={[styles.qtyBtnText, { color: colors.background }]}>-</Text>
             </TouchableOpacity>
             <Text style={[styles.qtyText, { color: textColor }]}>{item.quantity}</Text>
-            <TouchableOpacity onPress={() => changeQuantidade(item.productId, 1)} style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}>
+            <TouchableOpacity
+              onPress={() => changeQuantidade(item.productId, 1)}
+              style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.increaseQuantity')}
+            >
               <Text style={[styles.qtyBtnText, { color: colors.background }]}>+</Text>
             </TouchableOpacity>
           </RNView>
@@ -244,7 +254,7 @@ export default function PedidoModal() {
       {!clienteBloqueado && (
         <RNView style={styles.buttonsRow}>
           <Button title={t('orders.addItem')} onPress={handleEditInConta} variant="outline" style={styles.btnSpacing} />
-          {!isCliente && <Button title={t('sales.direct')} onPress={handleGerarVenda} style={{ flex: 1 }} />}
+          {!isCliente && <Button title={t('orders.generateSale')} onPress={handleGerarVenda} style={{ flex: 1 }} />}
         </RNView>
       )}
 
@@ -272,7 +282,12 @@ export default function PedidoModal() {
       ) : (
         <RNView style={styles.buttonsRow}>
           {!isCliente && (
-            <TouchableOpacity style={[styles.deleteBtn, { backgroundColor: Colors.status.danger }]} onPress={handleDelete}>
+            <TouchableOpacity
+              style={[styles.deleteBtn, { backgroundColor: Colors.status.danger }]}
+              onPress={handleDelete}
+              accessibilityRole="button"
+              accessibilityLabel={t('orders.delete')}
+            >
               <FontAwesome name="trash" size={18} color="#fff" />
             </TouchableOpacity>
           )}

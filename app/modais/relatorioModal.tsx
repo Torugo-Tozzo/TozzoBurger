@@ -10,13 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/Colors';
 import { useTranslation } from 'react-i18next';
 import { getProductTypeLabel } from '@/components/productTypeLabel';
-
-type RelatorioProduto = {
-  id: string;
-  name: string;
-  price: number;
-  totalVendido: number;
-};
+import { buildReportChartData, type RelatorioProduto } from '@/app/modais/reportChartData';
 
 type TipoGrafico = 'pizza' | 'progresso';
 
@@ -84,7 +78,7 @@ export default function RelatorioModal() {
     }
     
     fetchTipoDescricao();
-  }, [productTypeId]);
+  }, [productTypeId, i18n.language]);
   
   useEffect(() => {
     async function carregarDadosRelatorio() {
@@ -117,86 +111,6 @@ export default function RelatorioModal() {
     carregarDadosRelatorio();
   }, [dataInicial, dataFinal, productTypeId]);
 
-  const prepararDadosGrafico = () => {
-    if (!relatorioData || relatorioData.length === 0) 
-      return { 
-        dadosPizza: [], 
-        dadosProgresso: { data: [], colors: [], labels: [] }
-      };
-
-    const dadosOrdenados = [...relatorioData].sort((a, b) => b.totalVendido - a.totalVendido);
-    
-    let dadosPizza = [];
-    let labels = [];
-    let values = [];
-    let colors = [];
-    
-    if (dadosOrdenados.length <= 5) {
-      dadosPizza = dadosOrdenados.map((item, index) => {
-        const color = getColor(index);
-        colors.push(color);
-        return {
-          name: item.name,
-          totalVendido: item.totalVendido,
-          color: color,
-          legendFontColor: '#7F7F7F',
-          legendFontSize: 12
-        };
-      });
-      
-      labels = dadosOrdenados.map(item => item.name);
-      values = dadosOrdenados.map(item => item.totalVendido);
-    } else {
-      const top5 = dadosOrdenados.slice(0, 5);
-      const outros = dadosOrdenados.slice(5);
-      
-      const totalOutros = outros.reduce((sum, item) => sum + item.totalVendido, 0);
-      
-      top5.forEach((item, index) => {
-        const color = getColor(index);
-        colors.push(color);
-        dadosPizza.push({
-          name: item.name,
-          totalVendido: item.totalVendido,
-          color: color,
-          legendFontColor: '#7F7F7F',
-          legendFontSize: 12
-        });
-      });
-      
-      const outrosColor = getColor(5);
-      colors.push(outrosColor);
-      dadosPizza.push({
-        name: t('charts.other'),
-        totalVendido: totalOutros,
-        color: outrosColor,
-        legendFontColor: '#7F7F7F',
-        legendFontSize: 12
-      });
-      
-      labels = [...top5.map(item => item.name), 'Outros'];
-      values = [...top5.map(item => item.totalVendido), totalOutros];
-    }
-    
-    const totalVendido = values.reduce((sum, value) => sum + value, 0);
-    
-    const dadosProgresso = {
-      data: values.map(value => value / totalVendido),
-      colors: colors,
-      labels: labels
-    };
-    
-    return { dadosPizza, dadosProgresso };
-  };
-  
-  const getColor = (index: number) => {
-    const colors = [
-      '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', 
-      '#FF9F40', '#8AC054', '#5D9CEC', '#F06292', '#7986CB'
-    ];
-    return colors[index % colors.length];
-  };
-  
   const ListHeader = () => (
     <View style={[styles.listHeaderContainer, { backgroundColor: colors.text, borderBottomColor: colors.border }]}>
       <Text style={[styles.listHeaderText, { color: colors.background }]}>{t('charts.product')}</Text>
@@ -248,7 +162,7 @@ export default function RelatorioModal() {
     }
   };
 
-  const { dadosPizza, dadosProgresso } = prepararDadosGrafico();
+  const { dadosPizza, dadosProgresso } = buildReportChartData(relatorioData, (key) => t(key));
   const screenWidth = Dimensions.get('window').width - 40;
 
   return (
