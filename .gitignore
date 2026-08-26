@@ -43,3 +43,6 @@ yarn-error.*
 # Superpowers scratch (SDD workspaces, brainstorm mockups)
 .superpowers/
 /audit-context/
+
+# graphify knowledge-graph snapshot (regenerated via /graphify, not part of history)
+graphify-out/
