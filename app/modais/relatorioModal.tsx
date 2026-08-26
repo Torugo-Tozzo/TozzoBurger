@@ -1,29 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions, useColorScheme, Share } from 'react-native';
+import { StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions, useColorScheme, Share, Alert } from 'react-native';
 import { View, Text } from '@/components/Themed';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useProductDatabase } from '@/database/useProductDatabase';
-import { useVendasDatabase } from '@/database/useVendaDatabse';
+import { useSaleDatabase } from '@/database/useSaleDatabase';
 import { Picker } from "@react-native-picker/picker";
 import { PieChart, ProgressChart } from 'react-native-chart-kit';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/Colors';
-
-type RelatorioProduto = {
-  id: string;
-  nome: string;
-  preco: number;
-  totalVendido: number;
-};
+import { useTranslation } from 'react-i18next';
+import { getProductTypeLabel } from '@/components/productTypeLabel';
+import { buildReportChartData, type RelatorioProduto } from '@/app/modais/reportChartData';
 
 type TipoGrafico = 'pizza' | 'progresso';
 
 export default function RelatorioModal() {
   const params = useLocalSearchParams();
-  const { getTipoProdutos } = useProductDatabase();
-  const { getRelatorioPorPeriodo } = useVendasDatabase();
+  const { getProductTypes } = useProductDatabase();
+  const { getSalesReportByPeriod } = useSaleDatabase();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { t, i18n } = useTranslation();
 
   const [dataInicial] = useState(() =>
     params.dataInicial ? new Date(params.dataInicial as string) : new Date()
@@ -33,27 +30,28 @@ export default function RelatorioModal() {
     params.dataFinal ? new Date(params.dataFinal as string) : new Date()
   );
   
-  const [tipoProdutoId, setTipoProdutoId] = useState<number | null>(
-    params.tipoProdutoId && params.tipoProdutoId !== '' 
-      ? Number(params.tipoProdutoId) 
+  const [productTypeId, setTipoProdutoId] = useState<number | null>(
+    params.productTypeId && params.productTypeId !== ''
+      ? Number(params.productTypeId)
       : 100
   );
   
   const [tipoGrafico, setTipoGrafico] = useState<TipoGrafico>('pizza');
-  const [tiposProdutos, setTiposProdutos] = useState<{ id: number; descricao: string }[]>([]);
+  const [tiposProdutos, setTiposProdutos] = useState<{ id: number; description: string }[]>([]);
   
-  const dataInicialFormatada = dataInicial.toLocaleDateString('pt-BR');
-  const dataFinalFormatada = dataFinal.toLocaleDateString('pt-BR');
+  const dataInicialFormatada = dataInicial.toLocaleDateString(i18n.language);
+  const dataFinalFormatada = dataFinal.toLocaleDateString(i18n.language);
+  const formatCurrency = (value: number) => new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(value);
   
-  const [tipoDescricao, setTipoDescricao] = useState<string>("Todos os tipos");
+  const [tipoDescricao, setTipoDescricao] = useState<string>(t('charts.allTypes'));
   const [relatorioData, setRelatorioData] = useState<RelatorioProduto[]>([]);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     async function fetchTiposProdutos() {
       try {
-        const tipos = await getTipoProdutos();
-        setTiposProdutos(tipos);
+        const types = await getProductTypes();
+        setTiposProdutos(types);
       } catch (error) {
         console.error('Erro ao carregar tipos de produtos:', error);
       }
@@ -64,23 +62,23 @@ export default function RelatorioModal() {
   
   useEffect(() => {
     async function fetchTipoDescricao() {
-      if (tipoProdutoId && tipoProdutoId !== 100) {
+      if (productTypeId && productTypeId !== 100) {
         try {
-          const tipos = await getTipoProdutos();
-          const tipo = tipos.find(t => t.id === tipoProdutoId);
-          if (tipo) {
-            setTipoDescricao(tipo.descricao);
+          const types = await getProductTypes();
+          const productType = types.find(t => t.id === productTypeId);
+          if (productType) {
+            setTipoDescricao(getProductTypeLabel(productType.id, productType.description, t));
           }
         } catch (error) {
           console.error('Erro ao carregar tipo de produto:', error);
         }
       } else {
-        setTipoDescricao("Todos os tipos");
+        setTipoDescricao(t('charts.allTypes'));
       }
     }
     
     fetchTipoDescricao();
-  }, [tipoProdutoId]);
+  }, [productTypeId, i18n.language]);
   
   useEffect(() => {
     async function carregarDadosRelatorio() {
@@ -88,115 +86,36 @@ export default function RelatorioModal() {
       try {
         let tipoIdParam = '';
         
-        if (tipoProdutoId) {
-          if (tipoProdutoId === 100) {
+        if (productTypeId) {
+          if (productTypeId === 100) {
             tipoIdParam = '';
           } else {
-            tipoIdParam = tipoProdutoId.toString();
+            tipoIdParam = productTypeId.toString();
           }
         }
         
-        const dados = await getRelatorioPorPeriodo(
+        const report = await getSalesReportByPeriod(
           dataInicial.toISOString(),
           dataFinal.toISOString(),
           tipoIdParam
         );
-        setRelatorioData(dados);
+        setRelatorioData(report);
       } catch (error) {
-        console.error('Erro ao carregar dados do relatório:', error);
+        console.error('Failed to load sales report:', error);
+        Alert.alert(t('common.error'), t('errors.loadFailed'));
       } finally {
         setLoading(false);
       }
     }
     
     carregarDadosRelatorio();
-  }, [dataInicial, dataFinal, tipoProdutoId]);
+  }, [dataInicial, dataFinal, productTypeId]);
 
-  const prepararDadosGrafico = () => {
-    if (!relatorioData || relatorioData.length === 0) 
-      return { 
-        dadosPizza: [], 
-        dadosProgresso: { data: [], colors: [], labels: [] }
-      };
-
-    const dadosOrdenados = [...relatorioData].sort((a, b) => b.totalVendido - a.totalVendido);
-    
-    let dadosPizza = [];
-    let labels = [];
-    let values = [];
-    let colors = [];
-    
-    if (dadosOrdenados.length <= 5) {
-      dadosPizza = dadosOrdenados.map((item, index) => {
-        const color = getColor(index);
-        colors.push(color);
-        return {
-          name: item.nome,
-          totalVendido: item.totalVendido,
-          color: color,
-          legendFontColor: '#7F7F7F',
-          legendFontSize: 12
-        };
-      });
-      
-      labels = dadosOrdenados.map(item => item.nome);
-      values = dadosOrdenados.map(item => item.totalVendido);
-    } else {
-      const top5 = dadosOrdenados.slice(0, 5);
-      const outros = dadosOrdenados.slice(5);
-      
-      const totalOutros = outros.reduce((sum, item) => sum + item.totalVendido, 0);
-      
-      top5.forEach((item, index) => {
-        const color = getColor(index);
-        colors.push(color);
-        dadosPizza.push({
-          name: item.nome,
-          totalVendido: item.totalVendido,
-          color: color,
-          legendFontColor: '#7F7F7F',
-          legendFontSize: 12
-        });
-      });
-      
-      const outrosColor = getColor(5);
-      colors.push(outrosColor);
-      dadosPizza.push({
-        name: 'Outros',
-        totalVendido: totalOutros,
-        color: outrosColor,
-        legendFontColor: '#7F7F7F',
-        legendFontSize: 12
-      });
-      
-      labels = [...top5.map(item => item.nome), 'Outros'];
-      values = [...top5.map(item => item.totalVendido), totalOutros];
-    }
-    
-    const totalVendido = values.reduce((sum, value) => sum + value, 0);
-    
-    const dadosProgresso = {
-      data: values.map(value => value / totalVendido),
-      colors: colors,
-      labels: labels
-    };
-    
-    return { dadosPizza, dadosProgresso };
-  };
-  
-  const getColor = (index: number) => {
-    const colors = [
-      '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', 
-      '#FF9F40', '#8AC054', '#5D9CEC', '#F06292', '#7986CB'
-    ];
-    return colors[index % colors.length];
-  };
-  
   const ListHeader = () => (
     <View style={[styles.listHeaderContainer, { backgroundColor: colors.text, borderBottomColor: colors.border }]}>
-      <Text style={[styles.listHeaderText, { color: colors.background }]}>Produto</Text>
-      <Text style={[styles.listHeaderText, { color: colors.background }]}>Nº Vendas</Text>
-      <Text style={[styles.listHeaderText, { color: colors.background }]}>Total</Text>
+      <Text style={[styles.listHeaderText, { color: colors.background }]}>{t('charts.product')}</Text>
+      <Text style={[styles.listHeaderText, { color: colors.background }]}>{t('charts.numberSales')}</Text>
+      <Text style={[styles.listHeaderText, { color: colors.background }]}>{t('charts.total')}</Text>
     </View>
   );
   
@@ -219,39 +138,42 @@ export default function RelatorioModal() {
   
   const compartilharRelatorio = async (relatorioData: RelatorioProduto[], dataInicial: Date, dataFinal: Date) => {
     try {
-      const dataInicialFormatada = dataInicial.toLocaleDateString('pt-BR');
-      const dataFinalFormatada = dataFinal.toLocaleDateString('pt-BR');
+      const dataInicialFormatada = dataInicial.toLocaleDateString(i18n.language);
+      const dataFinalFormatada = dataFinal.toLocaleDateString(i18n.language);
       
-      let textoRelatorio = `RELATÓRIO DE VENDAS - PERÍODO: ${dataInicialFormatada} a ${dataFinalFormatada}\n\n`;
-      textoRelatorio += "PRODUTOS VENDIDOS:\n";
+      let textoRelatorio = `${t('charts.reportTitle').toUpperCase()} - ${t('charts.period').toUpperCase()}: ${dataInicialFormatada} ${t('charts.until')} ${dataFinalFormatada}\n\n`;
+      textoRelatorio += `${t('charts.mostSold').toUpperCase()}:\n`;
       
       relatorioData.forEach((item, index) => {
-        textoRelatorio += `${index + 1}. ${item.nome}; ${item.totalVendido} unidades: Total: R$ ${(item.preco * item.totalVendido).toFixed(2)}\n`;
+        textoRelatorio += `${index + 1}. ${item.name}; ${item.totalVendido} ${t('charts.units')}: ${t('charts.total')}: ${formatCurrency(item.price * item.totalVendido)}\n`;
       });
       
       const totalGeral = relatorioData.reduce((total, item) => total + item.totalVendido, 0);
-      const totalPreco = relatorioData.reduce((total, item) => total + (item.preco * item.totalVendido), 0);
-      textoRelatorio += `\nitens vendidos: ${totalGeral} unidades | Total: R$ ${totalPreco.toFixed(2)}`;
+      const totalPreco = relatorioData.reduce((total, item) => total + (item.price * item.totalVendido), 0);
+      textoRelatorio += `\n${t('charts.grandTotal')}: ${totalGeral} ${t('charts.units')} | ${t('charts.total')}: ${formatCurrency(totalPreco)}`;
 
       await Share.share({
         message: textoRelatorio,
-        title: 'Relatório de Vendas'
+        title: t('charts.reportTitle')
       });
     } catch (error) {
-      console.error('Erro ao compartilhar relatório:', error);
+      console.error('Failed to share sales report:', error);
+      Alert.alert(t('common.error'), t('errors.generic'));
     }
   };
 
-  const { dadosPizza, dadosProgresso } = prepararDadosGrafico();
+  const { dadosPizza, dadosProgresso } = buildReportChartData(relatorioData, (key) => t(key));
   const screenWidth = Dimensions.get('window').width - 40;
 
   return (
     <View style={styles.container}>
       <View style={[styles.header, { backgroundColor: colors.text, borderBottomColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.background }]}>Relatório de Vendas</Text>
+        <Text style={[styles.title, { color: colors.background }]}>{t('charts.reportTitle')}</Text>
         <TouchableOpacity
           style={styles.closeButton}
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.close')}
         >
           <Text style={[styles.closeButtonText, { color: colors.background }]}>X</Text>
         </TouchableOpacity>
@@ -259,39 +181,41 @@ export default function RelatorioModal() {
       
       <View style={styles.dateInfoContainer}>
         <Text style={styles.dateInfoText}>
-          Período: {dataInicialFormatada} até {dataFinalFormatada}
+          {t('charts.period')}: {dataInicialFormatada} {t('charts.until')} {dataFinalFormatada}
         </Text>
       </View>
       
       <ScrollView style={styles.content}>
         <View style={styles.chartControls}>
           <View style={styles.controlRow}>
-            <Text style={styles.controlLabel}>Tipo de Gráfico:</Text>
+            <Text style={styles.controlLabel}>{t('charts.title')}:</Text>
             <View style={styles.pickerSmallContainer}>
               <Picker
                 selectedValue={tipoGrafico}
                 onValueChange={(itemValue) => setTipoGrafico(itemValue)}
                 style={{ color: colors.text }}
                 dropdownIconColor={colors.text}
+                accessibilityLabel={t('charts.title')}
               >
-                <Picker.Item label="Pizza" value="pizza" />
-                <Picker.Item label="Progresso" value="progresso" />
+                <Picker.Item label={t('charts.pie')} value="pizza" />
+                <Picker.Item label={t('charts.progress')} value="progresso" />
               </Picker>
             </View>
           </View>
           
           <View style={styles.controlRow}>
-            <Text style={styles.controlLabel}>Tipo de Produto:</Text>
+            <Text style={styles.controlLabel}>{t('products.productType')}:</Text>
             <View style={styles.pickerSmallContainer}>
               <Picker
-                selectedValue={tipoProdutoId}
+                selectedValue={productTypeId}
                 onValueChange={(itemValue) => setTipoProdutoId(itemValue)}
                 style={{ color: colors.text }}
                 dropdownIconColor={colors.text}
+                accessibilityLabel={t('products.productType')}
               >
-                <Picker.Item label="Todos os tipos" value={100} />
+                <Picker.Item label={t('charts.allTypes')} value={100} />
                 {tiposProdutos.map((tipo) => (
-                  <Picker.Item key={tipo.id} label={tipo.descricao} value={tipo.id} />
+                  <Picker.Item key={tipo.id} label={getProductTypeLabel(tipo.id, tipo.description, t)} value={tipo.id} />
                 ))}
               </Picker>
             </View>
@@ -299,16 +223,16 @@ export default function RelatorioModal() {
         </View>
         
         <View style={styles.chartContainer}>
-          <Text style={styles.subtitle}>Produtos mais vendidos - {tipoDescricao}</Text>
+          <Text style={styles.subtitle}>{t('charts.mostSold')} - {tipoDescricao}</Text>
           
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.loadingText}>Carregando dados...</Text>
+              <Text style={styles.loadingText}>{t('charts.loading')}</Text>
             </View>
           ) : relatorioData.length === 0 ? (
             <Text style={styles.emptyText}>
-              Nenhum produto vendido no período selecionado.
+              {t('charts.emptyPeriod')}
             </Text>
           ) : (
             <>
@@ -337,7 +261,7 @@ export default function RelatorioModal() {
                           ]} 
                         />
                         <Text style={styles.legendText}>
-                          {item.name} ({item.totalVendido} un.)
+                          {item.name} ({item.totalVendido} {t('charts.units')})
                         </Text>
                       </View>
                     ))}
@@ -389,31 +313,33 @@ export default function RelatorioModal() {
         </View>
         
         <Text style={[styles.subtitle, { marginTop: 20 }]}>
-          Lista de Produtos Vendidos de {dataInicialFormatada} à {dataFinalFormatada}
+          {t('charts.listTitle', { from: dataInicialFormatada, to: dataFinalFormatada })}
         </Text>
         {!loading && relatorioData.length > 0 && (
           <>
             <ListHeader />
             {relatorioData.map(item => (
               <View key={item.id} style={styles.itemContainer}>
-                <Text style={styles.itemTabela}>{item.nome}</Text>
-                <Text style={styles.itemTabela}>{item.totalVendido} un.</Text>
-                <Text style={styles.itemTabela}>R$ {(item.preco * item.totalVendido).toFixed(2)}</Text>
+                <Text style={styles.itemTabela}>{item.name}</Text>
+                <Text style={styles.itemTabela}>{item.totalVendido} {t('charts.units')}</Text>
+                <Text style={styles.itemTabela}>{formatCurrency(item.price * item.totalVendido)}</Text>
               </View>
             ))}
             
               <View style={styles.itemContainer}>
-                <Text style={styles.itemTabela}>Total Geral</Text>
-                <Text style={styles.itemTabela}>{relatorioData.reduce((total, item) => total + item.totalVendido, 0)} un.</Text>
-                <Text style={styles.itemTabela}>R$ {relatorioData.reduce((total, item) => total + (item.preco * item.totalVendido), 0).toFixed(2)}</Text>
+                <Text style={styles.itemTabela}>{t('charts.grandTotal')}</Text>
+                <Text style={styles.itemTabela}>{relatorioData.reduce((total, item) => total + item.totalVendido, 0)} {t('charts.units')}</Text>
+                <Text style={styles.itemTabela}>{formatCurrency(relatorioData.reduce((total, item) => total + (item.price * item.totalVendido), 0))}</Text>
               </View>
             
             <TouchableOpacity
               style={[styles.shareButton, { backgroundColor: colors.text }]}
               onPress={() => compartilharRelatorio(relatorioData, dataInicial, dataFinal)}
+              accessibilityRole="button"
+              accessibilityLabel={t('charts.share')}
             >
               <Ionicons name="share-outline" size={20} color={colors.background} />
-              <Text style={[styles.shareButtonText, { color: colors.background }]}>Compartilhar</Text>
+              <Text style={[styles.shareButtonText, { color: colors.background }]}>{t('charts.share')}</Text>
             </TouchableOpacity>
           </>
         )}

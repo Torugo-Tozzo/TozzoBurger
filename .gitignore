@@ -42,3 +42,4 @@ yarn-error.*
 
 # Superpowers scratch (SDD workspaces, brainstorm mockups)
 .superpowers/
+/audit-context/

@@ -18,7 +18,7 @@ jest.mock('@/components/ui/ListFrame', () => ({ ListFrame: () => null }));
 jest.mock('@/components/ui/RecordCardSkeleton', () => ({ RecordCardSkeleton: () => null }));
 jest.mock('@/components/VendaItem', () => ({ VendaItem: () => null }));
 jest.mock('@/components/VendasFilterModal', () => () => null);
-jest.mock('@/database/useVendaDatabse', () => ({ useVendasDatabase: jest.fn() }));
+jest.mock('@/database/useSaleDatabase', () => ({ useSaleDatabase: jest.fn() }));
 jest.mock('@/database/useProductDatabase', () => ({ useProductDatabase: jest.fn() }));
 jest.mock('@/database/usePrinterDatabase', () => ({ usePrinterDatabase: jest.fn() }));
 jest.mock('@/context/AuthContext', () => ({ useAuth: jest.fn() }));
@@ -33,8 +33,8 @@ describe('paginação do histórico', () => {
   });
 
   it('remove paginação recebida nos filtros antes de aplicar a página atual', () => {
-    expect(withPage({ cliente: 'Ana', page: 99, limit: 1 }, 2)).toEqual({
-      cliente: 'Ana',
+    expect(withPage({ customerName: 'Ana', page: 99, limit: 1 }, 2)).toEqual({
+      customerName: 'Ana',
       page: 2,
       limit: 50,
     });

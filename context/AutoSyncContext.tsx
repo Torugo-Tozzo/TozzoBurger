@@ -3,7 +3,7 @@ import { AppState, AppStateStatus } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useAuth } from '@/context/AuthContext';
-import { sincronizarComServidor } from '@/database/useSyncDatabase';
+import { synchronizeWithServer } from '@/database/useSyncDatabase';
 import { runWithLock } from '@/database/syncGuard';
 
 type LastSyncResult = { ok: boolean | null; message?: string | null; time?: number | null };
@@ -34,9 +34,9 @@ export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) =>
     try {
       const rows = await (database as any).getAllAsync(
         `SELECT
-          (SELECT COUNT(*) FROM TB_PRODUTOS WHERE sync_status = 'pending') +
-          (SELECT COUNT(*) FROM TB_VENDAS WHERE sync_status = 'pending') +
-          (SELECT COUNT(*) FROM TB_PEDIDOS WHERE sync_status = 'pending') as total`
+          (SELECT COUNT(*) FROM TB_PRODUCTS WHERE sync_status = 'pending') +
+          (SELECT COUNT(*) FROM TB_SALES WHERE sync_status = 'pending') +
+          (SELECT COUNT(*) FROM TB_ORDERS WHERE sync_status = 'pending') as total`
       );
       setPendingCount(rows?.[0]?.total ?? 0);
     } catch {
@@ -57,7 +57,7 @@ export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) =>
       res = await runWithLock(async () => {
         setIsSyncing(true);
         try {
-          return await sincronizarComServidor(database as any, token);
+          return await synchronizeWithServer(database as any, token);
         } finally {
           setIsSyncing(false);
         }

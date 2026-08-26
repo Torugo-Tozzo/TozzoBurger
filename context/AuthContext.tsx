@@ -2,15 +2,15 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import * as api from '@/services/api';
 import * as SecureStore from 'expo-secure-store';
 import { useSQLiteContext } from 'expo-sqlite';
-import { seedTipoProduto } from '@/database/initializeDatabase';
-import { sincronizarComServidor } from '@/database/useSyncDatabase';
+import { seedProductType } from '@/database/initializeDatabase';
+import { synchronizeWithServer } from '@/database/useSyncDatabase';
 import { runWithLock } from '@/database/syncGuard';
 
 type User = {
   id?: number | string;
-  nome?: string;
+  name?: string;
   email?: string;
-  estabelecimentoId?: number | string | null;
+  establishmentId?: number | string | null;
   role?: string | null;
 };
 
@@ -44,11 +44,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (me && mounted) {
               setUser(me);
               try {
-                const schema = await database.getFirstAsync<{ usuarioId?: number | null }>(`SELECT usuarioId FROM TB_SCHEMA LIMIT 1`).catch(() => null);
-                const usuarioId = schema && typeof schema.usuarioId !== 'undefined' ? schema.usuarioId : null;
-                if (!usuarioId) {
+                const schema = await database.getFirstAsync<{ userId?: number | null }>(`SELECT userId FROM TB_SCHEMA LIMIT 1`).catch(() => null);
+                const userId = schema && typeof schema.userId !== 'undefined' ? schema.userId : null;
+                if (!userId) {
                       const uid = Number((me as any).id);
-                      await database.runAsync('UPDATE TB_SCHEMA SET usuarioId = ?', [!isNaN(uid) ? uid : null]);
+                      await database.runAsync('UPDATE TB_SCHEMA SET userId = ?', [!isNaN(uid) ? uid : null]);
                 }
               } catch (err) {
                 console.warn('Failed to run seedProdutosPadrao after rehydrate', err);
@@ -70,22 +70,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               try {
                 const prev = await database.getFirstAsync<{
                   id?: number;
-                  nome?: string;
+                  name?: string;
                   email?: string;
-                  estabelecimentoId?: number | string; nomeEstabelecimento?: string;
+                  establishmentId?: number | string; establishmentName?: string;
                   role?: string | null;
-                }>(`SELECT id, nome, email, estabelecimentoId, nomeEstabelecimento, role FROM TB_USUARIO LIMIT 1`).catch(() => null);
+                }>(`SELECT id, name, email, establishmentId, establishmentName, role FROM TB_USERS LIMIT 1`).catch(() => null);
                 if (prev && mounted) {
                   setUser({
                     id: prev.id,
-                    nome: prev.nome,
+                    name: prev.name,
                     email: prev.email,
-                    estabelecimentoId: prev.estabelecimentoId,
-                    role: prev.role ?? 'FUNCIONARIO',
+                    establishmentId: prev.establishmentId,
+                    role: prev.role ?? 'EMPLOYEE',
                   });
                 }
               } catch (e) {
-                console.warn('Failed to load local TB_USUARIO after network error', e);
+                console.warn('Failed to load local TB_USERS after network error', e);
               }
             }
           }
@@ -127,72 +127,72 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(me);
 
         try {
-          const prev = await database.getFirstAsync<{ id?: number; email?: string; estabelecimentoId?: string }>(`SELECT id, email, estabelecimentoId FROM TB_USUARIO LIMIT 1`).catch(() => null);
+          const prev = await database.getFirstAsync<{ id?: number; email?: string; establishmentId?: string }>(`SELECT id, email, establishmentId FROM TB_USERS LIMIT 1`).catch(() => null);
           const meId = (me as any)?.id;
           const meEmail = (me as any)?.email ?? null;
-          const meEstab = (me as any)?.estabelecimentoId ?? null;
-          const meRole = (me as any)?.role ?? 'FUNCIONARIO';
-          const meNome = (me as any)?.nome ?? null;
-          const meNomeEstab = (me as any)?.nomeEstabelecimento ?? null;
+          const meEstab = (me as any)?.establishmentId ?? null;
+          const meRole = (me as any)?.role ?? 'EMPLOYEE';
+          const meNome = (me as any)?.name ?? null;
+          const meNomeEstab = (me as any)?.establishmentName ?? null;
           const meIdNum = isNaN(Number(meId)) ? null : Number(meId);
 
           const insertUser = async () => {
-            await database.execAsync('DELETE FROM TB_USUARIO;');
+            await database.execAsync('DELETE FROM TB_USERS;');
             await database.runAsync(
-              'INSERT INTO TB_USUARIO (nome, email, estabelecimentoId, nomeEstabelecimento, role) VALUES (?, ?, ?, ?, ?)',
+              'INSERT INTO TB_USERS (name, email, establishmentId, establishmentName, role) VALUES (?, ?, ?, ?, ?)',
               [meNome, meEmail, meEstab, meNomeEstab, meRole]
             );
           };
 
           if (!prev) {
             await insertUser();
-            await database.runAsync('UPDATE TB_SCHEMA SET usuarioId = ?, estabelecimentoId = ?', [meIdNum, meEstab]).catch((e) => console.warn('[auth] db op failed', e));
-            await seedTipoProduto(database).catch((e) => console.warn('[auth] db op failed', e));
+            await database.runAsync('UPDATE TB_SCHEMA SET userId = ?, establishmentId = ?', [meIdNum, meEstab]).catch((e) => console.warn('[auth] db op failed', e));
+            await seedProductType(database).catch((e) => console.warn('[auth] db op failed', e));
           } else {
-            if (String(prev.estabelecimentoId) !== String(meEstab)) {
+            if (String(prev.establishmentId) !== String(meEstab)) {
               try {
                 await database.execAsync('BEGIN;');
                 const deletes = [
-                  'DELETE FROM RL_VENDA_PRODUTO;',
-                  'DELETE FROM RL_PEDIDO_PRODUTO;',
-                  'DELETE FROM TB_PRODUTOS;',
-                  'DELETE FROM TB_TP_PRODUTO;',
-                  'DELETE FROM TB_VENDAS;',
-                  'DELETE FROM TB_PEDIDOS;',
-                  'DELETE FROM TB_IMPRESSORAS;'
+                  'DELETE FROM RL_SALE_PRODUCT;',
+                  'DELETE FROM RL_ORDER_PRODUCT;',
+                  'DELETE FROM TB_PRODUCTS;',
+                  'DELETE FROM TB_PRODUCT_TYPES;',
+                  'DELETE FROM TB_SALES;',
+                  'DELETE FROM TB_ORDERS;',
+                  'DELETE FROM TB_PRINTERS;'
                 ];
                 for (const d of deletes) {
                   await database.execAsync(d).catch((e) => console.warn('[auth] db op failed', e));
                 }
-                await database.execAsync('DELETE FROM TB_USUARIO;').catch((e) => console.warn('[auth] db op failed', e));
+                await database.execAsync('DELETE FROM TB_USERS;').catch((e) => console.warn('[auth] db op failed', e));
                 await database.runAsync(
-                  'INSERT INTO TB_USUARIO (nome, email, estabelecimentoId, nomeEstabelecimento, role) VALUES (?, ?, ?, ?, ?)',
+                  'INSERT INTO TB_USERS (name, email, establishmentId, establishmentName, role) VALUES (?, ?, ?, ?, ?)',
                   [meNome, meEmail, meEstab, meNomeEstab, meRole]
                 ).catch((e) => console.warn('[auth] db op failed', e));
-                await database.runAsync('UPDATE TB_SCHEMA SET usuarioId = ?, estabelecimentoId = ?', [meIdNum, meEstab]).catch((e) => console.warn('[auth] db op failed', e));
+                await database.runAsync('UPDATE TB_SCHEMA SET userId = ?, establishmentId = ?', [meIdNum, meEstab]).catch((e) => console.warn('[auth] db op failed', e));
                 await database.execAsync('COMMIT;');
               } catch (err) {
                 await database.execAsync('ROLLBACK;').catch((e) => console.warn('[auth] db op failed', e));
                 console.warn('Failed during destructive swap; rolled back', err);
               }
 
-                await seedTipoProduto(database).catch((e) => console.warn('[auth] db op failed', e));
+                await seedProductType(database).catch((e) => console.warn('[auth] db op failed', e));
             } else {
-              await database.execAsync('DELETE FROM TB_USUARIO;').catch((e) => console.warn('[auth] db op failed', e));
+              await database.execAsync('DELETE FROM TB_USERS;').catch((e) => console.warn('[auth] db op failed', e));
               await database.runAsync(
-                'INSERT INTO TB_USUARIO (nome, email, estabelecimentoId, nomeEstabelecimento, role) VALUES (?, ?, ?, ?, ?)',
+                'INSERT INTO TB_USERS (name, email, establishmentId, establishmentName, role) VALUES (?, ?, ?, ?, ?)',
                 [meNome, meEmail, meEstab, meNomeEstab, meRole]
               ).catch((e) => console.warn('[auth] db op failed', e));
-              await database.runAsync('UPDATE TB_SCHEMA SET usuarioId = ?', [meIdNum]).catch((e) => console.warn('[auth] db op failed', e));
+              await database.runAsync('UPDATE TB_SCHEMA SET userId = ?', [meIdNum]).catch((e) => console.warn('[auth] db op failed', e));
             }
           }
         } catch (err) {
-          console.warn('Failed to check/replace TB_USUARIO on login', err);
+          console.warn('Failed to check/replace TB_USERS on login', err);
         }
         setToken(t);
         // The first sync must not block navigation. The list screens show their
         // skeletons while this background sync populates the local database.
-        void runWithLock(() => sincronizarComServidor(database, t))
+        void runWithLock(() => synchronizeWithServer(database, t))
           .then((res) => {
             if (res === null) console.log('[sync] skipped login-triggered sync; another sync is in progress');
           })

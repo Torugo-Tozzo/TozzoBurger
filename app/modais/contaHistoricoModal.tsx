@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { StyleSheet, FlatList, Alert, ActivityIndicator } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { useVendasDatabase } from '@/database/useVendaDatabse';
-import { VendaDatabase } from '@/database/types/Venda';
+import { useSaleDatabase } from '@/database/useSaleDatabase';
+import { Sale } from '@/database/types/Sale';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { sendMessageToDevice } from '@/useBLE';
 import { usePrinterDatabase } from '@/database/usePrinterDatabase';
@@ -16,35 +16,38 @@ import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { ListItem } from '@/components/ui/ListItem';
 import { ListFrame } from '@/components/ui/ListFrame';
-import { getVendaDetalhes } from '@/services/vendasDetalhes';
-import type { VendaRenderizavel } from '@/services/vendas';
+import { getVendaDetalhes } from '@/services/salesDetails';
+import type { VendaRenderizavel } from '@/services/sales';
 import { spacing, type } from '@/constants/theme';
+import { useTranslation } from 'react-i18next';
 
-type VendaDetalheItem = { nome: string; quantidade: number; preco: number; subtotal: number };
+type VendaDetalheItem = { name: string; quantity: number; price: number; subtotal: number };
 
-function toVendaDatabase(venda: VendaRenderizavel): VendaDatabase {
+function toSale(venda: VendaRenderizavel): Sale {
   return {
     id: venda.id,
     total: venda.total,
-    horario: venda.horario,
-    cliente: venda.cliente,
-    excluida: venda.excluida,
+    soldAt: venda.soldAt,
+    customerName: venda.customerName,
+    isCancelled: venda.isCancelled,
     updated_at: Date.now(),
-    criado_por: venda.criado_por,
-    criado_por_nome: venda.criado_por_nome,
+    createdBy: venda.createdBy,
+    createdByName: venda.createdByName,
   };
 }
 
 export default function ContaHistoricoModal() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
-  const { vendaId, origem } = useLocalSearchParams<{ vendaId?: string; origem?: string }>();
-  const { getVendaById } = useVendasDatabase();
+  const { saleId, origem } = useLocalSearchParams<{ saleId?: string; origem?: string }>();
+  const { getSaleById } = useSaleDatabase();
   const { showAdd: getProductById } = useProductDatabase();
   const { getPrinter } = usePrinterDatabase();
   const router = useRouter();
+  const { t, i18n } = useTranslation();
+  const formatCurrency = (value: number) => new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(value);
 
-  const [venda, setVenda] = useState<VendaDatabase | null>(null);
+  const [venda, setVenda] = useState<Sale | null>(null);
   const [produtos, setProdutos] = useState<VendaDetalheItem[]>([]);
   const [isPrinterConnected, setIsPrinterConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,44 +67,44 @@ export default function ContaHistoricoModal() {
 
       async function fetchVenda() {
         try {
-          if (!vendaId) {
-            Alert.alert('Erro', 'ID da venda não fornecido.');
+          if (!saleId) {
+            Alert.alert(t('common.error'), t('sales.idMissing'));
             router.back();
             return;
           }
 
           if (origem === 'establishment') {
-          const remoteVenda = getVendaDetalhes(String(vendaId));
+          const remoteVenda = getVendaDetalhes(String(saleId));
             if (!remoteVenda) {
-              Alert.alert('Erro', 'Detalhes da venda não estão mais disponíveis.');
+              Alert.alert(t('common.error'), t('sales.notAvailable'));
               router.back();
               return;
             }
-            setVenda(toVendaDatabase(remoteVenda));
-            setProdutos(remoteVenda.itens.map((item) => ({
-              nome: item.nome,
-              quantidade: item.quantidade,
-              preco: item.preco,
+            setVenda(toSale(remoteVenda));
+            setProdutos(remoteVenda.items.map((item) => ({
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price,
               subtotal: item.subtotal,
             })));
           } else {
-            const vendaData = await getVendaById(String(vendaId));
-            if (!vendaData) {
-              Alert.alert('Erro', 'Venda não encontrada.');
+            const saleData = await getSaleById(String(saleId));
+            if (!saleData) {
+              Alert.alert(t('common.error'), t('sales.notFound'));
               router.back();
               return;
             }
 
-            setVenda(vendaData);
+            setVenda(saleData);
 
             const produtosComNomes = await Promise.all(
-              vendaData.produtos.map(async (produto) => {
-                const produtoData = await getProductById(produto.produtoId);
+              saleData.items.map(async (item) => {
+                const productData = await getProductById(item.productId);
                 return {
-                  nome: produtoData?.nome || 'Produto não encontrado',
-                  quantidade: produto.quantidade,
-                  preco: produtoData?.preco || 0,
-                  subtotal: produto.quantidade * (produtoData?.preco || 0),
+                  name: productData?.name || t('common.unknownProduct'),
+                  quantity: item.quantity,
+                  price: productData?.price || 0,
+                  subtotal: item.quantity * (productData?.price || 0),
                 };
               })
             );
@@ -110,7 +113,7 @@ export default function ContaHistoricoModal() {
           }
         } catch (error) {
           console.error('Erro ao carregar a venda:', error);
-          Alert.alert('Erro', 'Não foi possível carregar os detalhes da venda.');
+          Alert.alert(t('common.error'), t('sales.loadDetailsFailed'));
           router.back();
         } finally {
           setIsLoading(false);
@@ -122,7 +125,7 @@ export default function ContaHistoricoModal() {
       setIsLoading(true);
       fetchPrinter();
       fetchVenda();
-    }, [vendaId, origem])
+    }, [saleId, origem])
   );
 
   const handlePrint = async () => {
@@ -135,12 +138,12 @@ export default function ContaHistoricoModal() {
     try {
       await sendMessageToDevice(printContent, await getPrinter());
     } catch (error) {
-      Alert.alert('Erro', `${error}`);
+      Alert.alert(t('common.error'), t('printer.printFailed'));
       return;
     } finally {
       setLoadingPrint(null); // Desativar carregamento ao finalizar
     }
-    Alert.alert('Sucesso', 'Conta enviada para impressão.');
+    Alert.alert(t('common.success'), t('sales.sentToPrinter'));
   };
 
   const handleShare = async () => {
@@ -158,9 +161,9 @@ export default function ContaHistoricoModal() {
 
   const renderItem = ({ item }: { item: VendaDetalheItem }) => (
     <ListItem
-      title={item.nome}
-      subtitle={`${item.quantidade}x · R$ ${item.preco.toFixed(2)} un.`}
-      trailing={<Text style={styles.itemTextRight}>R$ {item.subtotal.toFixed(2)}</Text>}
+      title={item.name}
+      subtitle={`${item.quantity}x · ${formatCurrency(item.price)} / ${t('charts.units')}`}
+      trailing={<Text style={styles.itemTextRight}>{formatCurrency(item.subtotal)}</Text>}
     />
   );
 
@@ -168,7 +171,7 @@ export default function ContaHistoricoModal() {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text>Carregando...</Text>
+        <Text>{t('common.loading')}</Text>
       </View>
     );
   }
@@ -176,42 +179,42 @@ export default function ContaHistoricoModal() {
   if (!venda) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Carregando detalhes da venda...</Text>
+        <Text style={styles.title}>{t('sales.loadingDetails')}</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Detalhes da venda</Text>
+      <Text style={styles.title}>{t('sales.detailsTitle')}</Text>
       <Text style={[styles.saleId, { color: colors.textMuted }]}>#{venda.id}</Text>
       <View style={[styles.separator, { backgroundColor: colors.border }]} />
 
       <Text style={styles.detailText}>
-        Data: {new Date(venda.horario).toLocaleDateString('pt-BR')}
+        {t('sales.date')}: {new Date(venda.soldAt).toLocaleDateString(i18n.language)}
       </Text>
       <Text style={styles.detailText}>
-        Horário: {new Date(venda.horario).toLocaleTimeString('pt-BR')}
+        {t('sales.time')}: {new Date(venda.soldAt).toLocaleTimeString(i18n.language)}
       </Text>
-      <Text style={styles.detailText}>Cliente: {venda.cliente?.trim() || 'Não informado'}</Text>
-      {venda.criado_por_nome ? <Text style={styles.detailText}>Vendedor: {venda.criado_por_nome}</Text> : null}
+      <Text style={styles.detailText}>{t('sales.customer')}: {venda.customerName?.trim() || t('sales.customerNotProvided')}</Text>
+      {venda.createdByName ? <Text style={styles.detailText}>{t('sales.seller')}: {venda.createdByName}</Text> : null}
       <View style={[styles.separator, { backgroundColor: colors.border }]} />
-      <Text style={styles.subtitle}>Produtos</Text>
+      <Text style={styles.subtitle}>{t('sales.products')}</Text>
 
       <ListFrame style={styles.itemsFrame}>
         <FlatList
           data={produtos}
           renderItem={renderItem}
-          keyExtractor={(item, index) => String(item.nome + index)}
+          keyExtractor={(item, index) => String(item.name + index)}
         />
       </ListFrame>
-      <Text style={styles.title}>Total: R$ {venda.total.toFixed(2)}</Text>
+      <Text style={styles.title}>{t('sales.totalLabel', { amount: formatCurrency(venda.total) })}</Text>
       <View style={[styles.separator, { backgroundColor: colors.border }]} />
 
       <View style={styles.buttonContainer}>
-        <IconButton icon="share-alt" label="Compartilhar venda" onPress={handleShare} />
+        <IconButton icon="share-alt" label={t('sales.shareSale')} onPress={handleShare} />
         <Button
-          title="Imprimir conta"
+          title={t('sales.printAccount')}
           onPress={handlePrint}
           loading={Boolean(loadingPrint)}
           disabled={!isPrinterConnected}

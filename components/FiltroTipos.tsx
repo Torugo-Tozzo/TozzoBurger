@@ -3,10 +3,12 @@ import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { View, Text } from "@/components/Themed";
 import { spacing, type } from '@/constants/theme';
+import { useTranslation } from 'react-i18next';
+import { getProductTypeLabel } from '@/components/productTypeLabel';
 
 type TipoProduto = {
   id: number;
-  descricao: string;
+  description: string;
 };
 
 type FiltroTiposProps = {
@@ -24,6 +26,7 @@ function Divider({ color }: { color: string }) {
 export function FiltroTipos({ data, selectedId, onSelect }: FiltroTiposProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
 
   const styles = StyleSheet.create({
     container: {
@@ -59,9 +62,12 @@ export function FiltroTipos({ data, selectedId, onSelect }: FiltroTiposProps) {
             <TouchableOpacity
               onPress={() => onSelect(selected ? null : item.id)}
               style={[styles.button, selected && styles.selectedButton]}
+              accessibilityRole="button"
+              accessibilityLabel={getProductTypeLabel(item.id, item.description, t)}
+              accessibilityState={{ selected }}
             >
               <Text style={[{ fontSize: type.body, fontWeight: "bold" }, selected && styles.selectedText]}>
-                {item.descricao}
+                {getProductTypeLabel(item.id, item.description, t)}
               </Text>
             </TouchableOpacity>
           );

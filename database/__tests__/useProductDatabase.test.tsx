@@ -54,15 +54,15 @@ describe('useProductDatabase', () => {
 
     const { create } = renderProductDbHook();
     const result = await create({
-      nome: 'X-Salada',
-      preco: 25.5,
-      tipoProdutoId: 1,
+      name: 'X-Salada',
+      price: 25.5,
+      productTypeId: 1,
     } as any);
 
     expect(result).toEqual({ id: 'generated-uuid' });
-    expect(db.prepareAsync).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO TB_PRODUTOS'));
+    expect(db.prepareAsync).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO TB_PRODUCTS'));
     expect(statement.executeAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ $id: 'generated-uuid', $nome: 'X-Salada', $sync_status: 'pending' })
+      expect.objectContaining({ $id: 'generated-uuid', $name: 'X-Salada', $sync_status: 'pending' })
     );
     expect(statement.finalizeAsync).toHaveBeenCalledTimes(1);
   });
@@ -77,7 +77,7 @@ describe('useProductDatabase', () => {
     mockUseSQLiteContext.mockReturnValue(db);
 
     const { create } = renderProductDbHook();
-    await expect(create({ nome: 'X', preco: 1, tipoProdutoId: 1 } as any)).rejects.toThrow('insert failed');
+    await expect(create({ name: 'X', price: 1, productTypeId: 1 } as any)).rejects.toThrow('insert failed');
     expect(statement.finalizeAsync).toHaveBeenCalledTimes(1);
   });
 
@@ -91,7 +91,7 @@ describe('useProductDatabase', () => {
     await remove('produto-1');
 
     expect(db.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE TB_PRODUTOS SET deleted_at'),
+      expect.stringContaining('UPDATE TB_PRODUCTS SET deleted_at'),
       expect.arrayContaining([expect.any(Number), expect.any(Number), 'pending', 'produto-1'])
     );
   });
@@ -111,46 +111,46 @@ describe('useProductDatabase', () => {
     );
   });
 
-  it('create() marks produtos changed', async () => {
+  it('create() marks products changed', async () => {
     const statement = makeStatement();
     const db = { prepareAsync: jest.fn(async () => statement) };
     mockUseSQLiteContext.mockReturnValue(db);
 
     const { create } = renderProductDbHook();
-    await create({ nome: 'X-Salada', preco: 25.5, tipoProdutoId: 1 } as any);
+    await create({ name: 'X-Salada', price: 25.5, productTypeId: 1 } as any);
 
-    expect(mockMarkChanged).toHaveBeenCalledWith('produtos');
+    expect(mockMarkChanged).toHaveBeenCalledWith('products');
   });
 
-  it('createFromSync() marks produtos changed', async () => {
+  it('createFromSync() marks products changed', async () => {
     const statement = makeStatement();
     const db = { prepareAsync: jest.fn(async () => statement) };
     mockUseSQLiteContext.mockReturnValue(db);
 
     const { createFromSync } = renderProductDbHook();
-    await createFromSync({ id: 'p1', nome: 'X-Salada', preco: 25.5, tipoProdutoId: 1 } as any);
+    await createFromSync({ id: 'p1', name: 'X-Salada', price: 25.5, productTypeId: 1 } as any);
 
-    expect(mockMarkChanged).toHaveBeenCalledWith('produtos');
+    expect(mockMarkChanged).toHaveBeenCalledWith('products');
   });
 
-  it('update() marks produtos changed', async () => {
+  it('update() marks products changed', async () => {
     const statement = makeStatement();
     const db = { prepareAsync: jest.fn(async () => statement) };
     mockUseSQLiteContext.mockReturnValue(db);
 
     const { update } = renderProductDbHook();
-    await update({ id: 'p1', nome: 'X-Salada', preco: 30, tipoProdutoId: 1 } as any);
+    await update({ id: 'p1', name: 'X-Salada', price: 30, productTypeId: 1 } as any);
 
-    expect(mockMarkChanged).toHaveBeenCalledWith('produtos');
+    expect(mockMarkChanged).toHaveBeenCalledWith('products');
   });
 
-  it('remove() marks produtos changed', async () => {
+  it('remove() marks products changed', async () => {
     const db = { runAsync: jest.fn(async () => ({})) };
     mockUseSQLiteContext.mockReturnValue(db);
 
     const { remove } = renderProductDbHook();
     await remove('p1');
 
-    expect(mockMarkChanged).toHaveBeenCalledWith('produtos');
+    expect(mockMarkChanged).toHaveBeenCalledWith('products');
   });
 });

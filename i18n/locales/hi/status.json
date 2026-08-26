@@ -1,0 +1,10 @@
+{
+  "open": "खुला",
+  "inPreparation": "तैयारी में",
+  "delivering": "डिलीवरी हो रही है",
+  "closed": "बंद",
+  "cancelled": "रद्द",
+  "pending": "लंबित",
+  "active": "सक्रिय",
+  "inactive": "निष्क्रिय"
+}

@@ -1,0 +1,9 @@
+{
+  "generic": "出错了。",
+  "network": "请检查网络连接后重试。",
+  "required": "请填写所有必填字段。",
+  "invalidEmail": "请输入有效的电子邮箱地址。",
+  "loadFailed": "无法加载信息。",
+  "saveFailed": "无法保存更改。",
+  "deleteFailed": "无法删除项目。"
+}

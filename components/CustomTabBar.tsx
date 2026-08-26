@@ -3,12 +3,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Tab bar 100% custom. As props nativas da lib (tabBarActiveBackgroundColor +
  * tabBarButton/tabBarBackground customizado) tem um bug real nessa versao do
  * @react-navigation/bottom-tabs: qualquer tabBarButton/tabBarBackground
- * proprio quebra o icone+label do item ativo (fica em branco), e sem eles a
+ * proprio quebra o icone+label do item isActive (fica em branco), e sem eles a
  * borda por item (tabBarItemStyle.borderRightWidth) so aparece em 2 dos 5
  * botoes de forma inconsistente. Testado: config original, StyleSheet.
  * hairlineWidth, tabBarButton custom, tabBarBackground custom (com e sem as
@@ -20,6 +21,7 @@ import { useColorScheme } from '@/components/useColorScheme';
 export function CustomTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { t } = useTranslation();
 
   // `href` e opcao especifica do expo-router (esconde a tab quando null),
   // nao existe no tipo BottomTabNavigationOptions da lib base.
@@ -37,7 +39,7 @@ export function CustomTabBar({ state, descriptors, navigation, insets }: BottomT
         const routeIndex = state.routes.findIndex((r) => r.key === route.key);
         const focused = state.index === routeIndex;
         const color = focused ? colors.background : colors.text;
-        const label = typeof options.title === 'string' ? options.title : route.name;
+        const label = typeof options.title === 'string' ? options.title : t('navigation.tab');
 
         const onPress = () => {
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });

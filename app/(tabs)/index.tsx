@@ -12,20 +12,23 @@ import { useMinLoadingDuration } from '@/hooks/useMinLoadingDuration';
 import { spacing } from '@/constants/theme';
 import useProductList from '@/hooks/useProductList';
 import { useProductDatabase } from "@/database/useProductDatabase";
-import { ProductDatabase } from '@/database/types/Produto';
+import { Product } from '@/database/types/Product';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback } from 'react';
 import { useCart, useCartActions } from '@/context/CartContext';
 import { useSyncRefresh } from '@/hooks/useSyncRefresh';
+import { useTranslation } from 'react-i18next';
 
 /** Componente isolado — só ele re-renderiza quando o cart muda */
 function CartButton() {
   const { cart } = useCart();
-  const total = cart.reduce((sum, item) => sum + (item.quantidade ?? 0), 0);
+  const { t } = useTranslation();
+  const total = cart.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
   if (total <= 0) return null;
   return (
     <Button
-      title={`Ver Conta (${total})`}
+      title={t('orders.viewAccount', { count: total })}
+      accessibilityLabel={t('orders.viewAccount', { count: total })}
       onPress={() => router.push('/modais/contaModal')}
       style={styles.buttonWrap}
     />
@@ -33,37 +36,38 @@ function CartButton() {
 }
 
 export default function VendaScreen() {
-  const { products, tiposProduto, tipoProdutoId, filterByTipo, setSearch, search, isLoading, isLoadingMore, loadMore } = useProductList();
-  const { searchOrigemProdutoId, create, showAdd } = useProductDatabase();
+  const { t } = useTranslation();
+  const { products, productTypes, productTypeId, filterByProductType, setSearch, search, isLoading, isLoadingMore, loadMore } = useProductList();
+  const { searchBySourceProductId, create, showAdd } = useProductDatabase();
   // Apenas funções estáveis — NÃO lê `cart`, então não re-renderiza quando cart muda
   const { addToCart, addIfNotInCart } = useCartActions();
   const { refreshing, onRefresh } = useSyncRefresh();
 
   useFocusEffect(
     useCallback(() => {
-      filterByTipo(null);
+      filterByProductType(null);
       return;
     }, [])
   );
 
-  const handleAddToConta = useCallback((product: ProductDatabase) => {
+  const handleAddToConta = useCallback((product: Product) => {
     addToCart(product);
   }, [addToCart]);
 
-  const handleAdicional = useCallback(async (product: ProductDatabase) => {
-    const produtosAdds = await searchOrigemProdutoId(product.id);
+  const handleAdicional = useCallback(async (product: Product) => {
+    const productsAdditions = await searchBySourceProductId(product.id);
 
-    if (produtosAdds?.length) {
-      for (const produtoAdd of produtosAdds) {
-        if (addIfNotInCart(produtoAdd)) return;
+    if (productsAdditions?.length) {
+      for (const productAddition of productsAdditions) {
+        if (addIfNotInCart(productAddition)) return;
       }
     }
 
     const novoProdutoData = {
-      nome: `${product.nome} Add`,
-      preco: product.preco,
-      tipoProdutoId: product.tipoProdutoId,
-      origemProdutoId: product.id,
+      name: `${product.name} Add`,
+      price: product.price,
+      productTypeId: product.productTypeId,
+      sourceProductId: product.id,
     };
 
     const response = await create(novoProdutoData);
@@ -72,14 +76,14 @@ export default function VendaScreen() {
     if (novoProduto) {
       addToCart(novoProduto);
     }
-  }, [searchOrigemProdutoId, create, showAdd, addToCart, addIfNotInCart]);
+  }, [searchBySourceProductId, create, showAdd, addToCart, addIfNotInCart]);
 
-  const renderItem = useCallback(({ item }: { item: ProductDatabase }) => {
-    const tipo = tiposProduto?.find((t: any) => Number(t.id) === Number(item.tipoProdutoId))?.descricao;
-    return <ProductItemVenda data={item} tipoNome={tipo} onAddToCart={handleAddToConta} onAdicionaltoCart={handleAdicional} />;
-  }, [tiposProduto, handleAddToConta, handleAdicional]);
+  const renderItem = useCallback(({ item }: { item: Product }) => {
+    const productType = productTypes?.find((t: any) => Number(t.id) === Number(item.productTypeId))?.description;
+    return <ProductItemVenda data={item} tipoNome={productType} onAddToCart={handleAddToConta} onAdicionaltoCart={handleAdicional} />;
+  }, [productTypes, handleAddToConta, handleAdicional]);
 
-  const keyExtractor = useCallback((item: ProductDatabase) => String(item.id), []);
+  const keyExtractor = useCallback((item: Product) => String(item.id), []);
 
   // Skeleton cheio so no primeiro load (sem dado nenhum ainda) - mostrar ele
   // toda vez que ja tem dado na tela fazia a lista "piscar" (dado -> skeleton
@@ -94,7 +98,7 @@ export default function VendaScreen() {
       keyExtractor={keyExtractor}
       renderItem={renderItem}
       refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
-      ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto encontrado" message="Ajuste a busca ou o filtro de tipo." />}
+      ListEmptyComponent={<EmptyState icon="cutlery" title={t('products.empty')} message={t('products.adjustSearch')} />}
       onEndReached={loadMore}
       onEndReachedThreshold={0.5}
       ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
@@ -104,12 +108,12 @@ export default function VendaScreen() {
 
   return (
     <View style={styles.container}>
-      <Input placeholder="Pesquisar" onChangeText={setSearch} value={search} style={styles.input} />
+      <Input placeholder={t('common.search')} accessibilityLabel={t('common.search')} onChangeText={setSearch} value={search} style={styles.input} />
 
       <FiltroTipos
-        data={tiposProduto}
-        selectedId={Number(tipoProdutoId)}
-        onSelect={filterByTipo}
+        data={productTypes}
+        selectedId={Number(productTypeId)}
+        onSelect={filterByProductType}
       />
 
       {showSkeleton ? (

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Alert, FlatList, RefreshControl } from 'react-native';
 import { View, Text } from '@/components/Themed';
-import { usePedidosDatabase } from '@/database/usePedidoDatabase';
+import { useOrderDatabase } from '@/database/useOrderDatabase';
 import { useAutoSync } from '@/context/AutoSyncContext';
 import PedidoItem from '@/components/PedidoItem';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -14,16 +14,17 @@ import { useSyncRefresh } from '@/hooks/useSyncRefresh';
 import { useMinLoadingDuration } from '@/hooks/useMinLoadingDuration';
 import { useShouldReload } from '@/hooks/useShouldReload';
 import { spacing, type } from '@/constants/theme';
-import { PedidoDatabase } from '@/database/types/Pedido';
+import { Order } from '@/database/types/Order';
+import { useTranslation } from 'react-i18next';
 
-type PedidoComProdutos = PedidoDatabase & { produtos: string[] };
+type OrderWithProducts = Order & { products: string[] };
 
 // Evita re-render de toda a lista (perde React.memo dos cards) quando o
 // refetch em foco de aba traz o mesmo conteudo de antes - so muda o estado
 // se algo de fato mudou.
 function isPedidosPorDataEqual(
-  a: Record<string, PedidoComProdutos[]>,
-  b: Record<string, PedidoComProdutos[]>
+  a: Record<string, OrderWithProducts[]>,
+  b: Record<string, OrderWithProducts[]>
 ): boolean {
   const aKeys = Object.keys(a);
   const bKeys = Object.keys(b);
@@ -40,22 +41,23 @@ function isPedidosPorDataEqual(
 }
 
 export default function Pedidos() {
-  const { listPedidosRecentes, listPedidosRecentesPorUsuario, removePedido } = usePedidosDatabase();
+  const { t } = useTranslation();
+  const { listRecentOrders, listRecentOrdersByUser, removeOrder } = useOrderDatabase();
   const { lastSync } = useAutoSync();
   const { user } = useAuth();
   const { refreshing, onRefresh } = useSyncRefresh();
-  const shouldReloadPedidos = useShouldReload(['pedidos', 'produtos']);
-  const isCliente = user?.role === 'CLIENTE';
-  const [pedidosPorData, setPedidosPorData] = useState<Record<string, PedidoComProdutos[]>>({});
+  const shouldReloadPedidos = useShouldReload(['orders', 'products']);
+  const isCliente = user?.role === 'CUSTOMER';
+  const [ordersByDate, setOrdersByDate] = useState<Record<string, OrderWithProducts[]>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   async function load() {
     setIsLoading(true);
     try {
       const data = isCliente && user?.id
-        ? await listPedidosRecentesPorUsuario(user.id)
-        : await listPedidosRecentes();
-      setPedidosPorData((prev) => (isPedidosPorDataEqual(prev, data) ? prev : data));
+        ? await listRecentOrdersByUser(user.id)
+        : await listRecentOrders();
+      setOrdersByDate((prev) => (isPedidosPorDataEqual(prev, data) ? prev : data));
     } catch (err) {
       console.error('Erro ao carregar pedidos:', err);
     } finally {
@@ -73,24 +75,24 @@ export default function Pedidos() {
     if (shouldReloadPedidos()) load();
   }, [lastSync]);
 
-  const handleEdit = (pedidoId: string) => {
-    router.push({ pathname: '/modais/pedidoModal', params: { pedidoId } });
+  const handleEdit = (orderId: string) => {
+    router.push({ pathname: '/modais/pedidoModal', params: { orderId } });
   };
 
-  const handleDelete = (pedidoId: string) => {
-    Alert.alert('Confirmação', 'Deseja excluir este pedido?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Excluir', style: 'destructive', onPress: async () => { await removePedido(pedidoId); await load(); } },
+  const handleDelete = (orderId: string) => {
+    Alert.alert(t('common.confirm'), t('orders.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('orders.delete'), style: 'destructive', onPress: async () => { await removeOrder(orderId); await load(); } },
     ]);
   };
 
-  const renderPedido = (pedido: PedidoComProdutos) => (
+  const renderOrder = (order: OrderWithProducts) => (
     <PedidoItem
-      key={pedido.id}
-      data={pedido}
-      produtos={pedido.produtos}
-      onEdit={() => handleEdit(pedido.id)}
-      onDelete={isCliente ? undefined : () => handleDelete(pedido.id)}
+      key={order.id}
+      data={order}
+      products={order.products}
+      onEdit={() => handleEdit(order.id)}
+      onDelete={isCliente ? undefined : () => handleDelete(order.id)}
     />
   );
 
@@ -98,13 +100,13 @@ export default function Pedidos() {
   // toda vez que ja tem dado na tela fazia a lista "piscar" (dado -> skeleton
   // -> dado de novo), parecendo recarregar 2x. Com dado ja carregado, o
   // refetch em foco usa o spinner do RefreshControl (nao esconde a lista).
-  const hasData = Object.keys(pedidosPorData).length > 0;
+  const hasData = Object.keys(ordersByDate).length > 0;
   const showSkeleton = useMinLoadingDuration(isLoading && !hasData);
 
   if (showSkeleton) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Pedidos Recentes</Text>
+        <Text style={styles.title}>{t('orders.recentTitle')}</Text>
         <ListFrame>
           <RecordCardSkeleton />
           <ListDivider />
@@ -123,18 +125,18 @@ export default function Pedidos() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={Object.keys(pedidosPorData)}
+        data={Object.keys(ordersByDate)}
         keyExtractor={(d) => d}
         refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
-        ListEmptyComponent={<EmptyState icon="list" title="Nenhum pedido recente" message="Pedidos aparecem aqui assim que forem criados." />}
+        ListEmptyComponent={<EmptyState icon="list" title={t('orders.recentEmpty')} message={t('orders.recentMessage')} />}
         renderItem={({ item: dataKey }) => (
           <View style={styles.group}>
             <Text style={styles.date}>{dataKey}</Text>
             <ListFrame>
-              {(pedidosPorData[dataKey] || []).map((p, idx) => (
+              {(ordersByDate[dataKey] || []).map((p, idx) => (
                 <React.Fragment key={p.id}>
                   {idx > 0 ? <ListDivider /> : null}
-                  {renderPedido(p)}
+                  {renderOrder(p)}
                 </React.Fragment>
               ))}
             </ListFrame>

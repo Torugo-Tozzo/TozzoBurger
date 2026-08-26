@@ -1,0 +1,14 @@
+{
+  "syncing": "Sincronizando…",
+  "synced": "Sincronizado",
+  "syncNow": "Sincronizar ahora",
+  "syncFailed": "Error de sincronización.",
+  "lastSync": "Última sincronización",
+  "pending": "Cambios pendientes",
+  "noConnection": "Sin conexión a Internet.",
+  "retry": "Reintentar sincronización",
+  "syncFailedTitle": "Falló la sincronización",
+  "noConnectionMessage": "Sin conexión a internet. Comprueba tu conexión.",
+  "genericError": "No se pudo sincronizar.",
+  "accessibilityLabel": "Sincronizar datos"
+}

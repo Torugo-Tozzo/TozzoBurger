@@ -1,0 +1,22 @@
+{
+  "title": "उत्पाद",
+  "newProduct": "नया उत्पाद",
+  "editProduct": "उत्पाद संपादित करें",
+  "empty": "कोई उत्पाद नहीं मिला।",
+  "adjustSearch": "अपनी खोज या उत्पाद प्रकार फ़िल्टर को समायोजित करें।",
+  "addFirst": "पहला आइटम जोड़ने के लिए + दबाएं।",
+  "name": "नाम",
+  "price": "कीमत",
+  "ingredients": "सामग्री",
+  "productType": "उत्पाद प्रकार",
+  "delete": "उत्पाद हटाएँ",
+  "deleteConfirm": "क्या आप वाकई इस उत्पाद को हटाना चाहते हैं?",
+  "removeTitle": "हटाने की पुष्टि करें",
+  "remove": "हटाएं",
+  "addOnTitle": "अतिरिक्त उत्पाद",
+  "registerTitle": "उत्पाद दर्ज करें",
+  "namePlaceholder": "नाम दर्ज करें…",
+  "pricePlaceholder": "कीमत दर्ज करें…",
+  "ingredientsPlaceholder": "सामग्री दर्ज करें…",
+  "selectType": "प्रकार चुनें"
+}

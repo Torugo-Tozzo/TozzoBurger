@@ -1,0 +1,22 @@
+{
+  "title": "产品",
+  "newProduct": "新产品",
+  "editProduct": "编辑产品",
+  "empty": "未找到产品。",
+  "adjustSearch": "调整搜索内容或产品类型筛选条件。",
+  "addFirst": "点击 + 添加第一个商品。",
+  "name": "名称",
+  "price": "价格",
+  "ingredients": "配料",
+  "productType": "产品类型",
+  "delete": "删除产品",
+  "deleteConfirm": "确定要删除此产品吗？",
+  "removeTitle": "确认删除",
+  "remove": "删除",
+  "addOnTitle": "附加产品",
+  "registerTitle": "添加产品",
+  "namePlaceholder": "输入名称…",
+  "pricePlaceholder": "输入价格…",
+  "ingredientsPlaceholder": "输入配料…",
+  "selectType": "选择类型"
+}

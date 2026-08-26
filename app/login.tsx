@@ -5,9 +5,11 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import Colors from '@/constants/Colors';
+import { useTranslation } from 'react-i18next';
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const { t } = useTranslation();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const [email, setEmail] = useState('');
@@ -16,7 +18,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !senha) {
-      Alert.alert('Preencha email e senha');
+      Alert.alert(t('auth.credentialsRequired'));
       return;
     }
     setLoading(true);
@@ -25,12 +27,11 @@ export default function LoginScreen() {
       if (ok) {
         console.log('Login successful - initial sync running in background');
       } else {
-        Alert.alert('Falha no login', 'Credenciais inválidas');
+        Alert.alert(t('auth.loginFailedTitle'), t('auth.invalidCredentials'));
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
       console.warn('Login error:', err);
-      Alert.alert('Erro', msg);
+      Alert.alert(t('errors.generic'), t('auth.loginFailed'));
     } finally {
       setLoading(false);
     }
@@ -47,7 +48,8 @@ export default function LoginScreen() {
       <Text style={[styles.title, { color: colors.text }]}>Tozzo.uk</Text>
       <View style={styles.form}>
         <TextInput
-          placeholder="Email"
+          placeholder={t('auth.emailPlaceholder')}
+          accessibilityLabel={t('auth.email')}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -56,7 +58,8 @@ export default function LoginScreen() {
           placeholderTextColor={colors.textMuted}
         />
         <TextInput
-          placeholder="Senha"
+          placeholder={t('auth.passwordPlaceholder')}
+          accessibilityLabel={t('auth.password')}
           value={senha}
           onChangeText={setSenha}
           secureTextEntry
@@ -64,7 +67,8 @@ export default function LoginScreen() {
           placeholderTextColor={colors.textMuted}
         />
         <Button
-          title="Entrar"
+          title={t('auth.login')}
+          accessibilityLabel={t('auth.login')}
           onPress={handleLogin}
           loading={loading}
           disabled={loading}
@@ -105,6 +109,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     marginBottom: 12,
+    textAlign: 'left',
+    writingDirection: 'ltr',
   },
   button: {
     marginTop: 8,

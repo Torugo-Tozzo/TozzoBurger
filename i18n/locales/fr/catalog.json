@@ -1,0 +1,15 @@
+{
+  "burger": "Hamburger",
+  "artisanalBurger": "Hamburger artisanal",
+  "chicken": "Poulet",
+  "hotDog": "Hot-dog",
+  "drink": "Boisson",
+  "fries": "Frites",
+  "extra": "Supplément",
+  "other": "Autre",
+  "pizza": "Pizza",
+  "sushi": "Sushi",
+  "ingredientsFor": "Ingrédients de {{name}} :",
+  "ingredientsMissing": "Les ingrédients de ce produit ne sont pas renseignés.",
+  "typeLabel": "Type {{id}}"
+}

@@ -1,0 +1,15 @@
+{
+  "burger": "Burger",
+  "artisanalBurger": "Artisanal burger",
+  "chicken": "Chicken",
+  "hotDog": "Hot dog",
+  "drink": "Drink",
+  "fries": "French fries",
+  "extra": "Extra",
+  "other": "Other",
+  "pizza": "Pizza",
+  "sushi": "Sushi",
+  "ingredientsFor": "Ingredients for {{name}}:",
+  "ingredientsMissing": "Ingredients were not provided for this product.",
+  "typeLabel": "Type {{id}}"
+}

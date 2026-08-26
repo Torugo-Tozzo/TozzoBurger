@@ -1,7 +1,7 @@
 import { BleManager, Device } from 'react-native-ble-plx';
 import { PermissionsAndroid, Platform, Alert } from 'react-native';
 import { Buffer } from 'buffer';
-import { error } from 'console';
+import { i18n } from '@/i18n';
 
 const manager = new BleManager();
 
@@ -17,7 +17,6 @@ const checkAndRequestPermissions = async (): Promise<boolean> => {
     const allGranted = Object.values(granted).every(value => value === PermissionsAndroid.RESULTS.GRANTED);
 
     if (!allGranted) {
-      console.log('Permissões necessárias não foram concedidas.');
       return false;
     }
   }
@@ -57,7 +56,7 @@ const listNearbyDevices = async (): Promise<Device[]> => {
 };
 
 // Conecta a um dispositivo Bluetooth e registra o UUID e o nome
-const connectToDevice = async (deviceId: string): Promise<Device | null> => {
+const connectToDevice = async (deviceId: string, options: { showAlert?: boolean } = {}): Promise<Device | null> => {
   try {
     console.log(`Conectando ao dispositivo: ${deviceId}`);
     const device = await manager.connectToDevice(deviceId);
@@ -67,17 +66,23 @@ const connectToDevice = async (deviceId: string): Promise<Device | null> => {
     return device;
   } catch (error) {
     console.error('Erro ao conectar ao dispositivo:', error);
+    if (options.showAlert !== false) {
+      Alert.alert(i18n.t('printer.connectionError'), i18n.t('printer.connectionFailed'));
+    }
     return null;
   }
 };
 
 // Função para desconectar de um dispositivo
-const disconnectFromDevice = async (deviceId: string): Promise<void> => {
+const disconnectFromDevice = async (deviceId: string): Promise<boolean> => {
   try {
     await manager.cancelDeviceConnection(deviceId);
     console.log('Desconectado do dispositivo:', deviceId);
+    return true;
   } catch (error) {
     console.error('Erro ao desconectar do dispositivo:', error);
+    Alert.alert(i18n.t('printer.disconnectionError'), i18n.t('printer.disconnectionFailed'));
+    return false;
   }
 };
 
@@ -85,14 +90,14 @@ const disconnectFromDevice = async (deviceId: string): Promise<void> => {
 const sendMessageToDevice = async (message: string, printer: any): Promise<void> => {
   if (!printer || !printer.uuid) {
     console.error('Nenhuma impressora padrão registrada no banco.');
-    throw new Error('Nenhuma impressora padrão registrada no banco.');
+    throw new Error(i18n.t('printer.noPrinter'));
   }
 
   // Conectar ao dispositivo com o UUID da impressora
-  const device: Device | null = await connectToDevice(printer.uuid);
+  const device: Device | null = await connectToDevice(printer.uuid, { showAlert: false });
   if (!device) {
     console.error('Falha ao conectar à impressora.');
-    throw new Error('Falha ao conectar à impressora.');
+    throw new Error(i18n.t('printer.connectionFailed'));
   }
 
   // Busca os serviços e características e envia a mensagem
@@ -126,11 +131,14 @@ const sendMessageToDevice = async (message: string, printer: any): Promise<void>
 
   if (!messageSent) {
     console.error('Nenhuma característica disponível para escrita encontrada.');
-    throw new Error('Nenhuma característica disponível para escrita encontrada.');
+    throw new Error(i18n.t('printer.noWritableCharacteristic'));
   }
 
   // Desconectar do dispositivo
-  await disconnectFromDevice(printer.uuid);
+  const disconnected = await disconnectFromDevice(printer.uuid);
+  if (!disconnected) {
+    throw new Error(i18n.t('printer.disconnectionFailed'));
+  }
   console.log('Desconectado da impressora.');
 };
 

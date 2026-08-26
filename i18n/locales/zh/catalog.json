@@ -1,0 +1,15 @@
+{
+  "burger": "汉堡包",
+  "artisanalBurger": "手工汉堡",
+  "chicken": "鸡肉",
+  "hotDog": "热狗",
+  "drink": "饮料",
+  "fries": "炸薯条",
+  "extra": "额外配料",
+  "other": "其他",
+  "pizza": "披萨",
+  "sushi": "寿司",
+  "ingredientsFor": "{{name}}的配料：",
+  "ingredientsMissing": "未提供此产品的配料信息。",
+  "typeLabel": "类型 {{id}}"
+}

@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import { useTranslation } from 'react-i18next';
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
 function TabBarIcon(props: {
@@ -22,7 +23,8 @@ function TabBarIcon(props: {
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { user } = useAuth();
-  const isCliente = user?.role === 'CLIENTE';
+  const { t } = useTranslation();
+  const isCliente = user?.role === 'CUSTOMER';
 
   return (
     <Tabs
@@ -40,12 +42,12 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: isCliente ? 'Cardápio' : 'Vender',
+          title: isCliente ? t('navigation.menu') : t('navigation.sell'),
           headerTitleAlign: 'center',
           tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
           headerLeft: isCliente ? undefined : () => (
             <Link href="/modais/adicionalModal" asChild>
-              <Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('navigation.addOn')}>
                 {({ pressed }) => (
                   <FontAwesome
                     name="flash"
@@ -62,14 +64,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name='pedidos'
         options={{
-          title: 'Pedidos',
+          title: t('navigation.orders'),
           tabBarIcon: ({ color }) => <MaterialIcons name="receipt-long" size={28} style={{ marginBottom: -3 }} color={color} />,
         }}
       />
       <Tabs.Screen
         name="historico"
         options={{
-          title: 'Vendas',
+          title: t('navigation.sales'),
           href: isCliente ? null : '/historico',
           tabBarIcon: ({ color }) => <TabBarIcon name="dollar" color={color} />,
         }}
@@ -77,13 +79,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="produtos"
         options={{
-          title: 'Catálogo',
+          title: t('navigation.catalog'),
           href: isCliente ? null : '/produtos',
           tabBarIcon: ({ color }) => <TabBarIcon name="book" color={color} />,
           headerRight: () => (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Link href="/modais/produtoModal" asChild>
-                <Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel={t('products.newProduct')}>
                   {({ pressed }) => (
                     <FontAwesome
                       name="plus-circle"
@@ -102,7 +104,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="configs"
         options={{
-          title: 'Configurações',
+          title: t('navigation.settings'),
           tabBarIcon: ({ color }) => <TabBarIcon name="cog" color={color} />,
         }}
       />

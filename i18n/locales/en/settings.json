@@ -1,0 +1,15 @@
+{
+  "title": "Settings",
+  "account": "Account",
+  "language": "Language",
+  "selectLanguage": "Select language",
+  "currentLanguage": "Current language",
+  "printer": "Printer",
+  "sync": "Synchronization",
+  "languageEnglish": "English",
+  "languagePortugueseBrazil": "Portuguese (Brazil)",
+  "languageSpanish": "Spanish",
+  "languageFrench": "French",
+  "languageChinese": "Chinese",
+  "languageHindi": "Hindi"
+}

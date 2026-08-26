@@ -1,0 +1,7 @@
+{
+  "title": "Mode hors connexion",
+  "offlineMessage": "Vous êtes hors connexion. Les modifications seront synchronisées lorsque vous vous reconnecterez.",
+  "online": "En ligne",
+  "queued": "En attente de synchronisation",
+  "availableWhenOnline": "Disponible lorsque vous êtes en ligne."
+}

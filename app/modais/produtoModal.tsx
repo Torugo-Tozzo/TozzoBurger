@@ -8,25 +8,28 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { spacing, radius, type } from '@/constants/theme';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { getProductTypeLabel } from '@/components/productTypeLabel';
 
 export default function ProdutoModalScreen() {
   const { productId } = useLocalSearchParams();
-  const { show, create, update, getTipoProdutos } = useProductDatabase();
+  const { show, create, update, getProductTypes } = useProductDatabase();
 
-  const [nome, setNome] = useState('');
-  const [preco, setPreco] = useState('');
-  const [ingredientes, setIngredientes] = useState('');
-  const [tipoProdutoId, setTipoProdutoId] = useState<number | undefined>();
-  const [tiposProdutos, setTiposProdutos] = useState<{ id: number; descricao: string }[]>([]);
+  const [name, setNome] = useState('');
+  const [price, setPreco] = useState('');
+  const [ingredients, setIngredientes] = useState('');
+  const [productTypeId, setTipoProdutoId] = useState<number | undefined>();
+  const [tiposProdutos, setTiposProdutos] = useState<{ id: number; description: string }[]>([]);
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
 
   useEffect(() => {
     async function fetchTiposProdutos() {
       try {
-        const tipos = await getTipoProdutos();
-        setTiposProdutos(tipos);
+        const types = await getProductTypes();
+        setTiposProdutos(types);
       } catch (error) {
         console.error('Erro ao carregar tipos de produtos:', error);
       }
@@ -42,10 +45,10 @@ export default function ProdutoModalScreen() {
         try {
           const product = await show(prodId);
           if (product) {
-            setNome(product.nome);
-            setPreco(product.preco.toString());
-            setTipoProdutoId(product.tipoProdutoId);
-            setIngredientes(product.ingredientes?.toString() || '');
+            setNome(product.name);
+            setPreco(product.price.toString());
+            setTipoProdutoId(product.productTypeId);
+            setIngredientes(product.ingredients?.toString() || '');
           }
         } catch (error) {
           console.error('Erro ao carregar o produto:', error);
@@ -58,75 +61,79 @@ export default function ProdutoModalScreen() {
 
   async function handleSave() {
     try {
-      if (!nome || !preco || !tipoProdutoId) {
-        Alert.alert('Erro', 'Por favor, preencha os campos obrigatórios: \nnome, preço e tipo.');
+      if (!name || !price || !productTypeId) {
+        Alert.alert(t('common.error'), t('errors.required'));
         return;
       }
 
       if (productId) {
-        await update({ id: String(productId), nome, preco: parseFloat(preco), tipoProdutoId, ingredientes });
+        await update({ id: String(productId), name, price: parseFloat(price), productTypeId, ingredients });
       } else {
-        await create({ nome, preco: parseFloat(preco), tipoProdutoId, ingredientes });
+        await create({ name, price: parseFloat(price), productTypeId, ingredients });
       }
       router.back();
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
-      Alert.alert('Erro', 'Houve um erro ao salvar o produto.');
+      Alert.alert(t('common.error'), t('errors.saveFailed'));
     }
   }
 
   return (
     <View style={{ flex: 1, padding: spacing.xl, borderColor: 'black', borderWidth: 1 }}>
       <Text style={{ fontSize: type.heading, fontWeight: 'bold' }}>
-        {productId ? 'Editar Produto' : 'Cadastrar Produto'}
+        {productId ? t('products.editProduct') : t('products.registerTitle')}
       </Text>
       <View style={{ marginVertical: spacing.xl, height: 1, backgroundColor: colors.border }} />
 
-      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>Nome do Produto</Text>
+      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>{t('products.name')}</Text>
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
-        placeholder="Digite o Nome..."
-        value={nome}
+        placeholder={t('products.namePlaceholder')}
+        accessibilityLabel={t('products.name')}
+        value={name}
         onChangeText={setNome}
         placeholderTextColor={colors.textMuted}
       />
 
-      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>Preço do Produto</Text>
+      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>{t('products.price')}</Text>
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text }}
-        placeholder="Digite o Preço.."
-        value={preco}
+        placeholder={t('products.pricePlaceholder')}
+        accessibilityLabel={t('products.price')}
+        value={price}
         keyboardType="numeric"
         onChangeText={setPreco}
         placeholderTextColor={colors.textMuted}
       />
 
-      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>Ingredientes do Produto</Text>
+      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>{t('products.ingredients')}</Text>
       <TextInput
         style={{ padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text, height: 100, textAlignVertical: 'top' }}
-        placeholder="Digite os Ingredientes.."
-        value={ingredientes}
+        placeholder={t('products.ingredientsPlaceholder')}
+        accessibilityLabel={t('products.ingredients')}
+        value={ingredients}
         onChangeText={setIngredientes}
         placeholderTextColor={colors.textMuted}
         multiline
       />
 
-      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>Tipo do Produto</Text>
+      <Text style={{ fontSize: type.body, marginVertical: spacing.md, fontWeight: 'bold' }}>{t('products.productType')}</Text>
       <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, marginBottom: spacing.md }}>
         <Picker
-          selectedValue={tipoProdutoId}
+          selectedValue={productTypeId}
           onValueChange={(itemValue) => setTipoProdutoId(Number(itemValue))}
           style={{ color: colors.textMuted }}
           dropdownIconColor={colors.text}
+          accessibilityLabel={t('products.productType')}
         >
-          <Picker.Item label="Selecione um tipo" value={undefined} />
+          <Picker.Item label={t('products.selectType')} value={undefined} />
           {tiposProdutos.map((tipo) => (
-            <Picker.Item key={tipo.id} label={tipo.descricao} value={tipo.id} />
+            <Picker.Item key={tipo.id} label={getProductTypeLabel(tipo.id, tipo.description, t)} value={tipo.id} />
           ))}
         </Picker>
       </View>
 
-      <Button title="Salvar" onPress={handleSave} />
+      <Button title={t('common.save')} onPress={handleSave} />
     </View>
   );
 }

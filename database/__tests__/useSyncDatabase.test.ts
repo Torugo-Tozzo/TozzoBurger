@@ -32,64 +32,64 @@ describe('sincronizarComServidor — table watermark', () => {
     mockMarkChanged.mockReset();
   });
 
-  it('marks produtos changed when the server sends new produtos', async () => {
+  it('marks products changed when the server sends new products', async () => {
     mockGetChanges.mockResolvedValue({
-      produtos: [{ id: 'p1', nome: 'X', preco: 10, updated_at: Date.now() }],
-      pedidos: [],
-      vendas: [],
-      tiposProduto: [],
+      products: [{ id: 'p1', name: 'X', price: 10, updated_at: Date.now() }],
+      orders: [],
+      sales: [],
+      productTypes: [],
     });
 
     await sincronizarComServidor(makeFakeDb() as any, 'token');
 
-    expect(mockMarkChanged).toHaveBeenCalledWith('produtos');
-    expect(mockMarkChanged).not.toHaveBeenCalledWith('pedidos');
-    expect(mockMarkChanged).not.toHaveBeenCalledWith('vendas');
+    expect(mockMarkChanged).toHaveBeenCalledWith('products');
+    expect(mockMarkChanged).not.toHaveBeenCalledWith('orders');
+    expect(mockMarkChanged).not.toHaveBeenCalledWith('sales');
   });
 
-  it('marks produtos changed when the server sends new tiposProduto, even with no produtos', async () => {
+  it('marks products changed when the server sends new productTypes, even with no products', async () => {
     mockGetChanges.mockResolvedValue({
-      produtos: [],
-      pedidos: [],
-      vendas: [],
-      tiposProduto: [{ id: 1, descricao: 'Bebida', updated_at: Date.now() }],
+      products: [],
+      orders: [],
+      sales: [],
+      productTypes: [{ id: 1, description: 'Bebida', updated_at: Date.now() }],
     });
 
     await sincronizarComServidor(makeFakeDb() as any, 'token');
 
-    expect(mockMarkChanged).toHaveBeenCalledWith('produtos');
+    expect(mockMarkChanged).toHaveBeenCalledWith('products');
   });
 
-  it('marks pedidos changed when the server sends new pedidos', async () => {
+  it('marks orders changed when the server sends new orders', async () => {
     mockGetChanges.mockResolvedValue({
-      produtos: [],
-      pedidos: [{ id: 'ped1', status: 'ABERTO', updated_at: Date.now() }],
-      vendas: [],
-      tiposProduto: [],
+      products: [],
+      orders: [{ id: 'ped1', status: 'ABERTO', updated_at: Date.now() }],
+      sales: [],
+      productTypes: [],
     });
 
     await sincronizarComServidor(makeFakeDb() as any, 'token');
 
-    expect(mockMarkChanged).toHaveBeenCalledWith('pedidos');
-    expect(mockMarkChanged).not.toHaveBeenCalledWith('produtos');
+    expect(mockMarkChanged).toHaveBeenCalledWith('orders');
+    expect(mockMarkChanged).not.toHaveBeenCalledWith('products');
   });
 
-  it('marks vendas changed when the server sends new vendas', async () => {
+  it('marks sales changed when the server sends new sales', async () => {
     mockGetChanges.mockResolvedValue({
-      produtos: [],
-      pedidos: [],
-      vendas: [{ id: 'ven1', updated_at: Date.now() }],
-      tiposProduto: [],
+      products: [],
+      orders: [],
+      sales: [{ id: 'ven1', updated_at: Date.now() }],
+      productTypes: [],
     });
 
     await sincronizarComServidor(makeFakeDb() as any, 'token');
 
-    expect(mockMarkChanged).toHaveBeenCalledWith('vendas');
-    expect(mockMarkChanged).not.toHaveBeenCalledWith('produtos');
+    expect(mockMarkChanged).toHaveBeenCalledWith('sales');
+    expect(mockMarkChanged).not.toHaveBeenCalledWith('products');
   });
 
   it('marks nothing changed when the server has nothing new', async () => {
-    mockGetChanges.mockResolvedValue({ produtos: [], pedidos: [], vendas: [], tiposProduto: [] });
+    mockGetChanges.mockResolvedValue({ products: [], orders: [], sales: [], productTypes: [] });
 
     await sincronizarComServidor(makeFakeDb() as any, 'token');
 

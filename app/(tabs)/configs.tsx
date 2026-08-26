@@ -3,6 +3,7 @@ import { Alert, ActivityIndicator, TextInput, StyleSheet, ScrollView, RefreshCon
 import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { Picker } from '@react-native-picker/picker';
 import { Button } from '@/components/ui/Button';
 import Colors from '@/constants/Colors';
 import { usePrinterDatabase } from '@/database/usePrinterDatabase'; // Importando o hook de banco de dados
@@ -10,6 +11,15 @@ import { listNearbyDevices, connectToDevice, disconnectFromDevice } from '@/useB
 import { useAuth } from '@/context/AuthContext';
 import Constants from 'expo-constants';
 import { useSyncRefresh } from '@/hooks/useSyncRefresh';
+import { useTranslation } from 'react-i18next';
+import { radius, spacing } from '@/constants/theme';
+import {
+  AppLocale,
+  LOCALE_NATIVE_NAMES,
+  normalizeLocale,
+  setLocale,
+  SUPPORTED_LOCALES,
+} from '@/i18n';
 
 const BluetoothScreen = () => {
   const { setPrinter, getPrinter, removePrinter } = usePrinterDatabase(); // Métodos do banco de dados
@@ -18,22 +28,46 @@ const BluetoothScreen = () => {
   const [isScanning, setIsScanning] = useState(false); // Estado para controlar se está escaneando
 
   const { user, login, logout, token } = useAuth();
-  const isCliente = user?.role === 'CLIENTE';
+  const isCliente = user?.role === 'CUSTOMER';
   const colorScheme = useColorScheme() ?? 'light';
   const isDark = colorScheme === 'dark';
   const colors = Colors[colorScheme];
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+  const [localeChanging, setLocaleChanging] = useState(false);
+  const { t, i18n } = useTranslation();
+  const [selectedLocale, setSelectedLocale] = useState<AppLocale>(() => normalizeLocale(i18n.language));
   const { refreshing, onRefresh } = useSyncRefresh();
+
+  useEffect(() => {
+    setSelectedLocale(normalizeLocale(i18n.language));
+  }, [i18n.language]);
+
+  const handleLocaleChange = async (nextLocale: AppLocale) => {
+    const currentLocale = normalizeLocale(i18n.language);
+    if (nextLocale === currentLocale) return;
+
+    setLocaleChanging(true);
+    try {
+      const appliedLocale = await setLocale(nextLocale);
+      setSelectedLocale(appliedLocale);
+    } catch (error) {
+      console.error('Failed to save language preference:', error);
+      setSelectedLocale(normalizeLocale(i18n.language));
+      Alert.alert(t('common.error'), t('errors.saveFailed'));
+    } finally {
+      setLocaleChanging(false);
+    }
+  };
 
   useEffect(() => {
     // Verifica se já existe uma impressora registrada
     const fetchPrinter = async () => {
       try {
         const printerUUID = await getPrinter(); // Obtém o UUID da impressora
-        if (printerUUID && printerUUID.nome) {
-          setConnectedPrinter(printerUUID.nome);
+        if (printerUUID && printerUUID.name) {
+          setConnectedPrinter(printerUUID.name);
         }
       } catch (error) {
         console.log('Nenhuma impressora registrada.');
@@ -49,7 +83,7 @@ const BluetoothScreen = () => {
     try {
       const foundDevices = await listNearbyDevices(); // Obtém os dispositivos encontrados
       if (foundDevices.length === 0) {
-        Alert.alert('Nenhum dispositivo encontrado. \nSeu bluetooth está ligado?');
+        Alert.alert(t('printer.scanEmptyTitle'), t('printer.scanEmptyMessage'));
       } else {
         setDevices(foundDevices); // Atualiza a lista de dispositivos encontrados
       }
@@ -66,18 +100,18 @@ const BluetoothScreen = () => {
       const connectedDevice = await connectToDevice(device.id); // Conecta ao dispositivo
 
       if (connectedDevice) {
-        // Quando o dispositivo for conectado, registra o UUID e o nome
+        const disconnected = await disconnectFromDevice(device.id);
+        if (!disconnected) return;
+
+        // Quando o dispositivo for conectado, registra o UUID e o name
         await setPrinter(device.id, device.name); // Salva o UUID da impressora no banco de dados
-        setConnectedPrinter(device.name || device.id); // Atualiza o estado com o nome da impressora conectada
+        setConnectedPrinter(device.name || device.id); // Atualiza o estado com o name da impressora conectada
         setDevices([]); // Limpa a lista de dispositivos após conectar a impressora
-        Alert.alert('Impressora conectada com sucesso!');
-      } else {
-        Alert.alert('Erro ao conectar ao dispositivo.');
+        Alert.alert(t('common.success'), t('printer.connectedMessage'));
       }
     } catch (error) {
       console.error('Erro ao conectar:', error);
     }
-    await disconnectFromDevice(device.id); // Desconecta do dispositivo
   };
 
   // Função para remover a impressora conectada
@@ -85,7 +119,7 @@ const BluetoothScreen = () => {
     try {
       await removePrinter(); // Remove o UUID da impressora do banco de dados
       setConnectedPrinter(null); // Limpa o estado
-      Alert.alert('Impressora removida.');
+      Alert.alert(t('common.success'), t('printer.removed'));
     } catch (error) {
       console.error('Erro ao remover impressora:', error);
     }
@@ -96,13 +130,13 @@ const BluetoothScreen = () => {
     try {
       const ok = await login(email.trim(), senha);
       if (!ok) {
-        Alert.alert('Falha ao entrar', 'Credenciais inválidas');
+        Alert.alert(t('auth.loginFailedTitle'), t('auth.invalidCredentials'));
       } else {
         setEmail('');
         setSenha('');
       }
     } catch (err) {
-      Alert.alert('Erro', 'Erro ao tentar fazer login');
+      Alert.alert(t('common.error'), t('auth.loginFailed'));
     } finally {
       setLoginLoading(false);
     }
@@ -117,23 +151,25 @@ const BluetoothScreen = () => {
 
       {/* Sections: User / Printer */}
       <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={[styles.sectionHeader, { backgroundColor: colors.surfaceHeader }] }>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Usuário</Text>
+        <View style={[styles.sectionHeader, styles.sectionHeaderRow, { backgroundColor: colors.surfaceHeader }] }>
+          <FontAwesome name="user" size={16} color={colors.text} />
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.account')}</Text>
         </View>
         <View style={styles.sectionContent}>
           {user ? (
             <View style={{ alignItems: 'center' }}>
               <FontAwesome name="user-circle" size={56} color={colors.textMuted} style={styles.userIcon} />
-              <Text style={[styles.username, { color: colors.text }]}>{user.nome ?? user.email}</Text>
+              <Text style={[styles.username, { color: colors.text }]}>{user.name ?? user.email}</Text>
               <View style={{ marginTop: 8 }}>
-                <Button title="Sair" onPress={() => logout()} />
+              <Button title={t('auth.logout')} onPress={() => logout()} />
               </View>
             </View>
           ) : (
             <View>
-              <Text style={{ marginBottom: 8, color: colors.text }}>Conecte-se à internet para sincronizar</Text>
+              <Text style={{ marginBottom: 8, color: colors.text }}>{t('offline.availableWhenOnline')}</Text>
               <TextInput
-                placeholder="E-mail"
+                placeholder={t('auth.email')}
+                accessibilityLabel={t('auth.email')}
                 value={email}
                 onChangeText={setEmail}
                 style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
@@ -141,32 +177,66 @@ const BluetoothScreen = () => {
                 keyboardType="email-address"
               />
               <TextInput
-                placeholder="Senha"
+                placeholder={t('auth.password')}
+                accessibilityLabel={t('auth.password')}
                 value={senha}
                 onChangeText={setSenha}
                 style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
                 secureTextEntry
               />
-              <Button title={loginLoading ? 'Entrando...' : 'Entrar'} onPress={handleLogin} disabled={loginLoading} loading={loginLoading} />
+              <Button title={loginLoading ? t('auth.loggingIn') : t('auth.login')} onPress={handleLogin} disabled={loginLoading} loading={loginLoading} />
             </View>
           )}
         </View>
       </View>
 
+      <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.sectionHeader, styles.sectionHeaderRow, { backgroundColor: colors.surfaceHeader }]}>
+          <FontAwesome name="language" size={16} color={colors.text} />
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.language')}</Text>
+        </View>
+        <View style={styles.sectionContent}>
+          <Text style={{ marginBottom: 8, color: colors.text }}>{t('settings.selectLanguage')}</Text>
+          <View style={[styles.pickerFrame, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <Picker
+              selectedValue={selectedLocale}
+              onValueChange={(value) => handleLocaleChange(value as AppLocale)}
+              enabled={!localeChanging}
+              accessibilityLabel={t('settings.selectLanguage')}
+              style={{ color: colors.text }}
+              dropdownIconColor={colors.text}
+            >
+              {/* Each option shows the language's own name for itself (not
+                  translated into the active UI language) so a speaker of
+                  that language recognizes it at a glance in the picker. */}
+              {SUPPORTED_LOCALES.map((locale) => (
+                <Picker.Item key={locale} label={LOCALE_NATIVE_NAMES[locale]} value={locale} />
+              ))}
+            </Picker>
+          </View>
+          <Text style={{ color: colors.textMuted, marginTop: 8 }}>
+            {t('settings.currentLanguage')}: {LOCALE_NATIVE_NAMES[selectedLocale]}
+          </Text>
+        </View>
+      </View>
+
       {!isCliente && (
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.sectionHeader, { backgroundColor: colors.surfaceHeader }] }>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Impressora</Text>
+          <View style={[styles.sectionHeader, styles.sectionHeaderRow, { backgroundColor: colors.surfaceHeader }] }>
+            <FontAwesome name="print" size={16} color={colors.text} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.printer')}</Text>
           </View>
           <View style={styles.sectionContent}>
             {connectedPrinter ? (
               <View>
-                <Text style={{ fontSize: 18, marginBottom: 10, color: colors.text }}>Impressora conectada: {connectedPrinter}</Text>
-                <Button title="Remover Impressora" onPress={handleRemovePrinter} variant="danger" />
+                <Text style={{ fontSize: 18, marginBottom: 10, color: colors.text }}>
+                  {t('printer.connectedAs', { name: connectedPrinter })}
+                </Text>
+                <Button title={t('printer.remove')} onPress={handleRemovePrinter} variant="danger" />
               </View>
             ) : (
               <View>
-                <Button title="Adicionar Impressora" onPress={handleScanDevices} />
+                <Button title={t('printer.add')} onPress={handleScanDevices} />
               </View>
             )}
           </View>
@@ -174,12 +244,14 @@ const BluetoothScreen = () => {
       )}
 
       {!isCliente && (isScanning ? (
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary} accessibilityLabel={t('common.loading')} />
       ) : (
         devices.map((item) => (
           <View key={item.id} style={{ marginVertical: 10 }}>
-            <Text style={{ textAlign: 'center', margin: 10, color: colors.text }}>{item.name || 'Dispositivo desconhecido'}</Text>
-            <Button title="Registrar Impressora" onPress={() => handleConnect(item)} />
+            <Text style={{ textAlign: 'center', margin: 10, color: colors.text }}>
+              {item.name || t('printer.unknownDevice')}
+            </Text>
+            <Button title={t('printer.register')} onPress={() => handleConnect(item)} />
           </View>
         ))
       ))}
@@ -219,12 +291,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#e6e6e6',
+    borderRadius: radius.md,
   },
   sectionHeader: {
     padding: 12,
     backgroundColor: '#fafafa',
     borderBottomColor: 'black',
     borderBottomWidth: 1
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  pickerFrame: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    overflow: 'hidden',
   },
   sectionTitle: {
     fontSize: 16,

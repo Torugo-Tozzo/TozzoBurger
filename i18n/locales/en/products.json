@@ -1,0 +1,22 @@
+{
+  "title": "Products",
+  "newProduct": "New product",
+  "editProduct": "Edit product",
+  "empty": "No products found.",
+  "adjustSearch": "Adjust your search or product type filter.",
+  "addFirst": "Tap + to add the first item.",
+  "name": "Name",
+  "price": "Price",
+  "ingredients": "Ingredients",
+  "productType": "Product type",
+  "delete": "Delete product",
+  "deleteConfirm": "Are you sure you want to delete this product?",
+  "removeTitle": "Confirm removal",
+  "remove": "Remove",
+  "addOnTitle": "Add-on product",
+  "registerTitle": "Register product",
+  "namePlaceholder": "Enter the name…",
+  "pricePlaceholder": "Enter the price…",
+  "ingredientsPlaceholder": "Enter the ingredients…",
+  "selectType": "Select a type"
+}

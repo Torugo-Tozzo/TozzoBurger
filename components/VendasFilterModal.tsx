@@ -14,7 +14,8 @@ import { Text, View } from '@/components/Themed';
 import { Button } from '@/components/ui/Button';
 import Colors from '@/constants/Colors';
 import { spacing, type } from '@/constants/theme';
-import type { VendasFilters } from '@/services/vendas';
+import type { VendasFilters } from '@/services/sales';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   visible: boolean;
@@ -27,10 +28,10 @@ type Props = {
 
 type CalendarField = 'dataInicial' | 'dataFinal' | null;
 
-function formatDate(date: string | null | undefined) {
-  if (!date) return 'Selecionar data';
+function formatDate(date: string | null | undefined, locale: string, fallback: string) {
+  if (!date) return fallback;
   const parsed = new Date(`${date}T12:00:00`);
-  return Number.isNaN(parsed.getTime()) ? 'Selecionar data' : parsed.toLocaleDateString('pt-BR');
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed.toLocaleDateString(locale);
 }
 
 function calendarDate(date: string | null | undefined) { return date || undefined; }
@@ -42,6 +43,8 @@ function dateFromCalendar(day: { year: number; month: number; day: number }) {
 export function VendasFilterModal({ visible, filters, onChange, onApply, onClear, onClose }: Props) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { t, i18n } = useTranslation();
+  const zeroCurrency = new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(0);
   const [calendarField, setCalendarField] = useState<CalendarField>(null);
 
   const update = (field: keyof VendasFilters, value: string | null) => {
@@ -62,53 +65,59 @@ export function VendasFilterModal({ visible, filters, onChange, onApply, onClear
           onPress={(event) => event.stopPropagation()}
         >
           <View style={styles.header}>
-            <Text style={styles.title}>Filtros</Text>
-            <Pressable onPress={onClose} accessibilityLabel="Fechar filtros" hitSlop={10}>
+            <Text style={styles.title}>{t('sales.filters')}</Text>
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t('sales.closeFilters')} hitSlop={10}>
               <FontAwesome name="times" size={18} color={colors.text} />
             </Pressable>
           </View>
 
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            <Text style={styles.sectionLabel}>Período</Text>
+            <Text style={styles.sectionLabel}>{t('sales.period')}</Text>
             <View style={styles.row}>
               <View style={styles.half}>
-                <Text style={styles.label}>Data inicial</Text>
+                <Text style={styles.label}>{t('sales.initialDate')}</Text>
                 <TouchableOpacity
                   style={[styles.dateButton, { borderColor: colors.border, backgroundColor: colors.surface }]}
                   onPress={() => setCalendarField('dataInicial')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('sales.initialDate')}
                 >
-                  <Text>{formatDate(filters.dataInicial)}</Text>
+                  <Text>{formatDate(filters.dataInicial, i18n.language, t('sales.initialDate'))}</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.half}>
-                <Text style={styles.label}>Data final</Text>
+                <Text style={styles.label}>{t('sales.finalDate')}</Text>
                 <TouchableOpacity
                   style={[styles.dateButton, { borderColor: colors.border, backgroundColor: colors.surface }]}
                   onPress={() => setCalendarField('dataFinal')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('sales.finalDate')}
                 >
-                  <Text>{formatDate(filters.dataFinal)}</Text>
+                  <Text>{formatDate(filters.dataFinal, i18n.language, t('sales.finalDate'))}</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             <View style={styles.row}>
               <View style={styles.half}>
-                <Text style={styles.label}>Hora inicial</Text>
+                <Text style={styles.label}>{t('sales.initialTime')}</Text>
                 <TextInput
                   value={filters.horaInicial ?? ''}
                   onChangeText={(value) => update('horaInicial', value)}
                   placeholder="00:00"
+                  accessibilityLabel={t('sales.initialTime')}
                   keyboardType="numbers-and-punctuation"
                   placeholderTextColor={colors.textMuted}
                   style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 />
               </View>
               <View style={styles.half}>
-                <Text style={styles.label}>Hora final</Text>
+                <Text style={styles.label}>{t('sales.finalTime')}</Text>
                 <TextInput
                   value={filters.horaFinal ?? ''}
                   onChangeText={(value) => update('horaFinal', value)}
                   placeholder="23:59"
+                  accessibilityLabel={t('sales.finalTime')}
                   keyboardType="numbers-and-punctuation"
                   placeholderTextColor={colors.textMuted}
                   style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
@@ -116,34 +125,37 @@ export function VendasFilterModal({ visible, filters, onChange, onApply, onClear
               </View>
             </View>
 
-            <Text style={styles.sectionLabel}>Venda</Text>
-            <Text style={styles.label}>Nome do cliente</Text>
+            <Text style={styles.sectionLabel}>{t('sales.sale')}</Text>
+            <Text style={styles.label}>{t('sales.customerName')}</Text>
             <TextInput
-              value={filters.cliente ?? ''}
-              onChangeText={(value) => update('cliente', value)}
-              placeholder="Todos os clientes"
+              value={filters.customerName ?? ''}
+              onChangeText={(value) => update('customerName', value)}
+              placeholder={t('sales.allCustomers')}
+              accessibilityLabel={t('sales.customerName')}
               placeholderTextColor={colors.textMuted}
               style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             />
 
             <View style={styles.row}>
               <View style={styles.half}>
-                <Text style={styles.label}>Total mínimo</Text>
+                <Text style={styles.label}>{t('sales.minimumTotal')}</Text>
                 <TextInput
                   value={filters.totalMin == null ? '' : String(filters.totalMin)}
                   onChangeText={(value) => update('totalMin', value)}
-                  placeholder="R$ 0,00"
+                  placeholder={zeroCurrency}
+                  accessibilityLabel={t('sales.minimumTotal')}
                   keyboardType="decimal-pad"
                   placeholderTextColor={colors.textMuted}
                   style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 />
               </View>
               <View style={styles.half}>
-                <Text style={styles.label}>Total máximo</Text>
+                <Text style={styles.label}>{t('sales.maximumTotal')}</Text>
                 <TextInput
                   value={filters.totalMax == null ? '' : String(filters.totalMax)}
                   onChangeText={(value) => update('totalMax', value)}
-                  placeholder="Sem limite"
+                  placeholder={t('sales.noLimit')}
+                  accessibilityLabel={t('sales.maximumTotal')}
                   keyboardType="decimal-pad"
                   placeholderTextColor={colors.textMuted}
                   style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
@@ -152,15 +164,15 @@ export function VendasFilterModal({ visible, filters, onChange, onApply, onClear
             </View>
 
             <View style={styles.actions}>
-              <Button title="Limpar" variant="outline" onPress={onClear} style={styles.actionButton} />
-              <Button title="Aplicar filtros" onPress={onApply} style={styles.actionButton} />
+              <Button title={t('sales.clearFilters')} variant="outline" onPress={onClear} style={styles.actionButton} />
+              <Button title={t('sales.applyFilters')} onPress={onApply} style={styles.actionButton} />
             </View>
           </ScrollView>
 
           {calendarField ? (
             <View style={[styles.calendarOverlay, { backgroundColor: colors.background, borderColor: colors.border }]}>
               <Text style={styles.calendarTitle}>
-                {calendarField === 'dataInicial' ? 'Data inicial' : 'Data final'}
+                {calendarField === 'dataInicial' ? t('sales.initialDate') : t('sales.finalDate')}
               </Text>
               <Calendar
                 current={calendarDate(filters[calendarField])}
@@ -180,7 +192,7 @@ export function VendasFilterModal({ visible, filters, onChange, onApply, onClear
                   monthTextColor: colors.text,
                 }}
               />
-              <Button title="Voltar aos filtros" variant="outline" onPress={() => setCalendarField(null)} />
+              <Button title={t('sales.backToFilters')} variant="outline" onPress={() => setCalendarField(null)} />
             </View>
           ) : null}
         </Pressable>

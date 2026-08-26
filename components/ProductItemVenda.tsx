@@ -5,20 +5,23 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/IconButton";
 import { IngredientesModal } from "@/components/ui/IngredientesModal";
-import { ProductDatabase } from "@/database/types/Produto";
+import { Product } from "@/database/types/Product";
 import { FontAwesome } from "@expo/vector-icons";
 import Colors from "@/constants/Colors";
 import { tipoColors, spacing, type, radius } from "@/constants/theme";
+import { useTranslation } from 'react-i18next';
+import { getProductTypeLabel } from '@/components/productTypeLabel';
 
 type Props = {
-  data: ProductDatabase;
+  data: Product;
   tipoNome?: string;
-  onAddToCart: (product: ProductDatabase) => void;
-  onAdicionaltoCart: (product: ProductDatabase, ehAdd: boolean) => void;
+  onAddToCart: (product: Product) => void;
+  onAdicionaltoCart: (product: Product, ehAdd: boolean) => void;
 };
 
 function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome }: Props) {
   const [modalVisible, setModalVisible] = useState(false);
+  const { t, i18n } = useTranslation();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -32,23 +35,30 @@ function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome 
     ]).start();
   };
 
-  const tipoLabel = tipoNome ?? (data as any).tipoNome ?? `Tipo ${data.tipoProdutoId}`;
+  const tipoLabel = getProductTypeLabel(data.productTypeId, tipoNome ?? (data as any).tipoNome, t);
+  const price = new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(data.price);
 
   return (
     <Card bordered={false} style={styles.container}>
       <View style={styles.info}>
-        <Text style={styles.nome}>{data.nome}</Text>
-        <Text style={styles.preco}>Preço: R$ {data.preco.toFixed(2)}</Text>
+        <Text style={styles.name}>{data.name}</Text>
+        <Text style={styles.price}>{t('products.price')}: {price}</Text>
       </View>
 
-      <Pressable onPress={() => setModalVisible(true)}>
-        <Badge label={tipoLabel} color={tipoColors[data.tipoProdutoId] ?? '#888'} />
+      <Pressable
+        onPress={() => setModalVisible(true)}
+        accessibilityRole="button"
+        accessibilityLabel={t('catalog.ingredientsFor', { name: data.name })}
+      >
+        <Badge label={tipoLabel} color={tipoColors[data.productTypeId] ?? '#888'} />
       </Pressable>
 
       <Animated.View style={{ transform: [{ scale: iconScaleAnim }] }}>
         <Pressable
           onPress={() => { triggerAnimation(iconScaleAnim); onAdicionaltoCart(data, true); }}
           style={{ flexDirection: "row" }}
+          accessibilityRole="button"
+          accessibilityLabel={t('navigation.addOn')}
         >
           <FontAwesome name="flash" size={25} color={colors.primary} style={{ marginRight: spacing.xl, marginLeft: spacing.md }} />
         </Pressable>
@@ -58,7 +68,7 @@ function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome 
         <View style={[styles.addButton, { backgroundColor: colors.primary }]}>
           <IconButton
             icon="plus"
-            label="Adicionar à conta"
+            label={t('common.addToOrder')}
             onPress={() => { triggerAnimation(buttonScaleAnim); onAddToCart(data); }}
             size={20}
             color={colors.background}
@@ -69,8 +79,8 @@ function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome 
       <IngredientesModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        nomeProduto={data.nome}
-        ingredientes={data.ingredientes}
+        nomeProduto={data.name}
+        ingredients={data.ingredients}
       />
     </Card>
   );
@@ -79,8 +89,8 @@ function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome 
 const styles = StyleSheet.create({
   container: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   info: { flex: 1 },
-  nome: { fontSize: type.body, fontWeight: "bold" },
-  preco: { fontSize: type.bodySm },
+  name: { fontSize: type.body, fontWeight: "bold" },
+  price: { fontSize: type.bodySm },
   addButton: { width: 44, height: 44, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', marginLeft: spacing.sm },
 });
 

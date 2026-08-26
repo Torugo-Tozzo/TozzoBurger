@@ -1,0 +1,9 @@
+{
+  "generic": "Something went wrong.",
+  "network": "Check your internet connection and try again.",
+  "required": "Complete all required fields.",
+  "invalidEmail": "Enter a valid email address.",
+  "loadFailed": "Could not load the information.",
+  "saveFailed": "Could not save the changes.",
+  "deleteFailed": "Could not delete the item."
+}

@@ -3,10 +3,13 @@ import { TouchableOpacity, View, ActivityIndicator, StyleSheet, Alert, useColorS
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useAutoSync } from '@/context/AutoSyncContext';
 import Colors from '@/constants/Colors';
+import { i18n } from '@/i18n';
+import { useTranslation } from 'react-i18next';
 
 export default function SyncIndicator() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const { isSyncing, triggerSync } = useAutoSync();
   const { lastSyncResult } = useAutoSync();
   const lastHandledResultRef = useRef<number | null>(null);
@@ -35,8 +38,10 @@ export default function SyncIndicator() {
       setResult('error');
       if (resultTimerRef.current) clearTimeout(resultTimerRef.current as any);
       resultTimerRef.current = setTimeout(() => { if (mountedRef.current) setResult('idle'); }, 2500) as any;
-      const nice = /network|offline|internet|ENOTFOUND|Network request failed/i.test(r.message ?? '') ? 'Sem internet. Verifique sua conexão.' : (r.message ?? 'Falha na sincronização');
-      Alert.alert('Sincronização falhou', nice);
+      const nice = /network|offline|internet|ENOTFOUND|Network request failed/i.test(r.message ?? '')
+        ? i18n.t('sync.noConnectionMessage')
+        : i18n.t('sync.genericError');
+      Alert.alert(i18n.t('sync.syncFailedTitle'), nice);
     }
   }, [lastSyncResult]);
 
@@ -81,8 +86,10 @@ export default function SyncIndicator() {
       setResult('error');
       if (resultTimerRef.current) clearTimeout(resultTimerRef.current as any);
       resultTimerRef.current = setTimeout(() => { if (mountedRef.current) setResult('idle'); }, 2500) as any;
-      const nice = /network|offline|internet|ENOTFOUND|Network request failed/i.test(errorMsg ?? '') ? 'Sem internet. Verifique sua conexão.' : (errorMsg ?? 'Falha na sincronização');
-      Alert.alert('Sincronização falhou', nice);
+      const nice = /network|offline|internet|ENOTFOUND|Network request failed/i.test(errorMsg ?? '')
+        ? i18n.t('sync.noConnectionMessage')
+        : i18n.t('sync.genericError');
+      Alert.alert(i18n.t('sync.syncFailedTitle'), nice);
     }
   };
 
@@ -92,7 +99,12 @@ export default function SyncIndicator() {
     <TouchableOpacity
       onPress={handlePress}
       style={[styles.container, disabled ? styles.disabled : undefined]}
-      accessibilityLabel="sync-button"
+      accessibilityLabel={
+        (isSyncing || localLoading) ? t('sync.syncing')
+          : result === 'success' ? t('sync.synced')
+            : result === 'error' ? t('sync.syncFailedTitle')
+              : t('sync.accessibilityLabel')
+      }
       disabled={disabled}
     >
       <View style={styles.inner}>

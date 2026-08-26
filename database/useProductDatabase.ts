@@ -1,32 +1,32 @@
 import { useSQLiteContext } from "expo-sqlite"
-import { ProductDatabase } from "./types/Produto"
+import { Product } from "./types/Product"
 import { generateUUID } from "./utils/uuid"
 import { markChanged } from "./tableWatermark"
 
 export function useProductDatabase() {
   const database = useSQLiteContext()
 
-  async function create(data: Omit<ProductDatabase, "id" | "updated_at">) {
+  async function create(data: Omit<Product, "id" | "updated_at">) {
     const statement = await database.prepareAsync(
-      "INSERT INTO TB_PRODUTOS (id, nome, preco, tipoProdutoId, origemProdutoId, ingredientes, updated_at, sync_status) VALUES ($id, $nome, $preco, $tipoProdutoId, $origemProdutoId, $ingredientes, $updated_at, $sync_status)"
+      "INSERT INTO TB_PRODUCTS (id, name, price, productTypeId, sourceProductId, ingredients, updated_at, sync_status) VALUES ($id, $name, $price, $productTypeId, $sourceProductId, $ingredients, $updated_at, $sync_status)"
     )
 
     try {
       const id = generateUUID()
       const result = await statement.executeAsync({
         $id: id,
-        $nome: data.nome,
-        $preco: data.preco,
-        $tipoProdutoId: data.tipoProdutoId,
-        $origemProdutoId: data.origemProdutoId ?? null,
-        $ingredientes: data.ingredientes ?? null,
+        $name: data.name,
+        $price: data.price,
+        $productTypeId: data.productTypeId,
+        $sourceProductId: data.sourceProductId ?? null,
+        $ingredients: data.ingredients ?? null,
         $updated_at: Date.now(),
         $sync_status: 'pending',
       })
 
         console.log('[db] produto criado', { id })
 
-        markChanged('produtos')
+        markChanged('products')
 
         return { id }
     } catch (error) {
@@ -36,24 +36,24 @@ export function useProductDatabase() {
     }
   }
 
-  async function createFromSync(data: ProductDatabase) {
+  async function createFromSync(data: Product) {
     const statement = await database.prepareAsync(
-      "INSERT INTO TB_PRODUTOS (id, nome, preco, tipoProdutoId, origemProdutoId, ingredientes, updated_at, sync_status) VALUES ($id, $nome, $preco, $tipoProdutoId, $origemProdutoId, $ingredientes, $updated_at, $sync_status)"
+      "INSERT INTO TB_PRODUCTS (id, name, price, productTypeId, sourceProductId, ingredients, updated_at, sync_status) VALUES ($id, $name, $price, $productTypeId, $sourceProductId, $ingredients, $updated_at, $sync_status)"
     )
 
     try {
       await statement.executeAsync({
         $id: data.id,
-        $nome: data.nome,
-        $preco: data.preco,
-        $tipoProdutoId: data.tipoProdutoId,
-        $origemProdutoId: data.origemProdutoId ?? null,
-        $ingredientes: data.ingredientes ?? null,
+        $name: data.name,
+        $price: data.price,
+        $productTypeId: data.productTypeId,
+        $sourceProductId: data.sourceProductId ?? null,
+        $ingredients: data.ingredients ?? null,
         $updated_at: (data as any).updated_at ?? Date.now(),
         $sync_status: 'synced',
       })
 
-      markChanged('produtos')
+      markChanged('products')
 
       return { id: data.id }
     } catch (error) {
@@ -66,16 +66,16 @@ export function useProductDatabase() {
   async function searchByName(name: string, limit?: number, offset?: number) {
     try {
       if (limit !== undefined) {
-        const query = `SELECT P.* FROM TB_PRODUTOS P JOIN TB_TP_PRODUTO T ON P.tipoProdutoId = T.id WHERE P.deleted_at IS NULL AND T.ativo = 1 AND P.nome LIKE ? ORDER BY P.nome ASC, P.id ASC LIMIT ? OFFSET ?`
+        const query = `SELECT P.* FROM TB_PRODUCTS P JOIN TB_PRODUCT_TYPES T ON P.productTypeId = T.id WHERE P.deleted_at IS NULL AND T.isActive = 1 AND P.name LIKE ? ORDER BY P.name ASC, P.id ASC LIMIT ? OFFSET ?`
 
-        const response = await database.getAllAsync<ProductDatabase>(query, [`%${name}%`, limit, offset ?? 0])
+        const response = await database.getAllAsync<Product>(query, [`%${name}%`, limit, offset ?? 0])
 
         return response
       }
 
-      const query = `SELECT P.* FROM TB_PRODUTOS P JOIN TB_TP_PRODUTO T ON P.tipoProdutoId = T.id WHERE P.deleted_at IS NULL AND T.ativo = 1 AND P.nome LIKE ?`
+      const query = `SELECT P.* FROM TB_PRODUCTS P JOIN TB_PRODUCT_TYPES T ON P.productTypeId = T.id WHERE P.deleted_at IS NULL AND T.isActive = 1 AND P.name LIKE ?`
 
-      const response = await database.getAllAsync<ProductDatabase>(query, `%${name}%`)
+      const response = await database.getAllAsync<Product>(query, `%${name}%`)
 
       return response
     } catch (error) {
@@ -83,23 +83,23 @@ export function useProductDatabase() {
     }
   }
 
-  async function update(data: Omit<ProductDatabase, "updated_at">) {
+  async function update(data: Omit<Product, "updated_at">) {
     const statement = await database.prepareAsync(
-      "UPDATE TB_PRODUTOS SET nome = $nome, preco = $preco, tipoProdutoId = $tipoProdutoId, ingredientes = $ingredientes, updated_at = $updated_at, sync_status = $sync_status WHERE id = $id"
+      "UPDATE TB_PRODUCTS SET name = $name, price = $price, productTypeId = $productTypeId, ingredients = $ingredients, updated_at = $updated_at, sync_status = $sync_status WHERE id = $id"
     )
 
     try {
       await statement.executeAsync({
         $id: data.id,
-        $nome: data.nome,
-        $preco: data.preco,
-        $tipoProdutoId: data.tipoProdutoId,
-        $ingredientes: data.ingredientes ?? null,
+        $name: data.name,
+        $price: data.price,
+        $productTypeId: data.productTypeId,
+        $ingredients: data.ingredients ?? null,
         $updated_at: Date.now(),
         $sync_status: 'pending',
       })
 
-      markChanged('produtos')
+      markChanged('products')
     } catch (error) {
       throw error
     } finally {
@@ -111,11 +111,11 @@ export function useProductDatabase() {
     try {
       const now = Date.now();
       await database.runAsync(
-        'UPDATE TB_PRODUTOS SET deleted_at = ?, updated_at = ?, sync_status = ? WHERE id = ?',
+        'UPDATE TB_PRODUCTS SET deleted_at = ?, updated_at = ?, sync_status = ? WHERE id = ?',
         [now, now, 'pending', id]
       );
 
-      markChanged('produtos')
+      markChanged('products')
     } catch (error) {
       throw error
     }
@@ -123,9 +123,9 @@ export function useProductDatabase() {
 
   async function show(id: string) {
     try {
-      const query = "SELECT * FROM TB_PRODUTOS WHERE id = ? AND deleted_at IS NULL"
+      const query = "SELECT * FROM TB_PRODUCTS WHERE id = ? AND deleted_at IS NULL"
 
-      const response = await database.getFirstAsync<ProductDatabase>(query, [
+      const response = await database.getFirstAsync<Product>(query, [
         id,
       ])
 
@@ -137,9 +137,9 @@ export function useProductDatabase() {
 
   async function showAdd(id: string) {
     try {
-      const query = "SELECT * FROM TB_PRODUTOS WHERE id = ? AND deleted_at IS NULL"
+      const query = "SELECT * FROM TB_PRODUCTS WHERE id = ? AND deleted_at IS NULL"
 
-      const response = await database.getFirstAsync<ProductDatabase>(query, [
+      const response = await database.getFirstAsync<Product>(query, [
         id,
       ])
 
@@ -149,11 +149,11 @@ export function useProductDatabase() {
     }
   }
 
-  async function getTipoProdutos() {
+  async function getProductTypes() {
     try {
-      const query = "SELECT id, descricao FROM TB_TP_PRODUTO WHERE deleted_at IS NULL AND ativo = 1"
+      const query = "SELECT id, description FROM TB_PRODUCT_TYPES WHERE deleted_at IS NULL AND isActive = 1"
 
-      const response = await database.getAllAsync<{ id: number; descricao: string }>(
+      const response = await database.getAllAsync<{ id: number; description: string }>(
         query
       )
 
@@ -163,11 +163,11 @@ export function useProductDatabase() {
     }
   }
 
-  async function filterByTipo(tipoProdutoId: number, limit: number, offset: number): Promise<ProductDatabase[]> {
+  async function filterByProductType(productTypeId: number, limit: number, offset: number): Promise<Product[]> {
     try {
-      const query = `SELECT P.* FROM TB_PRODUTOS P JOIN TB_TP_PRODUTO T ON P.tipoProdutoId = T.id WHERE P.deleted_at IS NULL AND T.ativo = 1 AND P.tipoProdutoId = ? ORDER BY P.nome ASC, P.id ASC LIMIT ? OFFSET ?`
+      const query = `SELECT P.* FROM TB_PRODUCTS P JOIN TB_PRODUCT_TYPES T ON P.productTypeId = T.id WHERE P.deleted_at IS NULL AND T.isActive = 1 AND P.productTypeId = ? ORDER BY P.name ASC, P.id ASC LIMIT ? OFFSET ?`
 
-      const response = await database.getAllAsync<ProductDatabase>(query, [tipoProdutoId, limit, offset])
+      const response = await database.getAllAsync<Product>(query, [productTypeId, limit, offset])
 
       return response
     } catch (error) {
@@ -175,11 +175,11 @@ export function useProductDatabase() {
     }
   }
 
-  async function searchOrigemProdutoId(produtoId: string): Promise<ProductDatabase[]> {
+  async function searchBySourceProductId(productId: string): Promise<Product[]> {
     try {
-      const query = `SELECT P.* FROM TB_PRODUTOS P JOIN TB_TP_PRODUTO T ON P.tipoProdutoId = T.id WHERE P.origemProdutoId = ? AND P.deleted_at IS NULL AND T.ativo = 1`
+      const query = `SELECT P.* FROM TB_PRODUCTS P JOIN TB_PRODUCT_TYPES T ON P.productTypeId = T.id WHERE P.sourceProductId = ? AND P.deleted_at IS NULL AND T.isActive = 1`
 
-      const response = await database.getAllAsync<ProductDatabase>(query, [produtoId])
+      const response = await database.getAllAsync<Product>(query, [productId])
 
       return response
     } catch (error) {
@@ -195,9 +195,15 @@ export function useProductDatabase() {
     update, 
     remove, 
     show, 
-    getTipoProdutos, 
-    filterByTipo, 
-    searchOrigemProdutoId, 
+    getProductTypes,
+    filterByProductType,
+    searchBySourceProductId,
+    /** @deprecated Use getProductTypes. */
+    getTipoProdutos: getProductTypes,
+    /** @deprecated Use filterByProductType. */
+    filterByTipo: filterByProductType,
+    /** @deprecated Use searchBySourceProductId. */
+    searchOrigemProdutoId: searchBySourceProductId,
     showAdd 
   }
 }

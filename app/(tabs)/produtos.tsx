@@ -14,15 +14,17 @@ import { ProductCardSkeleton } from "@/components/ui/ProductCardSkeleton";
 import { ListFrame } from "@/components/ui/ListFrame";
 import { ListDivider } from "@/components/ui/ListDivider";
 import { useMinLoadingDuration } from "@/hooks/useMinLoadingDuration";
+import { useTranslation } from 'react-i18next';
 
 export default function ProdutosScreen() {
+  const { t } = useTranslation();
   const { remove } = useProductDatabase();
-  const { products, tiposProduto, tipoProdutoId, filterByTipo, setSearch, isLoading, isLoadingMore, loadMore } = useProductList()
+  const { products, productTypes, productTypeId, filterByProductType, setSearch, isLoading, isLoadingMore, loadMore } = useProductList()
   const { refreshing, onRefresh } = useSyncRefresh();
 
   useFocusEffect(
     useCallback(() => {
-      filterByTipo(null);
+      filterByProductType(null);
       return;
     }, [])
   );
@@ -39,29 +41,29 @@ export default function ProdutosScreen() {
       data={products}
       keyExtractor={(item) => String(item.id)}
       refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />}
-      ListEmptyComponent={<EmptyState icon="cutlery" title="Nenhum produto cadastrado" message="Toque no + pra adicionar o primeiro item." />}
+      ListEmptyComponent={<EmptyState icon="cutlery" title={t('products.empty')} message={t('products.addFirst')} />}
       onEndReached={loadMore}
       onEndReachedThreshold={0.5}
       ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
       ItemSeparatorComponent={ListDivider}
       renderItem={({ item }) => {
-        const tipo = tiposProduto?.find((t: any) => Number(t.id) === Number(item.tipoProdutoId))?.descricao;
+        const productType = productTypes?.find((t: any) => Number(t.id) === Number(item.productTypeId))?.description;
 
         return (
           <Product
             data={item}
-            tipoNome={tipo}
+            tipoNome={productType}
             onDelete={() => {
               Alert.alert(
-                'Confirmar Remoção',
-                'Tem certeza que deseja remover este produto?',
+                t('products.removeTitle'),
+                t('products.deleteConfirm'),
                 [
-                  { text: 'Cancelar', style: 'cancel' },
+                  { text: t('common.cancel'), style: 'cancel' },
                   {
-                    text: 'Remover',
+                    text: t('products.remove'),
                     onPress: () => {
                       remove(item.id);
-                      filterByTipo(Number(tipoProdutoId));
+                      filterByProductType(Number(productTypeId));
                     },
                     style: 'destructive',
                   },
@@ -77,11 +79,11 @@ export default function ProdutosScreen() {
 
   return (
     <View style={styles.container}>
-      <Input placeholder="Pesquisar" onChangeText={setSearch} style={styles.input} />
+      <Input placeholder={t('common.search')} accessibilityLabel={t('common.search')} onChangeText={setSearch} style={styles.input} />
       <FiltroTipos
-        data={tiposProduto}
-        selectedId={Number(tipoProdutoId)}
-        onSelect={filterByTipo}
+        data={productTypes}
+        selectedId={Number(productTypeId)}
+        onSelect={filterByProductType}
       />
       {showSkeleton ? (
         <ListFrame>

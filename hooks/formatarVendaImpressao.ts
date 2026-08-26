@@ -1,50 +1,58 @@
-import { VendaDatabase } from "@/database/types/Venda";
+import { Sale } from "@/database/types/Sale";
+import { i18n } from "@/i18n";
 
 export interface Produto {
-  nome: string;
-  quantidade: number;
-  preco: number;
+  name: string;
+  quantity: number;
+  price: number;
 }
 
-function removerAcentos(texto: string | undefined | null): string {
-  if (!texto) return "";
-  return texto
-    .normalize("NFD") // Separa o caractere base do acento (Ex: 'ç' vira 'c' + '¸')
-    .replace(/[\u0300-\u036f]/g, "") // Remove os diacríticos (acentos)
-    .replace(/[^\x00-\x7F]/g, ""); // Remove qualquer caractere não-ASCII restante por segurança
-}
-
-export function formatarVendaParaImpressao(venda: VendaDatabase, produtos: Produto[]): string {
-  const clienteLimpo = removerAcentos(venda.cliente) || "Nao informado";
+export function formatarVendaParaImpressao(venda: Sale, produtos: Produto[]): string {
+  const locale = i18n.language;
+  const formatCurrency = (value: number) => new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value);
+  const formatQuantity = (value: number) => new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 0,
+  }).format(value);
+  const soldAt = new Date(venda.soldAt);
+  const formattedDate = new Intl.DateTimeFormat(locale).format(soldAt);
+  const formattedTime = new Intl.DateTimeFormat(locale, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(soldAt);
+  const customer = venda.customerName?.trim() || i18n.t('common.notProvided');
   let printContent = `
       \u001b!\u0030\u001bE\u0001TOZZO BURGER\u001bE\u0001\u001b!\u0000
-      \n------------- Informacoes da Venda -------------\n
-      Numero da Venda: #${venda.id}
-      Cliente: ${clienteLimpo}
-      Data: ${new Date(venda.horario).toLocaleDateString()} as ${new Date(venda.horario).toLocaleTimeString()}
-      \n---------------- Itens da Venda ----------------\n\n`;
+      \n------------- ${i18n.t('printer.saleInfoTitle')} -------------\n
+      ${i18n.t('printer.saleNumber')}: #${venda.id}
+      ${i18n.t('printer.customer')}: ${customer}
+      ${i18n.t('printer.date')}: ${formattedDate} ${i18n.t('printer.at')} ${formattedTime}
+      \n---------------- ${i18n.t('printer.itemsTitle')} ----------------\n\n`;
 
   produtos.forEach((produto) => {
-    let nomeProdutoLimpo = removerAcentos(produto.nome);
+    let productName = produto.name;
 
-    nomeProdutoLimpo = nomeProdutoLimpo.length > 30
-      ? nomeProdutoLimpo.slice(0, 27) + "..."
-      : nomeProdutoLimpo;
+    productName = productName.length > 30
+      ? productName.slice(0, 27) + "..."
+      : productName;
 
-    const valorTotal = `R$ ${(produto.quantidade * produto.preco).toFixed(2)}`;
+    const totalPrice = formatCurrency(produto.quantity * produto.price);
     
-    const numPontosLinha = 48 - (nomeProdutoLimpo.length + valorTotal.length + 8); 
+    const numPontosLinha = 48 - (productName.length + totalPrice.length + 8);
     const pontos = ".".repeat(numPontosLinha > 0 ? numPontosLinha : 0);
 
-    printContent += `\x1bE1( ${produto.quantidade} x ) ${nomeProdutoLimpo.toUpperCase()}${pontos}${valorTotal}\x1bE0\n`;
+    printContent += `\x1bE1( ${formatQuantity(produto.quantity)} x ) ${productName}${pontos}${totalPrice}\x1bE0\n`;
     
-    printContent += produto.quantidade > 1
-      ? `    \x1bE1Preco Unitario: R$ ${produto.preco.toFixed(2)}\x1bE0\n\n`
+    printContent += produto.quantity > 1
+      ? `    \x1bE1${i18n.t('printer.unitPrice')}: ${formatCurrency(produto.price)}\x1bE0\n\n`
       : '\n';
   });
 
-  printContent += `\n---------------- Final da Conta ----------------\n`
-  printContent += `\n\u001b!\u0030\u001bE\u0001TOTAL: R$ ${venda.total.toFixed(2)}\u001bE\u0001\u001b!\u0000\n\n\n\n\n\n`;
+  printContent += `\n---------------- ${i18n.t('printer.finalAccount')} ----------------\n`;
+  printContent += `\n\u001b!\u0030\u001bE\u0001${i18n.t('printer.total')}: ${formatCurrency(venda.total)}\u001bE\u0001\u001b!\u0000\n\n\n\n\n\n`;
 
   return printContent;
 }
