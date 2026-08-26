@@ -33,5 +33,6 @@
   "removed": "Printer removed.",
   "connectedAs": "Connected printer: {{name}}",
   "unknownDevice": "Unknown device",
-  "register": "Register printer"
+  "register": "Register printer",
+  "paperWidth": "Paper width"
 }
