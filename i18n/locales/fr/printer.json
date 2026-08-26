@@ -33,5 +33,6 @@
   "removed": "Imprimante supprimée.",
   "connectedAs": "Imprimante connectée : {{name}}",
   "unknownDevice": "Appareil inconnu",
-  "register": "Enregistrer l’imprimante"
+  "register": "Enregistrer l’imprimante",
+  "paperWidth": "Largeur du papier"
 }

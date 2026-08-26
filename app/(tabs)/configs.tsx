@@ -20,6 +20,8 @@ import {
   setLocale,
   SUPPORTED_LOCALES,
 } from '@/i18n';
+import { PRINTER_WIDTH_PRESETS, PrinterWidthPreset } from '@/constants/printerWidths';
+import { getPrinterWidth, setPrinterWidth } from '@/services/printerPreferences';
 
 const BluetoothScreen = () => {
   const { setPrinter, getPrinter, removePrinter } = usePrinterDatabase(); // Métodos do banco de dados
@@ -38,11 +40,29 @@ const BluetoothScreen = () => {
   const [localeChanging, setLocaleChanging] = useState(false);
   const { t, i18n } = useTranslation();
   const [selectedLocale, setSelectedLocale] = useState<AppLocale>(() => normalizeLocale(i18n.language));
+  const [selectedPrinterWidth, setSelectedPrinterWidth] = useState<PrinterWidthPreset>('80mm');
+  const [printerWidthChanging, setPrinterWidthChanging] = useState(false);
   const { refreshing, onRefresh } = useSyncRefresh();
 
   useEffect(() => {
     setSelectedLocale(normalizeLocale(i18n.language));
   }, [i18n.language]);
+
+  useEffect(() => {
+    getPrinterWidth().then(setSelectedPrinterWidth);
+  }, []);
+
+  const handlePrinterWidthChange = async (value: PrinterWidthPreset) => {
+    setPrinterWidthChanging(true);
+    try {
+      const applied = await setPrinterWidth(value);
+      setSelectedPrinterWidth(applied);
+    } catch (error) {
+      console.error('Failed to save printer width preference:', error);
+    } finally {
+      setPrinterWidthChanging(false);
+    }
+  };
 
   const handleLocaleChange = async (nextLocale: AppLocale) => {
     const currentLocale = normalizeLocale(i18n.language);
@@ -239,6 +259,23 @@ const BluetoothScreen = () => {
                 <Button title={t('printer.add')} onPress={handleScanDevices} />
               </View>
             )}
+            <View style={{ marginTop: 16 }}>
+              <Text style={{ marginBottom: 8, color: colors.text }}>{t('printer.paperWidth')}</Text>
+              <View style={[styles.pickerFrame, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                <Picker
+                  selectedValue={selectedPrinterWidth}
+                  onValueChange={(value) => handlePrinterWidthChange(value as PrinterWidthPreset)}
+                  enabled={!printerWidthChanging}
+                  accessibilityLabel={t('printer.paperWidth')}
+                  style={{ color: colors.text }}
+                  dropdownIconColor={colors.text}
+                >
+                  {PRINTER_WIDTH_PRESETS.map((preset) => (
+                    <Picker.Item key={preset} label={preset} value={preset} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
           </View>
         </View>
       )}

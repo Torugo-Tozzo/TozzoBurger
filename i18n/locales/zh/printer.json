@@ -33,5 +33,6 @@
   "removed": "打印机已移除。",
   "connectedAs": "已连接的打印机：{{name}}",
   "unknownDevice": "未知设备",
-  "register": "注册打印机"
+  "register": "注册打印机",
+  "paperWidth": "纸张宽度"
 }

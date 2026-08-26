@@ -33,5 +33,6 @@
   "removed": "Impressora removida.",
   "connectedAs": "Impressora conectada: {{name}}",
   "unknownDevice": "Dispositivo desconhecido",
-  "register": "Registrar impressora"
+  "register": "Registrar impressora",
+  "paperWidth": "Largura do papel"
 }
