@@ -1,5 +1,7 @@
 import { Sale } from "@/database/types/Sale";
 import { i18n } from "@/i18n";
+import { getPrinterWidth } from "@/services/printerPreferences";
+import { PRINTER_WIDTH_COLUMNS } from "@/constants/printerWidths";
 
 export interface Produto {
   name: string;
@@ -7,7 +9,8 @@ export interface Produto {
   price: number;
 }
 
-export function formatarVendaParaImpressao(venda: Sale, produtos: Produto[]): string {
+export async function formatarVendaParaImpressao(venda: Sale, produtos: Produto[]): Promise<string> {
+  const columns = PRINTER_WIDTH_COLUMNS[await getPrinterWidth()];
   const locale = i18n.language;
   const formatCurrency = (value: number) => new Intl.NumberFormat(locale, {
     style: 'currency',
@@ -41,7 +44,7 @@ export function formatarVendaParaImpressao(venda: Sale, produtos: Produto[]): st
 
     const totalPrice = formatCurrency(produto.quantity * produto.price);
     
-    const numPontosLinha = 48 - (productName.length + totalPrice.length + 8);
+    const numPontosLinha = columns - (productName.length + totalPrice.length + 8);
     const pontos = ".".repeat(numPontosLinha > 0 ? numPontosLinha : 0);
 
     printContent += `\x1bE1( ${formatQuantity(produto.quantity)} x ) ${productName}${pontos}${totalPrice}\x1bE0\n`;

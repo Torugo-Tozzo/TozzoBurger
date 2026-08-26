@@ -364,7 +364,7 @@ export default function HistoricoScreen() {
         const product = await showAdd(item.productId);
         return { name: product?.name ?? t('sales.unknownProduct'), quantity: item.quantity, price: product?.price ?? 0 };
       }));
-      await sendMessageToDevice(formatarVendaParaImpressao(sale, products), await getPrinter());
+      await sendMessageToDevice(await formatarVendaParaImpressao(sale, products), await getPrinter());
       Alert.alert(t('sales.printSuccessTitle'), t('sales.printSuccessMessage'));
     } catch (error) {
       console.error('Erro ao imprimir venda:', error);

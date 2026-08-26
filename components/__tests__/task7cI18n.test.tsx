@@ -134,7 +134,7 @@ describe('Task 7C presentation i18n', () => {
       await i18n.changeLanguage('pt-BR');
     });
 
-    const receipt = formatarVendaParaImpressao(
+    const receipt = await formatarVendaParaImpressao(
       {
         id: 'sale-1',
         total: 12.5,
