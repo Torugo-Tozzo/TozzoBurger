@@ -6,7 +6,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { IngredientesModal } from "@/components/ui/IngredientesModal";
 import { tipoColors, spacing, type } from '@/constants/theme';
 import { useState } from "react";
-import { Product } from "@/database/types/Product";
+import type { Product } from "@/database/types/Product";
 import { useTranslation } from 'react-i18next';
 import { getProductTypeLabel } from '@/components/productTypeLabel';
 

@@ -7,6 +7,18 @@ import { I18N_NAMESPACES, resources } from './resources';
 export const SUPPORTED_LOCALES = ['en', 'pt-BR', 'es', 'fr', 'zh', 'hi'] as const;
 export type AppLocale = (typeof SUPPORTED_LOCALES)[number];
 
+// Each language's name for itself, not translated into the active UI
+// language — a speaker of that language must recognize it at a glance in a
+// picker, regardless of which locale is currently active.
+export const LOCALE_NATIVE_NAMES: Record<AppLocale, string> = {
+  en: 'English',
+  'pt-BR': 'Português (Brasil)',
+  es: 'Español',
+  fr: 'Français',
+  zh: '中文',
+  hi: 'हिन्दी',
+};
+
 export const LOCALE_PREFERENCE_KEY = '@tozzoburger/locale';
 
 function recognizeLocale(input: unknown): AppLocale | undefined {

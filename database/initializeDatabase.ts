@@ -22,6 +22,7 @@ const COLUMN_RENAMES = [
   ['TB_PRODUCTS', 'ingredientes', 'ingredients'],
   ['TB_PRODUCT_TYPES', 'descricao', 'description'],
   ['TB_PRODUCT_TYPES', 'ativo', 'isActive'],
+  ['TB_PRODUCT_TYPES', 'cor', 'color'],
   ['TB_SALES', 'horario', 'soldAt'],
   ['TB_SALES', 'cliente', 'customerName'],
   ['TB_SALES', 'excluida', 'isCancelled'],
@@ -152,7 +153,7 @@ export async function initializeDatabase(database: SQLiteDatabase) {
     CREATE TABLE IF NOT EXISTS TB_PRODUCT_TYPES (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       description TEXT NOT NULL,
-      cor TEXT NOT NULL DEFAULT '#9E9E9E',
+      color TEXT NOT NULL DEFAULT '#9E9E9E',
       isActive BOOLEAN NOT NULL DEFAULT 1,
       updated_at INTEGER NOT NULL,
       deleted_at INTEGER NULL,

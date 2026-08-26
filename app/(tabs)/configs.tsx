@@ -12,21 +12,14 @@ import { useAuth } from '@/context/AuthContext';
 import Constants from 'expo-constants';
 import { useSyncRefresh } from '@/hooks/useSyncRefresh';
 import { useTranslation } from 'react-i18next';
+import { radius, spacing } from '@/constants/theme';
 import {
   AppLocale,
+  LOCALE_NATIVE_NAMES,
   normalizeLocale,
   setLocale,
   SUPPORTED_LOCALES,
 } from '@/i18n';
-
-const LOCALE_LABEL_KEYS: Record<AppLocale, string> = {
-  en: 'settings.languageEnglish',
-  'pt-BR': 'settings.languagePortugueseBrazil',
-  es: 'settings.languageSpanish',
-  fr: 'settings.languageFrench',
-  zh: 'settings.languageChinese',
-  hi: 'settings.languageHindi',
-};
 
 const BluetoothScreen = () => {
   const { setPrinter, getPrinter, removePrinter } = usePrinterDatabase(); // Métodos do banco de dados
@@ -158,7 +151,8 @@ const BluetoothScreen = () => {
 
       {/* Sections: User / Printer */}
       <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={[styles.sectionHeader, { backgroundColor: colors.surfaceHeader }] }>
+        <View style={[styles.sectionHeader, styles.sectionHeaderRow, { backgroundColor: colors.surfaceHeader }] }>
+          <FontAwesome name="user" size={16} color={colors.text} />
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.account')}</Text>
         </View>
         <View style={styles.sectionContent}>
@@ -197,32 +191,39 @@ const BluetoothScreen = () => {
       </View>
 
       <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={[styles.sectionHeader, { backgroundColor: colors.surfaceHeader }]}>
+        <View style={[styles.sectionHeader, styles.sectionHeaderRow, { backgroundColor: colors.surfaceHeader }]}>
+          <FontAwesome name="language" size={16} color={colors.text} />
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.language')}</Text>
         </View>
         <View style={styles.sectionContent}>
           <Text style={{ marginBottom: 8, color: colors.text }}>{t('settings.selectLanguage')}</Text>
-          <Picker
-            selectedValue={selectedLocale}
-            onValueChange={(value) => handleLocaleChange(value as AppLocale)}
-            enabled={!localeChanging}
-            accessibilityLabel={t('settings.selectLanguage')}
-            style={{ color: colors.text }}
-            dropdownIconColor={colors.text}
-          >
-            {SUPPORTED_LOCALES.map((locale) => (
-              <Picker.Item key={locale} label={t(LOCALE_LABEL_KEYS[locale])} value={locale} />
-            ))}
-          </Picker>
-          <Text style={{ color: colors.textMuted }}>
-            {t('settings.currentLanguage')}: {t(LOCALE_LABEL_KEYS[selectedLocale])}
+          <View style={[styles.pickerFrame, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <Picker
+              selectedValue={selectedLocale}
+              onValueChange={(value) => handleLocaleChange(value as AppLocale)}
+              enabled={!localeChanging}
+              accessibilityLabel={t('settings.selectLanguage')}
+              style={{ color: colors.text }}
+              dropdownIconColor={colors.text}
+            >
+              {/* Each option shows the language's own name for itself (not
+                  translated into the active UI language) so a speaker of
+                  that language recognizes it at a glance in the picker. */}
+              {SUPPORTED_LOCALES.map((locale) => (
+                <Picker.Item key={locale} label={LOCALE_NATIVE_NAMES[locale]} value={locale} />
+              ))}
+            </Picker>
+          </View>
+          <Text style={{ color: colors.textMuted, marginTop: 8 }}>
+            {t('settings.currentLanguage')}: {LOCALE_NATIVE_NAMES[selectedLocale]}
           </Text>
         </View>
       </View>
 
       {!isCliente && (
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.sectionHeader, { backgroundColor: colors.surfaceHeader }] }>
+          <View style={[styles.sectionHeader, styles.sectionHeaderRow, { backgroundColor: colors.surfaceHeader }] }>
+            <FontAwesome name="print" size={16} color={colors.text} />
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.printer')}</Text>
           </View>
           <View style={styles.sectionContent}>
@@ -290,12 +291,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#e6e6e6',
+    borderRadius: radius.md,
   },
   sectionHeader: {
     padding: 12,
     backgroundColor: '#fafafa',
     borderBottomColor: 'black',
     borderBottomWidth: 1
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  pickerFrame: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    overflow: 'hidden',
   },
   sectionTitle: {
     fontSize: 16,
