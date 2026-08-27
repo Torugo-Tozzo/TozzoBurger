@@ -135,11 +135,30 @@ primeiro acesso.
 - `sync.adapter.ts` (camada de tradução de wire legado em português) é
   **removido** — sem dispositivo legado em campo, não há motivo pra manter
   compatibilidade retroativa.
-- Resolução de conflito usa o mecanismo padrão do Watermelon: no push, cada
-  registro carrega só as colunas que o cliente realmente alterou
-  (`_changed`); o merge no servidor aplica só essas colunas por cima do
-  estado mais recente, sem pisar em campos que o cliente nem tocou. Não
-  requer lógica de merge customizada nem CRDT.
+- Resolução de conflito usa o mecanismo padrão do Watermelon, e é
+  **client-side, não server-side**: em todo ciclo, `synchronize()` chama
+  `pullChanges` **antes** de `pushChanges` (inverte a ordem do
+  `useSyncDatabase.ts` atual, que hoje faz push primeiro). No pull, o
+  cliente pega o registro remoto como base e reaplica por cima só as
+  colunas que ele mesmo tem marcadas como sujas localmente (`_changed`,
+  mantido pelo próprio Watermelon) — reconciliação acontece **antes** do
+  próximo push existir, então o que é enviado no push já é o estado local
+  reconciliado (linha completa, não diff parcial — a API não precisa
+  reimplementar merge campo-a-campo).
+  Resolve o bug de raiz porque um campo nunca tocado localmente (ex:
+  `isOpen`, quando a escrita local foi só "adicionar item ao pedido") nunca
+  entra no `_changed` daquele registro — o pull já traz o valor mais
+  recente do servidor pra esse campo antes de qualquer push acontecer, sem
+  a API precisar decidir qual valor é mais novo.
+- No **servidor**, o papel é bem mais simples: **concorrência otimista**.
+  Se algum registro do push tiver `updatedAt` mais recente que o
+  `lastPulledAt` que o cliente informou (ou seja, mudou no servidor depois
+  da última vez que esse cliente puxou), o push inteiro daquele lote é
+  **rejeitado** (transação revertida, erro retornado) — o cliente pula pro
+  próximo ciclo, faz `pullChanges` de novo (pegando o valor fresco +
+  reconciliando via `_changed`) e tenta o push de novo com o estado já
+  correto. Não tem merge de campo escrito à mão na API — só comparação de
+  timestamp e aceitar/rejeitar em bloco.
 
 ## Impacto de UI (front + mobile)
 
