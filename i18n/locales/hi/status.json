@@ -1,6 +1,8 @@
 {
   "open": "खुला",
+  "requested": "अनुरोधित",
   "inPreparation": "तैयारी में",
+  "delivered": "डिलीवर किया गया",
   "delivering": "डिलीवरी हो रही है",
   "closed": "बंद",
   "cancelled": "रद्द",

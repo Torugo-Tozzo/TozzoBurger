@@ -34,7 +34,11 @@ function isPedidosPorDataEqual(
     const bList = b[key];
     if (!bList || aList.length !== bList.length) return false;
     for (let i = 0; i < aList.length; i++) {
-      if (aList[i].id !== bList[i].id || aList[i].updated_at !== bList[i].updated_at) return false;
+      if (
+        aList[i].id !== bList[i].id ||
+        aList[i].updated_at !== bList[i].updated_at ||
+        aList[i].isOpen !== bList[i].isOpen
+      ) return false;
     }
   }
   return true;
@@ -57,7 +61,12 @@ export default function Pedidos() {
       const data = isCliente && user?.id
         ? await listRecentOrdersByUser(user.id)
         : await listRecentOrders();
-      setOrdersByDate((prev) => (isPedidosPorDataEqual(prev, data) ? prev : data));
+      const openOrdersByDate = Object.fromEntries(
+        Object.entries(data)
+          .map(([date, orders]) => [date, orders.filter((order) => order.isOpen)] as const)
+          .filter(([, orders]) => orders.length > 0),
+      );
+      setOrdersByDate((prev) => (isPedidosPorDataEqual(prev, openOrdersByDate) ? prev : openOrdersByDate));
     } catch (err) {
       console.error('Erro ao carregar pedidos:', err);
     } finally {

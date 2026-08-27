@@ -1,6 +1,8 @@
 {
   "open": "已开启",
+  "requested": "已请求",
   "inPreparation": "准备中",
+  "delivered": "已送达",
   "delivering": "配送中",
   "closed": "已关闭",
   "cancelled": "已取消",

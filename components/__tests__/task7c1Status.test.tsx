@@ -46,7 +46,7 @@ describe('shared order status translations', () => {
             total: 25,
             openedAt: '2026-08-25T15:04:05.000Z',
             customerName: 'Cliente persistido',
-            status: 'OPEN',
+            isOpen: true,
             updated_at: 1,
           }}
           products={['Produto persistido']}

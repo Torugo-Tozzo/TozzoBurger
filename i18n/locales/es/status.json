@@ -1,6 +1,8 @@
 {
   "open": "Abierto",
+  "requested": "Solicitado",
   "inPreparation": "En preparación",
+  "delivered": "Entregado",
   "delivering": "En reparto",
   "closed": "Cerrado",
   "cancelled": "Cancelado",
