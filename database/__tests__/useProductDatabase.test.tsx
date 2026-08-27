@@ -39,9 +39,14 @@ jest.mock('../tableWatermark', () => ({
   markChanged: jest.fn(),
 }));
 
+jest.mock('../../context/AuthContext', () => ({
+  useAuth: jest.fn(),
+}));
+
 import { Database, Q } from '@nozbe/watermelondb';
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
 import { markChanged } from '../tableWatermark';
+import { useAuth } from '../../context/AuthContext';
 import { useProductDatabase } from '../useProductDatabase';
 import migrations from '../watermelon/migrations';
 import Order from '../watermelon/models/Order';
@@ -56,6 +61,13 @@ import schema from '../watermelon/schema';
 
 const modelClasses = [Product, ProductType, Order, OrderItem, Sale, SaleItem, User, Printer];
 const mockMarkChanged = markChanged as jest.Mock;
+const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+
+function setCurrentEstablishment(establishmentId: string | number | null) {
+  mockUseAuth.mockReturnValue({
+    user: { establishmentId },
+  } as ReturnType<typeof useAuth>);
+}
 
 function makeDatabase() {
   const adapter = new SQLiteAdapter({
@@ -120,6 +132,7 @@ describe('useProductDatabase', () => {
   beforeEach(() => {
     mockDatabase = makeDatabase();
     mockMarkChanged.mockReset();
+    setCurrentEstablishment('establishment-1');
   });
 
   it('create() creates a product with a Watermelon id and marks the table changed', async () => {
@@ -248,6 +261,33 @@ describe('useProductDatabase', () => {
     );
     await expect(productDatabase.showAdd(product.id)).resolves.toEqual(
       expect.objectContaining({ id: product.id, name: 'Burger Especial' }),
+    );
+  });
+
+  it('isolates product queries when the authenticated establishment changes', async () => {
+    await seedProductType(mockDatabase, '1', 'Lanches');
+
+    setCurrentEstablishment('establishment-a');
+    const establishmentADatabase = useProductDatabase();
+    const created = await establishmentADatabase.create({
+      name: 'Produto do A',
+      price: 25,
+      productTypeId: 1,
+      sourceProductId: 'source-a',
+    });
+
+    setCurrentEstablishment('establishment-b');
+    const establishmentBDatabase = useProductDatabase();
+
+    await expect(establishmentBDatabase.searchByName('Produto do A')).resolves.toEqual([]);
+    await expect(establishmentBDatabase.filterByProductType(1, 20, 0)).resolves.toEqual([]);
+    await expect(establishmentBDatabase.searchBySourceProductId('source-a')).resolves.toEqual([]);
+    await expect(establishmentBDatabase.show(created.id)).resolves.toBeNull();
+    await expect(establishmentBDatabase.showAdd(created.id)).resolves.toBeNull();
+
+    setCurrentEstablishment('establishment-a');
+    await expect(useProductDatabase().show(created.id)).resolves.toEqual(
+      expect.objectContaining({ id: created.id, name: 'Produto do A' }),
     );
   });
 });

@@ -5,6 +5,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { seedProductType } from '@/database/initializeDatabase';
 import { synchronizeWithServer } from '@/database/useSyncDatabase';
 import { runWithLock } from '@/database/syncGuard';
+import { resetWatermelonLocalData } from '@/database/watermelon/database';
 
 type User = {
   id?: number | string;
@@ -171,6 +172,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 ).catch((e) => console.warn('[auth] db op failed', e));
                 await database.runAsync('UPDATE TB_SCHEMA SET userId = ?, establishmentId = ?', [meIdNum, meEstab]).catch((e) => console.warn('[auth] db op failed', e));
                 await database.execAsync('COMMIT;');
+
+                await resetWatermelonLocalData().catch((e) => console.warn('[auth] Watermelon local data reset failed', e));
               } catch (err) {
                 await database.execAsync('ROLLBACK;').catch((e) => console.warn('[auth] db op failed', e));
                 console.warn('Failed during destructive swap; rolled back', err);

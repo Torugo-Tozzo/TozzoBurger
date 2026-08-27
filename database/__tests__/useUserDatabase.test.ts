@@ -113,4 +113,12 @@ describe('useUserDatabase', () => {
       establishmentName: 'Loja',
     });
   });
+
+  it('defaults an omitted role to EMPLOYEE', async () => {
+    const { create, show } = useUserDatabase();
+
+    await create({ name: 'Caixa', establishmentId: 7, establishmentName: 'Trailer' });
+
+    await expect(show(1)).resolves.toMatchObject({ role: 'EMPLOYEE' });
+  });
 });

@@ -67,7 +67,7 @@ export function useUserDatabase() {
         email: input.email ?? null,
         establishment_id: establishmentId(input.establishmentId),
         establishment_name: input.establishmentName ?? null,
-        role: input.role ?? null,
+        role: input.role ?? 'EMPLOYEE',
       });
 
       await database.batch(preparedUser);

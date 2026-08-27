@@ -1,6 +1,7 @@
 import { Q } from '@nozbe/watermelondb';
 import type { Clause } from '@nozbe/watermelondb/QueryDescription';
 
+import { useAuth } from '../context/AuthContext';
 import type { Product as ProductData } from './types/Product';
 import { markChanged } from './tableWatermark';
 import { database } from './watermelon/database';
@@ -36,23 +37,38 @@ function productCollection() {
   return database.get<ProductModel>('products');
 }
 
-async function findProduct(id: string): Promise<ProductModel | null> {
-  const [product] = await productCollection().query(Q.where('id', id)).fetch();
-  return product ?? null;
-}
-
 function activeProductTypeClause() {
   return Q.on('product_types', Q.where('is_active', true));
 }
 
-function asEstablishmentId(data: ProductInput): string {
-  const establishmentId = data.establishmentId;
-  return establishmentId == null ? '' : String(establishmentId);
+function asEstablishmentId(value: string | number | null | undefined): string {
+  return value == null || value === '' ? '' : String(value);
+}
+
+function normalizeEstablishmentId(value: string | number | null | undefined): string | null {
+  const normalized = asEstablishmentId(value);
+  return normalized === '' ? null : normalized;
+}
+
+async function findProduct(id: string, establishmentId: string | null): Promise<ProductModel | null> {
+  if (!establishmentId) return null;
+
+  const [product] = await productCollection()
+    .query(Q.where('id', id), Q.where('establishment_id', establishmentId))
+    .fetch();
+  return product ?? null;
 }
 
 export function useProductDatabase() {
+  const { user } = useAuth();
+  const currentEstablishmentId = normalizeEstablishmentId(user?.establishmentId);
+
   async function create(data: Omit<ProductData, 'id' | 'updated_at'>) {
     const input = data as ProductInput;
+    if (!currentEstablishmentId) {
+      throw new Error('Cannot create a product without an authenticated establishment');
+    }
+
     const now = new Date();
     const product = await database.write(() => productCollection().create((record) => {
       record.name = input.name;
@@ -60,7 +76,7 @@ export function useProductDatabase() {
       record.productTypeId = input.productTypeId == null ? null : String(input.productTypeId);
       record.sourceProductId = input.sourceProductId ?? null;
       record.ingredients = input.ingredients ?? null;
-      record.establishmentId = asEstablishmentId(input);
+      record.establishmentId = currentEstablishmentId;
       record.createdAt = now;
       record.updatedAt = now;
     }));
@@ -83,7 +99,7 @@ export function useProductDatabase() {
       product_type_id: input.productTypeId == null ? null : String(input.productTypeId),
       source_product_id: input.sourceProductId ?? null,
       ingredients: input.ingredients ?? null,
-      establishment_id: asEstablishmentId(input),
+      establishment_id: asEstablishmentId(input.establishmentId) || currentEstablishmentId || '',
       created_at: createdAt,
       updated_at: updatedAt,
     });
@@ -94,7 +110,10 @@ export function useProductDatabase() {
   }
 
   async function searchByName(name: string, limit?: number, offset?: number) {
+    if (!currentEstablishmentId) return [];
+
     const clauses: Clause[] = [
+      Q.where('establishment_id', currentEstablishmentId),
       activeProductTypeClause(),
       Q.where('name', Q.like(`%${Q.sanitizeLikeString(name)}%`)),
     ];
@@ -108,7 +127,7 @@ export function useProductDatabase() {
   }
 
   async function update(data: Omit<ProductData, 'updated_at'>) {
-    const product = await findProduct(data.id);
+    const product = await findProduct(data.id, currentEstablishmentId);
 
     if (product) {
       await database.write(() => product.update((record) => {
@@ -123,7 +142,7 @@ export function useProductDatabase() {
   }
 
   async function remove(id: string) {
-    const product = await findProduct(id);
+    const product = await findProduct(id, currentEstablishmentId);
 
     if (product) {
       await database.write(() => product.markAsDeleted());
@@ -133,7 +152,7 @@ export function useProductDatabase() {
   }
 
   async function show(id: string) {
-    const product = await findProduct(id);
+    const product = await findProduct(id, currentEstablishmentId);
     return product ? toProductData(product) : null;
   }
 
@@ -154,8 +173,11 @@ export function useProductDatabase() {
   }
 
   async function filterByProductType(productTypeId: number, limit: number, offset: number): Promise<ProductData[]> {
+    if (!currentEstablishmentId) return [];
+
     const products = await productCollection()
       .query(
+        Q.where('establishment_id', currentEstablishmentId),
         activeProductTypeClause(),
         Q.where('product_type_id', String(productTypeId)),
         Q.sortBy('name', Q.asc),
@@ -169,8 +191,14 @@ export function useProductDatabase() {
   }
 
   async function searchBySourceProductId(productId: string): Promise<ProductData[]> {
+    if (!currentEstablishmentId) return [];
+
     const products = await productCollection()
-      .query(activeProductTypeClause(), Q.where('source_product_id', productId))
+      .query(
+        Q.where('establishment_id', currentEstablishmentId),
+        activeProductTypeClause(),
+        Q.where('source_product_id', productId),
+      )
       .fetch();
 
     return products.map(toProductData);

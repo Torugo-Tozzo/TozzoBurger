@@ -1,4 +1,5 @@
 import { Database } from '@nozbe/watermelondb';
+import type { Model } from '@nozbe/watermelondb';
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
 
 import migrations from './migrations';
@@ -27,5 +28,27 @@ const adapter = new SQLiteAdapter({
 });
 
 export const database = new Database({ adapter, modelClasses });
+
+const localDataTables = ['products', 'product_types', 'printers'] as const;
+
+/**
+ * Removes the Watermelon records owned by the establishment-scoped hooks.
+ * Orders, sales, and users intentionally remain untouched until their hooks
+ * move to Watermelon in later migration tasks.
+ */
+export async function resetWatermelonLocalData(targetDatabase: Database = database) {
+  await targetDatabase.write(async () => {
+    const recordsToDelete: Model[] = [];
+
+    for (const tableName of localDataTables) {
+      const records = await targetDatabase.get<Model>(tableName).query().fetch();
+      recordsToDelete.push(...records.map((record) => record.prepareDestroyPermanently()));
+    }
+
+    if (recordsToDelete.length > 0) {
+      await targetDatabase.batch(...recordsToDelete);
+    }
+  });
+}
 
 export default database;

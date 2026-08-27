@@ -35,6 +35,10 @@ jest.mock('../watermelon/database', () => ({
   },
 }));
 
+jest.mock('../../context/AuthContext', () => ({
+  useAuth: jest.fn(),
+}));
+
 import { Database } from '@nozbe/watermelondb';
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
 import migrations from '../watermelon/migrations';
@@ -47,9 +51,17 @@ import Sale from '../watermelon/models/Sale';
 import SaleItem from '../watermelon/models/SaleItem';
 import User from '../watermelon/models/User';
 import schema from '../watermelon/schema';
+import { useAuth } from '../../context/AuthContext';
 import { usePrinterDatabase } from '../usePrinterDatabase';
 
 const modelClasses = [Product, ProductType, Order, OrderItem, Sale, SaleItem, User, Printer];
+const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+
+function setCurrentEstablishment(establishmentId: string | number | null) {
+  mockUseAuth.mockReturnValue({
+    user: { establishmentId },
+  } as ReturnType<typeof useAuth>);
+}
 
 function makeDatabase() {
   const adapter = new SQLiteAdapter({
@@ -68,13 +80,14 @@ function makeDatabase() {
 describe('usePrinterDatabase', () => {
   beforeEach(() => {
     mockDatabase = makeDatabase();
+    setCurrentEstablishment('establishment-1');
   });
 
   it('returns the legacy empty-printer object before a printer is configured', async () => {
     await expect(usePrinterDatabase().getPrinter()).resolves.toEqual({ uuid: null, name: null });
   });
 
-  it('setPrinter() creates the fixed printer record and updates it on subsequent calls', async () => {
+  it('setPrinter() creates one establishment printer record and updates it on subsequent calls', async () => {
     const printerDatabase = usePrinterDatabase();
 
     await printerDatabase.setPrinter('printer-1', 'Caixa');
@@ -84,6 +97,21 @@ describe('usePrinterDatabase', () => {
     await printerDatabase.setPrinter('printer-2', 'Balcão');
     await expect(printerDatabase.getPrinter()).resolves.toEqual({ uuid: 'printer-2', name: 'Balcão' });
     await expect(mockDatabase.get<Printer>('printers').query().fetchCount()).resolves.toBe(1);
+  });
+
+  it('does not return establishment A printer after the auth context changes to B', async () => {
+    setCurrentEstablishment('establishment-a');
+    const establishmentADatabase = usePrinterDatabase();
+    await establishmentADatabase.setPrinter('printer-a', 'Caixa A');
+
+    setCurrentEstablishment('establishment-b');
+    const establishmentBDatabase = usePrinterDatabase();
+
+    await expect(establishmentBDatabase.getPrinter()).resolves.toEqual({ uuid: null, name: null });
+    await establishmentBDatabase.setPrinter('printer-b', 'Caixa B');
+
+    setCurrentEstablishment('establishment-a');
+    await expect(usePrinterDatabase().getPrinter()).resolves.toEqual({ uuid: 'printer-a', name: 'Caixa A' });
   });
 
   it('removePrinter() permanently removes the local printer record', async () => {
