@@ -1,156 +1,253 @@
-import React from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+jest.mock('react-native', () => {
+  const databaseBridge = require('@nozbe/watermelondb/adapters/sqlite/sqlite-node/DatabaseBridge').default;
+  const bridgeMethods = [
+    'initialize',
+    'setUpWithSchema',
+    'setUpWithMigrations',
+    'find',
+    'query',
+    'queryIds',
+    'unsafeQueryRaw',
+    'count',
+    'batch',
+    'unsafeResetDatabase',
+    'getLocal',
+  ];
+  const asyncDatabaseBridge = bridgeMethods.reduce((bridge, method) => {
+    bridge[method] = (...args: unknown[]) =>
+      new Promise((resolve, reject) => {
+        databaseBridge[method](...args, resolve, reject);
+      });
+    return bridge;
+  }, {} as Record<string, (...args: unknown[]) => Promise<unknown>>);
 
-jest.mock('expo-sqlite', () => ({
-  useSQLiteContext: jest.fn(),
-}));
+  return {
+    NativeModules: { WMDatabaseBridge: asyncDatabaseBridge },
+    Platform: { OS: 'ios' },
+  };
+});
 
-jest.mock('../utils/uuid', () => ({
-  generateUUID: jest.fn(() => 'generated-uuid'),
+let mockDatabase: import('@nozbe/watermelondb').Database;
+
+jest.mock('../watermelon/database', () => ({
+  get database() {
+    return mockDatabase;
+  },
 }));
 
 jest.mock('../tableWatermark', () => ({
   markChanged: jest.fn(),
 }));
 
-import { useSQLiteContext } from 'expo-sqlite';
-import { useProductDatabase } from '../useProductDatabase';
+import { Database, Q } from '@nozbe/watermelondb';
+import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
 import { markChanged } from '../tableWatermark';
+import { useProductDatabase } from '../useProductDatabase';
+import migrations from '../watermelon/migrations';
+import Order from '../watermelon/models/Order';
+import OrderItem from '../watermelon/models/OrderItem';
+import Printer from '../watermelon/models/Printer';
+import Product from '../watermelon/models/Product';
+import ProductType from '../watermelon/models/ProductType';
+import Sale from '../watermelon/models/Sale';
+import SaleItem from '../watermelon/models/SaleItem';
+import User from '../watermelon/models/User';
+import schema from '../watermelon/schema';
 
-const mockUseSQLiteContext = useSQLiteContext as jest.Mock;
+const modelClasses = [Product, ProductType, Order, OrderItem, Sale, SaleItem, User, Printer];
 const mockMarkChanged = markChanged as jest.Mock;
 
-function makeStatement(executeImpl?: () => any) {
-  return {
-    executeAsync: jest.fn(executeImpl ?? (async () => ({}))),
-    finalizeAsync: jest.fn(async () => {}),
-  };
+function makeDatabase() {
+  const adapter = new SQLiteAdapter({
+    schema,
+    migrations,
+    dbName: ':memory:',
+    jsi: true,
+    onSetUpError: (error) => {
+      throw error;
+    },
+  });
+
+  return new Database({ adapter, modelClasses });
 }
 
-function renderProductDbHook() {
-  let result!: ReturnType<typeof useProductDatabase>;
-  function Harness() {
-    result = useProductDatabase();
-    return null;
-  }
-  act(() => {
-    TestRenderer.create(<Harness />);
+async function seedProductType(
+  database: Database,
+  id: string,
+  description: string,
+  isActive = true,
+) {
+  const now = Date.now();
+  const productTypes = database.get<ProductType>('product_types');
+  const productType = productTypes.prepareCreateFromDirtyRaw({
+    id,
+    _status: 'synced',
+    _changed: '',
+    description,
+    is_active: isActive,
+    color: '#2f84d3',
+    created_at: now,
+    updated_at: now,
   });
-  return result;
+
+  await database.write(async () => {
+    await database.batch(productType);
+  });
+
+  return productType;
+}
+
+async function seedProduct(
+  database: Database,
+  data: { name: string; price: number; productTypeId: string; sourceProductId?: string | null },
+) {
+  const now = new Date();
+  const products = database.get<Product>('products');
+
+  return database.write(() => products.create((product) => {
+    product.name = data.name;
+    product.price = data.price;
+    product.productTypeId = data.productTypeId;
+    product.sourceProductId = data.sourceProductId ?? null;
+    product.ingredients = null;
+    product.establishmentId = 'establishment-1';
+    product.createdAt = now;
+    product.updatedAt = now;
+  }));
 }
 
 describe('useProductDatabase', () => {
   beforeEach(() => {
-    mockUseSQLiteContext.mockReset();
+    mockDatabase = makeDatabase();
     mockMarkChanged.mockReset();
   });
 
-  it('create() inserts with a generated id and pending sync_status, always finalizing the statement', async () => {
-    const statement = makeStatement();
-    const db = {
-      prepareAsync: jest.fn(async () => statement),
-    };
-    mockUseSQLiteContext.mockReturnValue(db);
+  it('create() creates a product with a Watermelon id and marks the table changed', async () => {
+    await seedProductType(mockDatabase, '1', 'Lanches');
 
-    const { create } = renderProductDbHook();
+    const { create } = useProductDatabase();
     const result = await create({
       name: 'X-Salada',
       price: 25.5,
       productTypeId: 1,
-    } as any);
-
-    expect(result).toEqual({ id: 'generated-uuid' });
-    expect(db.prepareAsync).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO TB_PRODUCTS'));
-    expect(statement.executeAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ $id: 'generated-uuid', $name: 'X-Salada', $sync_status: 'pending' })
-    );
-    expect(statement.finalizeAsync).toHaveBeenCalledTimes(1);
-  });
-
-  it('create() still finalizes the statement when executeAsync throws', async () => {
-    const statement = makeStatement(() => {
-      throw new Error('insert failed');
     });
-    const db = {
-      prepareAsync: jest.fn(async () => statement),
-    };
-    mockUseSQLiteContext.mockReturnValue(db);
 
-    const { create } = renderProductDbHook();
-    await expect(create({ name: 'X', price: 1, productTypeId: 1 } as any)).rejects.toThrow('insert failed');
-    expect(statement.finalizeAsync).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ id: expect.any(String) });
+    await expect(mockDatabase.get<Product>('products').find(result.id)).resolves.toMatchObject({
+      name: 'X-Salada',
+      price: 25.5,
+      productTypeId: '1',
+      syncStatus: 'created',
+    });
+    expect(mockMarkChanged).toHaveBeenCalledWith('products');
   });
 
-  it('remove() soft-deletes: sets deleted_at instead of removing the row', async () => {
-    const db = {
-      runAsync: jest.fn(async () => ({})),
-    };
-    mockUseSQLiteContext.mockReturnValue(db);
+  it('createFromSync() preserves the incoming id and timestamp through the Model API', async () => {
+    await seedProductType(mockDatabase, '1', 'Lanches');
 
-    const { remove } = renderProductDbHook();
-    await remove('produto-1');
+    const { createFromSync } = useProductDatabase();
+    await expect(createFromSync({
+      id: 'p1',
+      name: 'X-Salada',
+      price: 25.5,
+      productTypeId: 1,
+      updated_at: 1234,
+      sourceProductId: 'source-1',
+      ingredients: 'queijo',
+    })).resolves.toEqual({ id: 'p1' });
 
-    expect(db.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE TB_PRODUCTS SET deleted_at'),
-      expect.arrayContaining([expect.any(Number), expect.any(Number), 'pending', 'produto-1'])
+    await expect(mockDatabase.get<Product>('products').find('p1')).resolves.toMatchObject({
+      id: 'p1',
+      name: 'X-Salada',
+      productTypeId: '1',
+      sourceProductId: 'source-1',
+      ingredients: 'queijo',
+      updatedAt: new Date(1234),
+      syncStatus: 'synced',
+    });
+    expect(mockMarkChanged).toHaveBeenCalledWith('products');
+  });
+
+  it('update() updates the same fields as the legacy hook and marks the table changed', async () => {
+    await seedProductType(mockDatabase, '1', 'Lanches');
+    const product = await seedProduct(mockDatabase, {
+      name: 'X-Salada',
+      price: 25.5,
+      productTypeId: '1',
+      sourceProductId: 'source-1',
+    });
+
+    const { update } = useProductDatabase();
+    await update({ id: product.id, name: 'X-Bacon', price: 30, productTypeId: 1, ingredients: 'bacon' });
+
+    await expect(mockDatabase.get<Product>('products').find(product.id)).resolves.toMatchObject({
+      name: 'X-Bacon',
+      price: 30,
+      productTypeId: '1',
+      ingredients: 'bacon',
+      sourceProductId: 'source-1',
+    });
+    expect(mockMarkChanged).toHaveBeenCalledWith('products');
+  });
+
+  it('remove() marks the product as deleted and hides it from show/search queries', async () => {
+    await seedProductType(mockDatabase, '1', 'Lanches');
+    const product = await seedProduct(mockDatabase, {
+      name: 'X-Salada',
+      price: 25.5,
+      productTypeId: '1',
+    });
+
+    const { remove, show } = useProductDatabase();
+    await remove(product.id);
+
+    expect(product.syncStatus).toBe('deleted');
+    await expect(show(product.id)).resolves.toBeNull();
+    await expect(mockDatabase.get<Product>('products').query(Q.where('id', product.id)).fetch()).resolves.toEqual([]);
+    expect(mockMarkChanged).toHaveBeenCalledWith('products');
+  });
+
+  it('searchByName() returns only matching products with active product types', async () => {
+    await seedProductType(mockDatabase, '1', 'Lanches', true);
+    await seedProductType(mockDatabase, '2', 'Inativos', false);
+    const active = await seedProduct(mockDatabase, { name: 'Burger Especial', price: 25, productTypeId: '1' });
+    await seedProduct(mockDatabase, { name: 'Burger Inativo', price: 20, productTypeId: '2' });
+    const deleted = await seedProduct(mockDatabase, { name: 'Burger Removido', price: 20, productTypeId: '1' });
+
+    await mockDatabase.write(() => deleted.markAsDeleted());
+
+    const { searchByName } = useProductDatabase();
+    await expect(searchByName('burger')).resolves.toEqual([
+      expect.objectContaining({ id: active.id, name: 'Burger Especial', productTypeId: 1 }),
+    ]);
+  });
+
+  it('getProductTypes(), filterByProductType(), source search, show(), and showAdd() keep their public behavior', async () => {
+    await seedProductType(mockDatabase, '1', 'Lanches', true);
+    await seedProductType(mockDatabase, '2', 'Inativos', false);
+    const product = await seedProduct(mockDatabase, {
+      name: 'Burger Especial',
+      price: 25,
+      productTypeId: '1',
+      sourceProductId: 'source-1',
+    });
+
+    const productDatabase = useProductDatabase();
+
+    await expect(productDatabase.getProductTypes()).resolves.toEqual([
+      { id: 1, description: 'Lanches' },
+    ]);
+    await expect(productDatabase.filterByProductType(1, 20, 0)).resolves.toEqual([
+      expect.objectContaining({ id: product.id, productTypeId: 1 }),
+    ]);
+    await expect(productDatabase.searchBySourceProductId('source-1')).resolves.toEqual([
+      expect.objectContaining({ id: product.id, sourceProductId: 'source-1' }),
+    ]);
+    await expect(productDatabase.show(product.id)).resolves.toEqual(
+      expect.objectContaining({ id: product.id, name: 'Burger Especial' }),
     );
-  });
-
-  it('searchByName() only returns rows with deleted_at IS NULL', async () => {
-    const db = {
-      getAllAsync: jest.fn(async () => []),
-    };
-    mockUseSQLiteContext.mockReturnValue(db);
-
-    const { searchByName } = renderProductDbHook();
-    await searchByName('burger');
-
-    expect(db.getAllAsync).toHaveBeenCalledWith(
-      expect.stringContaining('P.deleted_at IS NULL'),
-      '%burger%'
+    await expect(productDatabase.showAdd(product.id)).resolves.toEqual(
+      expect.objectContaining({ id: product.id, name: 'Burger Especial' }),
     );
-  });
-
-  it('create() marks products changed', async () => {
-    const statement = makeStatement();
-    const db = { prepareAsync: jest.fn(async () => statement) };
-    mockUseSQLiteContext.mockReturnValue(db);
-
-    const { create } = renderProductDbHook();
-    await create({ name: 'X-Salada', price: 25.5, productTypeId: 1 } as any);
-
-    expect(mockMarkChanged).toHaveBeenCalledWith('products');
-  });
-
-  it('createFromSync() marks products changed', async () => {
-    const statement = makeStatement();
-    const db = { prepareAsync: jest.fn(async () => statement) };
-    mockUseSQLiteContext.mockReturnValue(db);
-
-    const { createFromSync } = renderProductDbHook();
-    await createFromSync({ id: 'p1', name: 'X-Salada', price: 25.5, productTypeId: 1 } as any);
-
-    expect(mockMarkChanged).toHaveBeenCalledWith('products');
-  });
-
-  it('update() marks products changed', async () => {
-    const statement = makeStatement();
-    const db = { prepareAsync: jest.fn(async () => statement) };
-    mockUseSQLiteContext.mockReturnValue(db);
-
-    const { update } = renderProductDbHook();
-    await update({ id: 'p1', name: 'X-Salada', price: 30, productTypeId: 1 } as any);
-
-    expect(mockMarkChanged).toHaveBeenCalledWith('products');
-  });
-
-  it('remove() marks products changed', async () => {
-    const db = { runAsync: jest.fn(async () => ({})) };
-    mockUseSQLiteContext.mockReturnValue(db);
-
-    const { remove } = renderProductDbHook();
-    await remove('p1');
-
-    expect(mockMarkChanged).toHaveBeenCalledWith('products');
   });
 });

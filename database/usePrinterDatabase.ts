@@ -1,67 +1,64 @@
-import { useSQLiteContext } from "expo-sqlite";
-import { Printer } from "./types/Printer";
+import { Q } from '@nozbe/watermelondb';
+
+import { database } from './watermelon/database';
+import PrinterModel from './watermelon/models/Printer';
+
+const PRINTER_ID = '1';
+
+function printerCollection() {
+  return database.get<PrinterModel>('printers');
+}
+
+async function findPrinter(): Promise<PrinterModel | null> {
+  const [printer] = await printerCollection().query(Q.where('id', PRINTER_ID)).fetch();
+  return printer ?? null;
+}
 
 export function usePrinterDatabase() {
-    const database = useSQLiteContext();
+  // Cria ou atualiza a impressora padrão
+  async function setPrinter(uuid: string, name: string) {
+    await database.write(async () => {
+      const existingPrinter = await findPrinter();
 
-    // Cria ou atualiza a impressora padrão
-    async function setPrinter(uuid: string, name: string) {
-        try {
-            // Verifica se já existe um registro de impressora
-            const existingPrinter = await database.getFirstAsync<Printer>(
-                "SELECT * FROM TB_PRINTERS WHERE id = 1"
-            );
+      if (existingPrinter) {
+        await existingPrinter.update((printer) => {
+          printer.uuid = uuid;
+          printer.name = name;
+        });
+        return;
+      }
 
-            if (existingPrinter) {
-                // Se já existir, atualiza o UUID e o name
-                await database.runAsync(
-                    `UPDATE TB_PRINTERS SET uuid = ?, name = ? WHERE id = 1`,
-                    uuid,
-                    name
-                );
-            } else {
-                // Caso contrário, cria um novo registro para a impressora
-                await database.runAsync(
-                    `INSERT INTO TB_PRINTERS (id, uuid, name) VALUES (1, ?, ?)`,
-                    uuid,
-                    name
-                );
-            }
-        } catch (error) {
-            console.error("Erro ao definir impressora:", error);
-            throw error;
-        }
+      const preparedPrinter = printerCollection().prepareCreateFromDirtyRaw({
+        id: PRINTER_ID,
+        _status: 'created',
+        _changed: '',
+        uuid,
+        name,
+      });
+
+      await database.batch(preparedPrinter);
+    });
+  }
+
+  // Obtém o UUID e name da impressora registrada
+  async function getPrinter() {
+    const printer = await findPrinter();
+
+    if (!printer) {
+      return { uuid: null, name: null };
     }
 
-    // Obtém o UUID e name da impressora registrada
-    async function getPrinter() {
-        try {
-            const printer = await database.getFirstAsync<Printer>(
-                "SELECT * FROM TB_PRINTERS WHERE id = 1"
-            );
+    return { uuid: printer.uuid, name: printer.name };
+  }
 
-            if (!printer) {
-                // Caso não haja impressora registrada, retorna null ou um valor default
-                return { uuid: null, name: null };
-            }
+  // Remove a impressora registrada
+  async function removePrinter() {
+    const printer = await findPrinter();
 
-            return { uuid: printer.uuid, name: printer.name };
-        } catch (error) {
-            console.error("Erro ao obter impressora:", error);
-            throw error;
-        }
+    if (printer) {
+      await database.write(() => printer.destroyPermanently());
     }
+  }
 
-
-    // Remove a impressora registrada
-    async function removePrinter() {
-        try {
-            await database.runAsync("DELETE FROM TB_PRINTERS WHERE id = 1");
-        } catch (error) {
-            console.error("Erro ao remover impressora:", error);
-            throw error;
-        }
-    }
-
-    return { setPrinter, getPrinter, removePrinter };
+  return { setPrinter, getPrinter, removePrinter };
 }
