@@ -11,6 +11,7 @@ import {
 
 export type LocalSalesQuery = {
   clauses: Clause[];
+  baseClauses: Clause[];
   page: number;
   limit: number;
   matchesTime: (soldAt: Date) => boolean;
@@ -186,8 +187,14 @@ export function buildLocalSalesQuery(
     ? parseTimezoneOffsetMinutes(filters.timezoneOffsetMinutes)
     : 0;
 
+  const baseClauses = [...clauses];
   return {
-    clauses,
+    clauses: [
+      ...baseClauses,
+      Q.take(limit),
+      Q.skip((page - 1) * limit),
+    ],
+    baseClauses,
     page,
     limit,
     matchesTime: makeTimeMatcher(horaInicial, horaFinal, timezoneOffsetMinutes),

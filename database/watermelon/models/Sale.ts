@@ -19,6 +19,7 @@ export default class Sale extends Model {
   @field('total') total!: number;
   @date('sold_at') soldAt!: Date;
   @field('customer_name') customerName!: string | null;
+  @field('created_by_name') createdByName!: string | null;
   @field('is_cancelled') isCancelled!: boolean;
   @field('establishment_id') establishmentId!: string;
   @field('seller_id') sellerId!: string;

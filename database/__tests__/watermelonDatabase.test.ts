@@ -129,6 +129,7 @@ describe('WatermelonDB schema and models', () => {
         record.total = 51;
         record.soldAt = soldAt;
         record.customerName = 'Ana';
+        record.createdByName = 'Caixa';
         record.isCancelled = false;
         record.establishmentId = 'establishment-1';
         record.sellerId = user.id;
@@ -209,6 +210,7 @@ describe('WatermelonDB schema and models', () => {
       total: 51,
       soldAt,
       customerName: 'Ana',
+      createdByName: 'Caixa',
       isCancelled: false,
       establishmentId: 'establishment-1',
       sellerId: user.id,

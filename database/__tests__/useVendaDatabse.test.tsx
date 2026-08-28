@@ -267,12 +267,18 @@ describe('useSaleDatabase', () => {
     });
 
     const { createSale, getSaleById } = useSaleDatabase();
-    const result = await createSale([{ productId: 'product-1', quantity: 2 }], 'Cliente Y', 'seller-1');
+    const result = await createSale(
+      [{ productId: 'product-1', quantity: 2 }],
+      'Cliente Y',
+      'seller-1',
+      'Caixa Ana',
+    );
 
     await expect(getSaleById(result.saleId)).resolves.toMatchObject({
       id: result.saleId,
       total: 60,
       customerName: 'Cliente Y',
+      createdByName: 'Caixa Ana',
       establishmentId: 'establishment-1',
       items: [{
         productId: 'product-1',
@@ -296,6 +302,7 @@ describe('useSaleDatabase', () => {
       total: 25,
       soldAt: '2026-08-20T12:00:00.000Z',
       customerName: 'Sync',
+      createdByName: 'Sync Caixa',
       isCancelled: false,
       establishmentId: 'establishment-1',
       updated_at: 1234,
@@ -305,6 +312,7 @@ describe('useSaleDatabase', () => {
     await expect(mockDatabase.get<Sale>('sales').find('synced-sale-1')).resolves.toMatchObject({
       soldAt: new Date('2026-08-20T12:00:00.000Z'),
       updatedAt: new Date(1234),
+      createdByName: 'Sync Caixa',
       syncStatus: 'synced',
     });
     const [item] = await mockDatabase.get<SaleItem>('sale_items').query(Q.where('sale_id', 'synced-sale-1')).fetch();
@@ -398,11 +406,67 @@ describe('useSaleDatabase', () => {
 
     expect(query.page).toBe(2);
     expect(query.limit).toBe(25);
-    expect(query.clauses).toHaveLength(7);
+    expect(query.clauses).toHaveLength(9);
+    expect(query.clauses).toEqual(expect.arrayContaining([
+      { type: 'take', count: 25 },
+      { type: 'skip', count: 25 },
+    ]));
     expect(JSON.stringify(query.clauses)).toEqual(expect.stringContaining('establishment_id'));
     expect(JSON.stringify(query.clauses)).toEqual(expect.stringContaining('sold_at'));
     expect(JSON.stringify(query.clauses)).toEqual(expect.stringContaining('customer_name'));
     expect(JSON.stringify(query.clauses)).toEqual(expect.stringContaining('is_cancelled'));
+  });
+
+  it('passes the requested page bounds to the Watermelon sales query', async () => {
+    await seedProduct(mockDatabase, {
+      id: 'product-1',
+      name: 'X-Salada',
+      price: 25,
+      establishmentId: 'establishment-1',
+    });
+    await seedSale(mockDatabase, {
+      id: 'sale-1',
+      establishmentId: 'establishment-1',
+      soldAt: new Date('2026-08-20T12:00:00.000Z'),
+      total: 25,
+      productId: 'product-1',
+      quantity: 1,
+      unitPriceAtSale: 25,
+    });
+    await seedSale(mockDatabase, {
+      id: 'sale-2',
+      establishmentId: 'establishment-1',
+      soldAt: new Date('2026-08-20T11:00:00.000Z'),
+      total: 25,
+      productId: 'product-1',
+      quantity: 1,
+      unitPriceAtSale: 25,
+    });
+    await seedSale(mockDatabase, {
+      id: 'sale-3',
+      establishmentId: 'establishment-1',
+      soldAt: new Date('2026-08-20T10:00:00.000Z'),
+      total: 25,
+      productId: 'product-1',
+      quantity: 1,
+      unitPriceAtSale: 25,
+    });
+
+    const salesCollection = mockDatabase.get<Sale>('sales');
+    const querySpy = jest.spyOn(salesCollection, 'query');
+    const { listRecentSales } = useSaleDatabase();
+
+    await expect(listRecentSales({ page: 2, limit: 1 })).resolves.toMatchObject({
+      sales: [expect.objectContaining({ id: 'sale-2' })],
+      closing: 75,
+      pagination: expect.objectContaining({ total: 3, totalPages: 3 }),
+    });
+    const queryCalls = querySpy.mock.calls as unknown as Array<Array<{ type?: string; count?: number }>>;
+    expect(queryCalls.some((clauses) => clauses.some(
+      (clause) => clause.type === 'take' && clause.count === 1,
+    ) && clauses.some(
+      (clause) => clause.type === 'skip' && clause.count === 1,
+    ))).toBe(true);
   });
 
   it('matches local sale hours with the requested timezone offset', () => {
@@ -451,6 +515,31 @@ describe('useSaleDatabase', () => {
     await expect(saleDatabase.getSalesReportByPeriod('2026-08-20', '2026-08-20', '7')).resolves.toEqual([
       { id: 'product-1', name: 'X-Salada', price: 25, totalVendido: 2 },
     ]);
+  });
+
+  it('returns all local sales for a day instead of applying the recent-sales page limit', async () => {
+    await seedProduct(mockDatabase, {
+      id: 'product-1',
+      name: 'X-Salada',
+      price: 25,
+      establishmentId: 'establishment-1',
+    });
+
+    for (let index = 0; index < 51; index += 1) {
+      await seedSale(mockDatabase, {
+        id: `sale-${index}`,
+        establishmentId: 'establishment-1',
+        soldAt: new Date(`2026-08-20T12:00:${String(index).padStart(2, '0')}.000Z`),
+        total: 25,
+        productId: 'product-1',
+        quantity: 1,
+        unitPriceAtSale: 25,
+      });
+    }
+
+    const { listSalesByDay } = useSaleDatabase();
+
+    await expect(listSalesByDay('2026-08-20')).resolves.toHaveLength(51);
   });
 
   it('cancels only a sale in the authenticated establishment and hides it from local lists', async () => {

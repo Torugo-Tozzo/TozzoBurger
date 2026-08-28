@@ -48,12 +48,15 @@ type SaleSyncInput = SaleData & {
   seller_id?: string | number | null;
   order_id?: string | null;
   is_cancelled?: boolean | null;
+  created_by_name?: string | null;
 };
 
 type SaleProductRow = {
   name: string;
   quantity: number;
 };
+
+const SALES_SUMMARY_PAGE_SIZE = 100;
 
 function normalizeEstablishmentId(value: string | number | null | undefined): string | null {
   if (value == null) return null;
@@ -168,6 +171,11 @@ async function sellerName(sellerId: string, establishmentId: string): Promise<st
   return seller?.name ?? null;
 }
 
+async function createdByNameForSale(sale: SaleModel, establishmentId: string): Promise<string | null> {
+  if (sale.createdByName != null) return sale.createdByName;
+  return sellerName(sale.sellerId, establishmentId);
+}
+
 function toSaleData(sale: SaleModel, createdByName: string | null): SaleData {
   return {
     id: sale.id,
@@ -182,7 +190,7 @@ function toSaleData(sale: SaleModel, createdByName: string | null): SaleData {
     deleted_at: null,
     sync_status: sale.syncStatus === 'synced' ? 'synced' : 'pending',
     createdBy: sale.sellerId || null,
-    createdByName,
+    createdByName: sale.createdByName ?? createdByName,
   };
 }
 
@@ -223,7 +231,7 @@ async function toSaleWithProducts(
 ): Promise<SaleWithProducts> {
   const [items, createdByName] = await Promise.all([
     fetchSaleItems(sale.id, establishmentId),
-    sellerName(sale.sellerId, establishmentId),
+    createdByNameForSale(sale, establishmentId),
   ]);
   const products = await productNamesForItems(items, establishmentId);
 
@@ -257,6 +265,55 @@ async function fetchSales(query: LocalSalesQuery): Promise<SaleModel[]> {
     .fetch();
 }
 
+async function fetchSalesPage(
+  query: LocalSalesQuery,
+  page: number,
+  limit: number,
+): Promise<SaleModel[]> {
+  return saleCollection()
+    .query(
+      ...query.baseClauses,
+      Q.sortBy('sold_at', Q.desc),
+      Q.sortBy('id', Q.desc),
+      Q.take(limit),
+      Q.skip((page - 1) * limit),
+    )
+    .fetch();
+}
+
+async function summarizeSales(query: LocalSalesQuery): Promise<{ total: number; closing: number }> {
+  let page = 1;
+  let total = 0;
+  let closing = 0;
+
+  while (true) {
+    const salesPage = await fetchSalesPage(query, page, SALES_SUMMARY_PAGE_SIZE);
+    const matchingSales = salesPage.filter((sale) => query.matchesTime(sale.soldAt));
+    total += matchingSales.length;
+    closing += matchingSales.reduce((sum, sale) => sum + sale.total, 0);
+
+    if (salesPage.length < SALES_SUMMARY_PAGE_SIZE) break;
+    page += 1;
+  }
+
+  return { total, closing };
+}
+
+async function fetchAllSales(query: LocalSalesQuery): Promise<SaleModel[]> {
+  const allSales: SaleModel[] = [];
+  let page = 1;
+
+  while (true) {
+    const salesPage = await fetchSalesPage(query, page, SALES_SUMMARY_PAGE_SIZE);
+    allSales.push(...salesPage.filter((sale) => query.matchesTime(sale.soldAt)));
+
+    if (salesPage.length < SALES_SUMMARY_PAGE_SIZE) break;
+    page += 1;
+  }
+
+  return allSales;
+}
+
 export function useSaleDatabase() {
   const { user } = useAuth();
   const currentEstablishmentId = normalizeEstablishmentId(user?.establishmentId);
@@ -270,9 +327,6 @@ export function useSaleDatabase() {
     if (!currentEstablishmentId) {
       throw new Error('Cannot create a sale without an authenticated establishment');
     }
-
-    // The Watermelon schema keeps the seller relation, not a denormalized name.
-    void createdByName;
 
     const products = await Promise.all(items.map(async (item) => {
       const product = await findProduct(String(item.productId), currentEstablishmentId);
@@ -291,6 +345,7 @@ export function useSaleDatabase() {
         record.total = total;
         record.soldAt = now;
         record.customerName = customerName ?? null;
+        record.createdByName = createdByName ?? null;
         record.isCancelled = false;
         record.establishmentId = currentEstablishmentId;
         record.sellerId = sellerId;
@@ -329,8 +384,6 @@ export function useSaleDatabase() {
       throw new Error('Cannot create a sale without an authenticated establishment');
     }
 
-    void createdByName;
-
     const sale = await database.write(async () => {
       const order = await findOrder(String(orderId), currentEstablishmentId);
       if (!order) throw new Error(`Pedido com ID ${orderId} não encontrado.`);
@@ -349,6 +402,7 @@ export function useSaleDatabase() {
         record.total = order.total;
         record.soldAt = now;
         record.customerName = customerName === undefined ? order.customerName : customerName;
+        record.createdByName = createdByName ?? null;
         record.isCancelled = false;
         record.establishmentId = currentEstablishmentId;
         record.sellerId = sellerId;
@@ -386,7 +440,7 @@ export function useSaleDatabase() {
     return { saleId: sale.id };
   }
 
-  async function createFromSync(data: SaleData & { items?: SaleItemData[]; products?: SaleItemData[] }) {
+  async function createFromSync(data: SaleSyncInput) {
     if (!currentEstablishmentId) {
       throw new Error('Cannot sync a sale without an authenticated establishment');
     }
@@ -422,6 +476,7 @@ export function useSaleDatabase() {
       total: finiteNumber(raw.total),
       sold_at: soldAt,
       customer_name: raw.customerName ?? null,
+      created_by_name: raw.createdByName ?? raw.created_by_name ?? null,
       is_cancelled: isCancelled,
       establishment_id: currentEstablishmentId,
       seller_id: seller == null ? '' : String(seller),
@@ -473,7 +528,7 @@ export function useSaleDatabase() {
 
     const [items, createdByName] = await Promise.all([
       fetchSaleItems(sale.id, currentEstablishmentId),
-      sellerName(sale.sellerId, currentEstablishmentId),
+      createdByNameForSale(sale, currentEstablishmentId),
     ]);
 
     return {
@@ -505,16 +560,11 @@ export function useSaleDatabase() {
     }
 
     const query = buildLocalSalesQuery(filters ?? {}, currentEstablishmentId);
-    const allMatchingSales = (await fetchSales(query)).filter((sale) => query.matchesTime(sale.soldAt));
-    const total = allMatchingSales.length;
-    const closing = allMatchingSales.reduce((sum, sale) => sum + sale.total, 0);
-    const start = (query.page - 1) * query.limit;
-    const pageSales = allMatchingSales.slice(start, start + query.limit);
-    const salesWithProducts = await Promise.all(
-      pageSales.map((sale) => toSaleWithProducts(sale, currentEstablishmentId)),
-    );
-
     if (filters === undefined) {
+      const groupedSales = await fetchAllSales(query);
+      const salesWithProducts = await Promise.all(
+        groupedSales.map((sale) => toSaleWithProducts(sale, currentEstablishmentId)),
+      );
       const salesByDate: RecentSalesGrouped = {};
       for (const sale of salesWithProducts) {
         const date = new Date(sale.soldAt).toLocaleDateString();
@@ -523,6 +573,12 @@ export function useSaleDatabase() {
       }
       return salesByDate;
     }
+
+    const pageSales = (await fetchSales(query)).filter((sale) => query.matchesTime(sale.soldAt));
+    const { total, closing } = await summarizeSales(query);
+    const salesWithProducts = await Promise.all(
+      pageSales.map((sale) => toSaleWithProducts(sale, currentEstablishmentId)),
+    );
 
     const totalPages = total === 0 ? 0 : Math.ceil(total / query.limit);
     return {
@@ -542,7 +598,7 @@ export function useSaleDatabase() {
     if (!currentEstablishmentId) return [];
 
     const query = buildLocalSalesQuery({ dataInicial: data, dataFinal: data }, currentEstablishmentId);
-    const sales = (await fetchSales(query)).filter((sale) => query.matchesTime(sale.soldAt));
+    const sales = await fetchAllSales(query);
     return Promise.all(sales.map((sale) => toSaleWithProducts(sale, currentEstablishmentId)));
   }
 

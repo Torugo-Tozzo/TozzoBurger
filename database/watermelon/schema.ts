@@ -6,7 +6,7 @@ const syncTimestamps = [
 ];
 
 export default appSchema({
-  version: 1,
+  version: 2,
   tables: [
     tableSchema({
       name: 'products',
@@ -58,6 +58,7 @@ export default appSchema({
         { name: 'total', type: 'number' },
         { name: 'sold_at', type: 'number' },
         { name: 'customer_name', type: 'string', isOptional: true },
+        { name: 'created_by_name', type: 'string', isOptional: true },
         { name: 'is_cancelled', type: 'boolean' },
         { name: 'establishment_id', type: 'string', isIndexed: true },
         { name: 'seller_id', type: 'string', isIndexed: true },

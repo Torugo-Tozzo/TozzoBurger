@@ -62,6 +62,11 @@ export default function PedidoModal() {
   const colors = Colors[colorScheme];
   const { t, i18n } = useTranslation();
   const formatCurrency = (value: number) => new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(value);
+  const currentItemsPayload = () => (pedido?.items || []).map((item: any) => ({
+    productId: item.productId,
+    quantity: item.quantity,
+    status: isOrderItemStatus(item.status) ? item.status : ORDER_ITEM_STATUS.REQUESTED,
+  }));
 
   const isReadOnly = isCliente || pedido?.isOpen === false;
 
@@ -108,12 +113,7 @@ export default function PedidoModal() {
   const handleSave = async () => {
     if (!pedido || isReadOnly) return;
     try {
-      const itemsPayload = (pedido.items || []).map((item: any) => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        status: isOrderItemStatus(item.status) ? item.status : ORDER_ITEM_STATUS.REQUESTED,
-      }));
-      await updateOrder(pedido.id, itemsPayload, customerName);
+      await updateOrder(pedido.id, currentItemsPayload(), customerName);
       triggerSync().catch((e) => console.warn('[sync] trigger failed', e));
       Alert.alert(t('common.success'), t('orders.updated'));
       router.back();
@@ -142,6 +142,7 @@ export default function PedidoModal() {
   const handleGerarVenda = async () => {
     if (!pedido || isReadOnly) return;
     try {
+      await updateOrder(pedido.id, currentItemsPayload(), customerName);
       const { saleId } = await createSaleFromOrder(
         pedido.id,
         customerName ?? '',
