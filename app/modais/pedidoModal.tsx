@@ -47,7 +47,7 @@ export default function PedidoModal() {
   const orderId = String((params as any)?.orderId ?? '');
   const { getOrderById, updateOrder, removeOrder } = useOrderDatabase();
   const { showAdd, show: showProduto, searchByName } = useProductDatabase();
-  const { createSale } = useSaleDatabase();
+  const { createSaleFromOrder } = useSaleDatabase();
 
   const [pedido, setPedido] = useState<any | null>(null);
   const [customerName, setCliente] = useState('');
@@ -142,9 +142,12 @@ export default function PedidoModal() {
   const handleGerarVenda = async () => {
     if (!pedido || isReadOnly) return;
     try {
-      const items = (pedido.items || []).map((item: any) => ({ productId: item.productId, quantity: item.quantity }));
-      const { saleId } = await createSale(items, customerName ?? '', user?.id, user?.name ?? null);
-      await updateOrder(pedido.id, undefined, undefined, false);
+      const { saleId } = await createSaleFromOrder(
+        pedido.id,
+        customerName ?? '',
+        user?.id,
+        user?.name ?? null,
+      );
       Alert.alert(t('orders.generatedSaleTitle'), t('orders.generatedSaleMessage', { id: saleId }));
       router.back();
     } catch (err) {
