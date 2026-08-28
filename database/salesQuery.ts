@@ -14,6 +14,7 @@ export type LocalSalesQuery = {
   baseClauses: Clause[];
   page: number;
   limit: number;
+  hasTimeFilter: boolean;
   matchesTime: (soldAt: Date) => boolean;
 };
 
@@ -197,6 +198,7 @@ export function buildLocalSalesQuery(
     baseClauses,
     page,
     limit,
+    hasTimeFilter,
     matchesTime: makeTimeMatcher(horaInicial, horaFinal, timezoneOffsetMinutes),
   };
 }

@@ -265,6 +265,16 @@ async function fetchSales(query: LocalSalesQuery): Promise<SaleModel[]> {
     .fetch();
 }
 
+async function fetchSalesWithoutPagination(query: LocalSalesQuery): Promise<SaleModel[]> {
+  return saleCollection()
+    .query(
+      ...query.baseClauses,
+      Q.sortBy('sold_at', Q.desc),
+      Q.sortBy('id', Q.desc),
+    )
+    .fetch();
+}
+
 async function fetchSalesPage(
   query: LocalSalesQuery,
   page: number,
@@ -393,13 +403,20 @@ export function useSaleDatabase() {
       const products = await Promise.all(items.map(async (item) => {
         const product = await findProduct(item.productId, currentEstablishmentId);
         if (!product) throw new Error(`Produto ${item.productId} não encontrado`);
-        return { item, product };
+        const unitPriceAtSale = Number.isFinite(item.unitPriceAtOrder)
+          ? item.unitPriceAtOrder
+          : product.price;
+        return { item, product, unitPriceAtSale };
       }));
+      const total = products.reduce(
+        (sum, { item, unitPriceAtSale }) => sum + Number(item.quantity) * unitPriceAtSale,
+        0,
+      );
       const now = new Date();
       const sellerId = order.sellerId || (createdBy == null ? '' : String(createdBy));
 
       const createdSale = await saleCollection().create((record) => {
-        record.total = order.total;
+        record.total = total;
         record.soldAt = now;
         record.customerName = customerName === undefined ? order.customerName : customerName;
         record.createdByName = createdByName ?? null;
@@ -411,10 +428,7 @@ export function useSaleDatabase() {
         record.updatedAt = now;
       });
 
-      for (const { item, product } of products) {
-        const unitPriceAtSale = Number.isFinite(item.unitPriceAtOrder)
-          ? item.unitPriceAtOrder
-          : product.price;
+      for (const { item, product, unitPriceAtSale } of products) {
         await saleItemCollection().create((record) => {
           record.quantity = item.quantity;
           record.saleId = createdSale.id;
@@ -574,8 +588,20 @@ export function useSaleDatabase() {
       return salesByDate;
     }
 
-    const pageSales = (await fetchSales(query)).filter((sale) => query.matchesTime(sale.soldAt));
-    const { total, closing } = await summarizeSales(query);
+    let pageSales: SaleModel[];
+    let total: number;
+    let closing: number;
+    if (query.hasTimeFilter) {
+      const matchingSales = (await fetchSalesWithoutPagination(query))
+        .filter((sale) => query.matchesTime(sale.soldAt));
+      total = matchingSales.length;
+      closing = matchingSales.reduce((sum, sale) => sum + sale.total, 0);
+      const pageStart = (query.page - 1) * query.limit;
+      pageSales = matchingSales.slice(pageStart, pageStart + query.limit);
+    } else {
+      pageSales = await fetchSales(query);
+      ({ total, closing } = await summarizeSales(query));
+    }
     const salesWithProducts = await Promise.all(
       pageSales.map((sale) => toSaleWithProducts(sale, currentEstablishmentId)),
     );

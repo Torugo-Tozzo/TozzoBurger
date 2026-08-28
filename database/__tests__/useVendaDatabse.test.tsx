@@ -258,6 +258,92 @@ describe('useSaleDatabase', () => {
     expect(mockMarkChanged).toHaveBeenCalledWith('orders');
   });
 
+  it('paginates time-filtered sales after applying the in-memory time filter', async () => {
+    await seedProduct(mockDatabase, {
+      id: 'product-1',
+      name: 'X-Salada',
+      price: 25,
+      establishmentId: 'establishment-1',
+    });
+
+    for (let index = 0; index < 50; index += 1) {
+      const soldAt = new Date('2026-08-20T23:00:00.000Z');
+      soldAt.setSeconds(index);
+      await seedSale(mockDatabase, {
+        id: `sale-outside-time-${index}`,
+        establishmentId: 'establishment-1',
+        soldAt,
+        total: 25,
+        productId: 'product-1',
+        quantity: 1,
+        unitPriceAtSale: 25,
+      });
+    }
+    await seedSale(mockDatabase, {
+      id: 'sale-inside-time',
+      establishmentId: 'establishment-1',
+      soldAt: new Date('2026-08-20T12:00:00.000Z'),
+      total: 25,
+      productId: 'product-1',
+      quantity: 1,
+      unitPriceAtSale: 25,
+    });
+
+    const { listRecentSales } = useSaleDatabase();
+
+    await expect(listRecentSales({
+      horaInicial: '10:00',
+      horaFinal: '14:00',
+      timezoneOffsetMinutes: 0,
+      page: 1,
+      limit: 1,
+    })).resolves.toMatchObject({
+      sales: [expect.objectContaining({ id: 'sale-inside-time' })],
+      closing: 25,
+      pagination: {
+        page: 1,
+        limit: 1,
+        total: 1,
+        totalPages: 1,
+        hasNextPage: false,
+      },
+    });
+  });
+
+  it('uses historical item prices for the generated sale total', async () => {
+    await seedProduct(mockDatabase, {
+      id: 'product-1',
+      name: 'X-Salada',
+      price: 30,
+      establishmentId: 'establishment-1',
+    });
+    const order = await seedOrder(mockDatabase, {
+      id: 'order-historical-price',
+      establishmentId: 'establishment-1',
+      total: 60,
+      items: [{
+        productId: 'product-1',
+        quantity: 2,
+        status: 'DELIVERED',
+        unitPriceAtOrder: 20,
+      }],
+    });
+
+    const { createSaleFromOrder } = useSaleDatabase();
+    const result = await createSaleFromOrder(order.id);
+    const sale = await mockDatabase.get<Sale>('sales').find(result.saleId);
+    const [item] = await mockDatabase.get<SaleItem>('sale_items')
+      .query(Q.where('sale_id', result.saleId))
+      .fetch();
+
+    expect(item).toMatchObject({
+      quantity: 2,
+      unitPriceAtSale: 20,
+    });
+    expect(sale.total).toBe(item.quantity * item.unitPriceAtSale);
+    expect(sale.total).toBe(40);
+  });
+
   it('creates a direct sale with product prices and returns its items through the Model API', async () => {
     await seedProduct(mockDatabase, {
       id: 'product-1',
@@ -476,6 +562,7 @@ describe('useSaleDatabase', () => {
       timezoneOffsetMinutes: 180,
     }, 'establishment-1');
 
+    expect(query.hasTimeFilter).toBe(true);
     expect(query.matchesTime(new Date('2026-08-20T23:00:00.000Z'))).toBe(true);
     expect(query.matchesTime(new Date('2026-08-20T22:59:00.000Z'))).toBe(false);
     expect(query.matchesTime(new Date('2026-08-21T01:01:00.000Z'))).toBe(false);
