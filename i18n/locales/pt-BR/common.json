@@ -39,5 +39,14 @@
   "clearCartConfirm": "Deseja realmente limpar o carrinho?",
   "notFoundTitle": "Ops!",
   "notFoundMessage": "Esta tela não existe.",
-  "goHome": "Ir para a tela inicial!"
+  "goHome": "Ir para a tela inicial!",
+  "onboardingTitle": "Configure seu estabelecimento",
+  "onboardingChooseCategory": "Escolha a categoria do seu estabelecimento",
+  "onboardingSuggestedTypes": "Tipos de produto sugeridos",
+  "onboardingTypePlaceholder": "Novo tipo de produto",
+  "onboardingAddType": "Adicionar",
+  "onboardingConfirm": "Confirmar categoria",
+  "onboardingChangeCategory": "Escolher outra categoria",
+  "onboardingSaving": "Salvando…",
+  "onboardingSaveError": "Não foi possível salvar a categoria. Tente novamente."
 }

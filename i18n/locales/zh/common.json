@@ -39,5 +39,14 @@
   "clearCartConfirm": "确定要清空购物车吗？",
   "notFoundTitle": "糟糕！",
   "notFoundMessage": "此页面不存在。",
-  "goHome": "返回主页！"
+  "goHome": "返回主页！",
+  "onboardingTitle": "设置您的店铺",
+  "onboardingChooseCategory": "选择您的店铺类别",
+  "onboardingSuggestedTypes": "建议的产品类型",
+  "onboardingTypePlaceholder": "新的产品类型",
+  "onboardingAddType": "添加",
+  "onboardingConfirm": "确认类别",
+  "onboardingChangeCategory": "选择其他类别",
+  "onboardingSaving": "保存中…",
+  "onboardingSaveError": "无法保存类别，请重试。"
 }

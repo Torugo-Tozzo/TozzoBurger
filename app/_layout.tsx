@@ -19,6 +19,7 @@ import AppLoadingScreen from '@/components/AppLoadingScreen';
 import { StatusBar } from 'expo-status-bar';
 import { I18nextProvider, useTranslation } from 'react-i18next';
 import { i18n, initializeI18n } from '@/i18n';
+import CategoryOnboardingGate from '@/components/CategoryOnboardingGate';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -117,16 +118,18 @@ function RootLayoutNav() {
         backgroundColor={colorScheme === 'dark' ? '#000' : '#fff'} 
         translucent={true}
       />
-      <Stack>
-        <Stack.Screen name="login" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modais/contaModal" options={{ presentation: 'modal', title: t('navigation.account') }} />
-        <Stack.Screen name="modais/produtoModal" options={{ presentation: 'modal', title: t('navigation.product') }} />
-        <Stack.Screen name="modais/pedidoModal" options={{ presentation: 'modal', title: t('navigation.orders') }} />
-        <Stack.Screen name="modais/contaHistoricoModal" options={{ presentation: 'modal', title: t('navigation.closedAccount') }} />
-        <Stack.Screen name="modais/adicionalModal" options={{ presentation: 'modal', title: t('navigation.addOn') }} />
-        <Stack.Screen name="modais/relatorioModal" options={{ presentation: 'modal', title: t('navigation.report') }} />
-      </Stack>
+      <CategoryOnboardingGate>
+        <Stack>
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modais/contaModal" options={{ presentation: 'modal', title: t('navigation.account') }} />
+          <Stack.Screen name="modais/produtoModal" options={{ presentation: 'modal', title: t('navigation.product') }} />
+          <Stack.Screen name="modais/pedidoModal" options={{ presentation: 'modal', title: t('navigation.orders') }} />
+          <Stack.Screen name="modais/contaHistoricoModal" options={{ presentation: 'modal', title: t('navigation.closedAccount') }} />
+          <Stack.Screen name="modais/adicionalModal" options={{ presentation: 'modal', title: t('navigation.addOn') }} />
+          <Stack.Screen name="modais/relatorioModal" options={{ presentation: 'modal', title: t('navigation.report') }} />
+        </Stack>
+      </CategoryOnboardingGate>
     </ThemeProvider>
   );
 }

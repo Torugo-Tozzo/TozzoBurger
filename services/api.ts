@@ -1,5 +1,6 @@
 import { buildSalesQueryParams, DEFAULT_SALES_LIMIT, DEFAULT_SALES_PAGE, SalesFilters, SalesListResponse, SalesPagination } from './sales';
 import { fromLegacySyncResponse, fromLegacyUser } from './legacyWire';
+import type { EstablishmentCategory } from '@/database/watermelon/categorySeeds';
 
 // Fallback = produção. Para dev/homolog, defina EXPO_PUBLIC_API_URL no .env (ver .env.example).
 export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.tozzo.uk';
@@ -47,6 +48,17 @@ export type SyncIgnoredItem = {
 export type SyncPushResponse = {
   ignored?: SyncIgnoredItem[];
   ignored_order_deletes?: SyncIgnoredItem[];
+};
+
+export type Establishment = {
+  id: string | number;
+  category: EstablishmentCategory | null;
+  [key: string]: unknown;
+};
+
+export type ProductTypePayload = {
+  description: string;
+  color: string;
 };
 
 export class ApiHttpError extends Error {
@@ -157,6 +169,94 @@ export async function getMe(token: string) {
     return fromLegacyUser(await handleJsonResponse(res));
   } catch (err: any) {
     console.error('Network/getMe request failed', url, err?.message ?? err);
+    throw err;
+  }
+}
+
+export async function getEstablishment(token: string): Promise<Establishment> {
+  const url = new URL('/estabelecimentos', BASE_URL);
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
+    });
+
+    if (!res.ok) {
+      const errBody = await handleJsonResponse(res).catch(() => null);
+      const error = new ApiHttpError(res.status, errBody);
+      console.error('API getEstablishment error:', url.toString(), error.message);
+      throw error;
+    }
+
+    return await handleJsonResponse(res) as Establishment;
+  } catch (err: any) {
+    if (err instanceof ApiHttpError) throw err;
+    console.error('Network/getEstablishment request failed', url.toString(), err?.message ?? err);
+    throw err;
+  }
+}
+
+export async function updateEstablishmentCategory(
+  token: string,
+  establishmentId: string | number,
+  category: EstablishmentCategory,
+): Promise<Establishment> {
+  const url = new URL(`/establishments/${encodeURIComponent(String(establishmentId))}`, BASE_URL);
+  try {
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        ...NGROK_HEADERS,
+      },
+      body: JSON.stringify({ category }),
+    });
+
+    if (!res.ok) {
+      const errBody = await handleJsonResponse(res).catch(() => null);
+      const error = new ApiHttpError(res.status, errBody);
+      console.error('API updateEstablishmentCategory error:', url.toString(), error.message);
+      throw error;
+    }
+
+    return await handleJsonResponse(res) as Establishment;
+  } catch (err: any) {
+    if (err instanceof ApiHttpError) throw err;
+    console.error('Network/updateEstablishmentCategory request failed', url.toString(), err?.message ?? err);
+    throw err;
+  }
+}
+
+export async function createProductType(
+  token: string,
+  payload: ProductTypePayload,
+): Promise<Record<string, unknown>> {
+  const url = new URL('/tipos', BASE_URL);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        ...NGROK_HEADERS,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errBody = await handleJsonResponse(res).catch(() => null);
+      const error = new ApiHttpError(res.status, errBody);
+      console.error('API createProductType error:', url.toString(), error.message);
+      throw error;
+    }
+
+    return await handleJsonResponse(res) as Record<string, unknown>;
+  } catch (err: any) {
+    if (err instanceof ApiHttpError) throw err;
+    console.error('Network/createProductType request failed', url.toString(), err?.message ?? err);
     throw err;
   }
 }

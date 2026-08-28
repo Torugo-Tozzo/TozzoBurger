@@ -93,6 +93,28 @@ describe('mobile i18n foundation', () => {
     expect(i18n.t('common.appName')).toBe('TozzoBurger');
   });
 
+  it('bundles non-empty onboarding copy for every supported locale', () => {
+    const onboardingKeys = [
+      'onboardingTitle',
+      'onboardingChooseCategory',
+      'onboardingSuggestedTypes',
+      'onboardingTypePlaceholder',
+      'onboardingAddType',
+      'onboardingConfirm',
+      'onboardingChangeCategory',
+      'onboardingSaving',
+      'onboardingSaveError',
+    ];
+
+    for (const locale of SUPPORTED_LOCALES) {
+      for (const key of onboardingKeys) {
+        const value = resources[locale].common[key as keyof typeof resources[typeof locale]['common']];
+        expect(typeof value).toBe('string');
+        expect(String(value).trim().length).toBeGreaterThan(0);
+      }
+    }
+  });
+
   it('keeps the runtime supported-language check closed to app locales', () => {
     expect(i18n.services.languageUtils.supportedLngs).toEqual(SUPPORTED_LOCALES);
     expect(i18n.services.languageUtils.isSupportedCode('en')).toBe(true);

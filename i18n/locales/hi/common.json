@@ -39,5 +39,14 @@
   "clearCartConfirm": "क्या आप वाकई कार्ट खाली करना चाहते हैं?",
   "notFoundTitle": "ओह!",
   "notFoundMessage": "यह स्क्रीन मौजूद नहीं है।",
-  "goHome": "होम स्क्रीन पर जाएँ!"
+  "goHome": "होम स्क्रीन पर जाएँ!",
+  "onboardingTitle": "अपने प्रतिष्ठान की जानकारी सेट करें",
+  "onboardingChooseCategory": "अपने प्रतिष्ठान की श्रेणी चुनें",
+  "onboardingSuggestedTypes": "सुझाए गए उत्पाद प्रकार",
+  "onboardingTypePlaceholder": "नया उत्पाद प्रकार",
+  "onboardingAddType": "जोड़ें",
+  "onboardingConfirm": "श्रेणी की पुष्टि करें",
+  "onboardingChangeCategory": "दूसरी श्रेणी चुनें",
+  "onboardingSaving": "सहेजा जा रहा है…",
+  "onboardingSaveError": "श्रेणी सहेजी नहीं जा सकी। फिर से प्रयास करें।"
 }
