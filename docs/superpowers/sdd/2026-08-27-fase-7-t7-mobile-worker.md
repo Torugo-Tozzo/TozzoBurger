@@ -61,3 +61,26 @@ Os testes Watermelon exibem somente avisos já esperados do ambiente Jest: `EXNa
 - Implementação da Task 7: `673c34c0eebf68a661766022fd13944d355d70d2` (`feat: migrate mobile sales to Watermelon`)
 - O commit documental deste relatório é criado após o commit de implementação e seu hash é informado no handoff final.
 
+## Fix round 1
+
+- **Edições não salvas ao gerar venda:** `PedidoModal` agora serializa os itens e quantidades do estado exibido, persiste essa edição com `updateOrder` e somente depois chama `createSaleFromOrder`. Como `updateOrder` recalcula o total e a conversão relê o pedido persistido na mesma base, a venda copia o estado atual da tela.
+- **`createdByName` perdido:** o nome recebido do caller agora é gravado na coluna opcional `sales.created_by_name` na criação direta, na conversão pedido → venda e na importação de sync. A leitura usa o valor persistido e só consulta `users` como fallback para registros antigos; schema e migration foram elevados para a versão 2.
+- **Paginação Watermelon:** `buildLocalSalesQuery` separa cláusulas-base e aplica `Q.take`/`Q.skip` à query paginada; listagens que precisam de todos os registros percorrem páginas Watermelon em lotes. Também foi coberto o caso de `listSalesByDay` com mais de 50 vendas, evitando truncamento pelo limite padrão.
+
+Testes executados:
+
+```text
+npx jest database/__tests__/useVendaDatabse.test.tsx app/modais/__tests__/pedidoModal.test.tsx database/__tests__/watermelonDatabase.test.ts database/__tests__/watermelonReset.test.ts --runInBand --watchAll=false
+4 suítes, 14 testes aprovados
+
+npx jest --runInBand --watchAll=false
+32 suítes, 131 testes aprovados, 1 snapshot aprovado
+
+npx tsc --noEmit
+saída 0 (sem erros de TypeScript)
+
+rtk git diff --check
+sem erros
+```
+
+Commit da correção: `164f6176ee9dc73bd96845b1b234e0a55a326d94` (`fix-mobile-sale-edits-and-pagination`).
