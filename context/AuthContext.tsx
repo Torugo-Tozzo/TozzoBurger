@@ -3,7 +3,7 @@ import * as api from '@/services/api';
 import * as SecureStore from 'expo-secure-store';
 import { useSQLiteContext } from 'expo-sqlite';
 import { seedProductType } from '@/database/initializeDatabase';
-import { synchronizeWithServer } from '@/database/useSyncDatabase';
+import { synchronizeWithServer } from '@/database/watermelon/sync';
 import { runWithLock } from '@/database/syncGuard';
 import { resetWatermelonLocalData } from '@/database/watermelon/database';
 
@@ -195,7 +195,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setToken(t);
         // The first sync must not block navigation. The list screens show their
         // skeletons while this background sync populates the local database.
-        void runWithLock(() => synchronizeWithServer(database, t))
+        void runWithLock(() => synchronizeWithServer(t, (me as any)?.establishmentId))
           .then((res) => {
             if (res === null) console.log('[sync] skipped login-triggered sync; another sync is in progress');
           })

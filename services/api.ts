@@ -1,5 +1,5 @@
 import { buildSalesQueryParams, DEFAULT_SALES_LIMIT, DEFAULT_SALES_PAGE, SalesFilters, SalesListResponse, SalesPagination } from './sales';
-import { fromLegacySyncResponse, fromLegacyUser, toLegacySyncPayload } from './legacyWire';
+import { fromLegacySyncResponse, fromLegacyUser } from './legacyWire';
 
 // Fallback = produção. Para dev/homolog, defina EXPO_PUBLIC_API_URL no .env (ver .env.example).
 export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.tozzo.uk';
@@ -17,6 +17,61 @@ async function handleJsonResponse(res: Response) {
     return txt ? JSON.parse(txt) : {};
   } catch (err) {
     return txt;
+  }
+}
+
+export type WatermelonSyncTableChangeSet = {
+  created: unknown[];
+  updated: unknown[];
+  deleted: string[];
+};
+
+export type WatermelonSyncChangeSet = Record<string, WatermelonSyncTableChangeSet>;
+
+export type SyncPullRequest = {
+  lastPulledAt?: number | null;
+  schemaVersion: number;
+};
+
+export type SyncPullResponse = {
+  changes: WatermelonSyncChangeSet;
+  timestamp: number;
+};
+
+export type SyncIgnoredItem = {
+  type: string;
+  entityId: string | null;
+  reason: string;
+};
+
+export type SyncPushResponse = {
+  ignored?: SyncIgnoredItem[];
+  ignored_order_deletes?: SyncIgnoredItem[];
+};
+
+export class ApiHttpError extends Error {
+  readonly status: number;
+  readonly body: unknown;
+  readonly code?: string;
+  readonly details?: unknown;
+
+  constructor(status: number, body: unknown, fallbackMessage = `HTTP ${status}`) {
+    const record = body && typeof body === 'object' ? body as Record<string, unknown> : null;
+    const message = typeof record?.message === 'string'
+      ? record.message
+      : typeof body === 'string' && body.trim().length > 0
+        ? body
+        : fallbackMessage;
+    super(message);
+    this.name = 'ApiHttpError';
+    this.status = status;
+    this.body = body;
+    this.code = typeof record?.code === 'string'
+      ? record.code
+      : typeof record?.error === 'string'
+        ? record.error
+        : undefined;
+    this.details = record?.details;
   }
 }
 
@@ -106,35 +161,13 @@ export async function getMe(token: string) {
   }
 }
 
-export async function synchronize(token: string, payload: any) {
-  const url = `${BASE_URL}/sincronizacao/push`;
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
-      body: JSON.stringify(toLegacySyncPayload(payload)),
-    });
-
-    if (!res.ok) {
-      const errBody = await handleJsonResponse(res).catch(() => null);
-      const message = (errBody && (errBody.message || JSON.stringify(errBody))) || `HTTP ${res.status}`;
-      console.error('API sincronizar error:', url, message);
-      throw new Error(message);
-    }
-
-    return fromLegacySyncResponse(await handleJsonResponse(res));
-  } catch (err: any) {
-    console.error('Network/synchronize request failed', url, err?.message ?? err);
-    throw err;
+export async function pullChanges(token: string, params: SyncPullRequest): Promise<SyncPullResponse> {
+  const url = new URL('/sync/pull', BASE_URL);
+  url.searchParams.set('schemaVersion', String(params.schemaVersion));
+  if (params.lastPulledAt !== undefined && params.lastPulledAt !== null) {
+    url.searchParams.set('lastPulledAt', String(params.lastPulledAt));
   }
-}
 
-export async function getChanges(token: string, since?: string | null) {
-  let url = `${BASE_URL}/sincronizacao/pull`;
-  if (since) {
-    const q = encodeURIComponent(String(since));
-    url = `${url}?since=${q}`;
-  }
   try {
     const res = await fetch(url, {
       method: 'GET',
@@ -143,14 +176,42 @@ export async function getChanges(token: string, since?: string | null) {
 
     if (!res.ok) {
       const errBody = await handleJsonResponse(res).catch(() => null);
-      const message = (errBody && (errBody.message || JSON.stringify(errBody))) || `HTTP ${res.status}`;
-      console.error('API getChanges error:', url, message);
-      throw new Error(message);
+      const error = new ApiHttpError(res.status, errBody);
+      console.error('API sync pull error:', url.toString(), error.message);
+      throw error;
     }
 
-    return fromLegacySyncResponse(await handleJsonResponse(res));
+    return await handleJsonResponse(res) as SyncPullResponse;
   } catch (err: any) {
-    console.error('Network/getChanges request failed', url, err?.message ?? err);
+    if (err instanceof ApiHttpError) throw err;
+    console.error('Network/sync pull request failed', url.toString(), err?.message ?? err);
+    throw err;
+  }
+}
+
+export async function pushChanges(
+  token: string,
+  payload: { changes: WatermelonSyncChangeSet; lastPulledAt: number },
+): Promise<SyncPushResponse> {
+  const url = new URL('/sync/push', BASE_URL);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errBody = await handleJsonResponse(res).catch(() => null);
+      const error = new ApiHttpError(res.status, errBody);
+      console.error('API sync push error:', url.toString(), error.message);
+      throw error;
+    }
+
+    return await handleJsonResponse(res) as SyncPushResponse;
+  } catch (err: any) {
+    if (err instanceof ApiHttpError) throw err;
+    console.error('Network/sync push request failed', url.toString(), err?.message ?? err);
     throw err;
   }
 }
@@ -189,6 +250,3 @@ export async function listSales(token: string, filters: SalesFilters = {}): Prom
 
 /** @deprecated Use listSales; the public URL remains /vendas. */
 export const listVendas = listSales;
-
-/** @deprecated Use synchronize; kept for clients compiled against the old service name. */
-export const sincronizar = synchronize;

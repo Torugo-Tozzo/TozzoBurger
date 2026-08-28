@@ -64,7 +64,9 @@ export default function SyncIndicator() {
       console.warn('triggerSync error', e);
     }
 
-    if (res === null || typeof res === 'undefined') {
+    // The native Watermelon synchronize() resolves void on success. Only a
+    // null result means the caller was skipped because no token/lock cycle ran.
+    if (res === null) {
       ok = false;
       if (!errorMsg) errorMsg = 'Sem resposta do servidor';
     }
