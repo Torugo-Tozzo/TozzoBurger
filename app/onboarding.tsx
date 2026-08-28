@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
 
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -19,29 +20,48 @@ import {
   completeCategoryOnboarding,
 } from '@/services/categoryOnboarding';
 import { Button } from '@/components/ui/Button';
+import { useCategoryOnboardingAccess } from '@/hooks/useCategoryOnboardingAccess';
+import type { Establishment } from '@/services/api';
 
 type EstablishmentId = string | number;
 
 export type OnboardingScreenProps = {
   token?: string | null;
   establishmentId?: EstablishmentId | null;
+  knownEstablishment?: Establishment | null;
   onCompleted?: (category: EstablishmentCategory) => void;
 };
 
 export default function OnboardingScreen({
   token: tokenOverride,
   establishmentId: establishmentIdOverride,
+  knownEstablishment,
   onCompleted,
 }: OnboardingScreenProps = {}) {
   const { token: authToken, user } = useAuth();
   const { t } = useTranslation();
+  const router = useRouter();
   const token = tokenOverride ?? authToken;
   const establishmentId = establishmentIdOverride ?? user?.establishmentId;
+  const access = useCategoryOnboardingAccess({
+    token,
+    role: user?.role,
+    establishmentId,
+    knownEstablishment,
+  });
+  const redirected = useRef(false);
   const [category, setCategory] = useState<EstablishmentCategory | null>(null);
   const [productTypeDescriptions, setProductTypeDescriptions] = useState<string[]>([]);
   const [newDescription, setNewDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!access.shouldRedirect || redirected.current) return;
+
+    redirected.current = true;
+    router.replace('/(tabs)');
+  }, [access.shouldRedirect, router]);
 
   const chooseCategory = (nextCategory: EstablishmentCategory) => {
     setCategory(nextCategory);
@@ -87,6 +107,8 @@ export default function OnboardingScreen({
       setSaving(false);
     }
   };
+
+  if (!access.allowed) return null;
 
   return (
     <ScrollView contentContainerStyle={styles.container}>

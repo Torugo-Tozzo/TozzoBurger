@@ -13,6 +13,11 @@ import { runWithLock } from '@/database/syncGuard';
 import { synchronizeWithServer } from '@/database/watermelon/sync';
 
 const mockUseAuth = jest.fn();
+const mockRouterReplace = jest.fn();
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ replace: mockRouterReplace }),
+}));
 
 jest.mock('@/context/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
@@ -61,6 +66,7 @@ describe('category onboarding screen', () => {
     });
     mockUpdateEstablishmentCategory.mockResolvedValue({ id: 'establishment-1', category: 'HAMBURGUERIA' });
     mockCreateProductType.mockResolvedValue({ id: 'type-1' });
+    mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: null });
     mockSynchronizeWithServer.mockResolvedValue(undefined);
     mockRunWithLock.mockImplementation(async (callback) => callback());
   });
@@ -71,6 +77,7 @@ describe('category onboarding screen', () => {
       renderer = create(
         <OnboardingScreen token="token-123" establishmentId="establishment-1" />,
       );
+      await flushPromises();
     });
 
     await act(async () => {
@@ -110,6 +117,41 @@ describe('category onboarding screen', () => {
     );
     expect(mockRunWithLock).toHaveBeenCalledTimes(1);
     expect(mockSynchronizeWithServer).toHaveBeenCalledWith('token-123', 'establishment-1');
+  });
+
+  it('redirects a MANAGER opening onboarding directly without rendering or mutating', async () => {
+    mockUseAuth.mockReturnValue({
+      token: 'token-123',
+      user: { role: 'MANAGER', establishmentId: 'establishment-1' },
+    });
+    let renderer: ReturnType<typeof create>;
+
+    await act(async () => {
+      renderer = create(<OnboardingScreen />);
+      await flushPromises();
+    });
+
+    expect(mockRouterReplace).toHaveBeenCalledWith('/(tabs)');
+    expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
+    expect(mockGetEstablishment).not.toHaveBeenCalled();
+    expect(mockUpdateEstablishmentCategory).not.toHaveBeenCalled();
+    expect(mockCreateProductType).not.toHaveBeenCalled();
+  });
+
+  it('redirects an OWNER opening onboarding directly when the category is already configured', async () => {
+    mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: 'PIZZARIA' });
+    let renderer: ReturnType<typeof create>;
+
+    await act(async () => {
+      renderer = create(<OnboardingScreen />);
+      await flushPromises();
+    });
+
+    expect(mockGetEstablishment).toHaveBeenCalledWith('token-123');
+    expect(mockRouterReplace).toHaveBeenCalledWith('/(tabs)');
+    expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
+    expect(mockUpdateEstablishmentCategory).not.toHaveBeenCalled();
+    expect(mockCreateProductType).not.toHaveBeenCalled();
   });
 });
 

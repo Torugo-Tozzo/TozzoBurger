@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
 import OnboardingScreen from '@/app/onboarding';
 import { useAuth } from '@/context/AuthContext';
-import { getEstablishment, type Establishment } from '@/services/api';
+import { useCategoryOnboardingAccess } from '@/hooks/useCategoryOnboardingAccess';
 import type { EstablishmentCategory } from '@/database/watermelon/categorySeeds';
 
 type Props = {
@@ -11,58 +11,20 @@ type Props = {
 
 export default function CategoryOnboardingGate({ children }: Props) {
   const { token, user } = useAuth();
-  const role = user?.role;
-  const establishmentId = user?.establishmentId;
-  const isOwner = role === 'OWNER';
-  const eligible = Boolean(token && isOwner && establishmentId !== null && establishmentId !== undefined);
-  const [establishment, setEstablishment] = useState<Establishment | null>(null);
-  const [checking, setChecking] = useState(false);
+  const access = useCategoryOnboardingAccess({
+    token,
+    role: user?.role,
+    establishmentId: user?.establishmentId,
+  });
 
-  useEffect(() => {
-    let mounted = true;
-
-    if (!eligible || !token) {
-      setEstablishment(null);
-      setChecking(false);
-      return () => {
-        mounted = false;
-      };
-    }
-
-    setChecking(true);
-    setEstablishment(null);
-    getEstablishment(token)
-      .then((nextEstablishment) => {
-        if (mounted) setEstablishment(nextEstablishment);
-      })
-      .catch((error) => {
-        if (mounted) {
-          console.warn('Could not load establishment category', error);
-          setEstablishment(null);
-        }
-      })
-      .finally(() => {
-        if (mounted) setChecking(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [eligible, establishmentId, token]);
-
-  if (
-    eligible
-    && !checking
-    && establishment?.category === null
-    && establishment.id !== null
-    && establishment.id !== undefined
-  ) {
+  if (access.allowed && access.establishment) {
     return (
       <OnboardingScreen
         token={token}
-        establishmentId={establishment.id}
+        establishmentId={access.establishment.id}
+        knownEstablishment={access.establishment}
         onCompleted={(category: EstablishmentCategory) => {
-          setEstablishment((current) => current ? { ...current, category } : current);
+          access.markCategoryConfigured(category);
         }}
       />
     );
