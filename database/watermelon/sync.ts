@@ -29,6 +29,8 @@ type SyncChangeSet = Record<SyncTableName, SyncTableChanges>;
 type EstablishmentId = string | number | null | undefined;
 type OnPulledChanges = (changes: SyncChangeSet) => void;
 
+const MAX_SYNC_ATTEMPTS = 3;
+
 function isRecord(value: unknown): value is Record<string, any> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -360,6 +362,16 @@ function reportIgnoredPushItems(response: api.SyncPushResponse | undefined): voi
   }
 }
 
+function isSyncConflictError(error: unknown): boolean {
+  if (!isRecord(error)) return false;
+
+  if (error.status === 409) return true;
+  if (error.code === 'SYNC_CONFLICT' || error.error === 'SYNC_CONFLICT') return true;
+
+  const body = isRecord(error.body) ? error.body : null;
+  return body?.code === 'SYNC_CONFLICT' || body?.error === 'SYNC_CONFLICT';
+}
+
 /**
  * Creates the callback consumed by WatermelonDB's native synchronize().
  * The API already returns Watermelon raw records, so this boundary only
@@ -382,8 +394,8 @@ export function pullChanges(
 
 /**
  * Creates the callback consumed by WatermelonDB's native synchronize().
- * A 409 is intentionally allowed to reject this promise; the native sync
- * lifecycle remains responsible for its conflict handling.
+ * A 409 is intentionally allowed to reject this promise; the caller retries
+ * the complete native synchronization cycle when it is a sync conflict.
  */
 export function pushChanges(
   token: string,
@@ -408,19 +420,31 @@ export async function synchronizeWithServer(
   token: string,
   establishmentId?: EstablishmentId,
 ): Promise<void> {
-  let pulledChanges: SyncChangeSet | null = null;
+  let attempt = 0;
 
-  await watermelonSynchronize({
-    database,
-    pullChanges: pullChanges(token, establishmentId, (changes) => {
-      pulledChanges = changes;
-    }),
-    pushChanges: pushChanges(token, establishmentId),
-    migrationsEnabledAtVersion: 1,
-    onDidPullChanges: async () => {
-      if (pulledChanges) markPulledTables(pulledChanges);
-    },
-  });
+  while (true) {
+    attempt += 1;
+    let pulledChanges: SyncChangeSet | null = null;
+
+    try {
+      await watermelonSynchronize({
+        database,
+        pullChanges: pullChanges(token, establishmentId, (changes) => {
+          pulledChanges = changes;
+        }),
+        pushChanges: pushChanges(token, establishmentId),
+        migrationsEnabledAtVersion: 1,
+        onDidPullChanges: async () => {
+          if (pulledChanges) markPulledTables(pulledChanges);
+        },
+      });
+      return;
+    } catch (error) {
+      if (!isSyncConflictError(error) || attempt >= MAX_SYNC_ATTEMPTS) {
+        throw error;
+      }
+    }
+  }
 }
 
 export default synchronizeWithServer;
