@@ -84,3 +84,30 @@ sem erros
 ```
 
 Commit da correção: `164f6176ee9dc73bd96845b1b234e0a55a326d94` (`fix-mobile-sale-edits-and-pagination`).
+
+## Fix round 2
+
+- **Paginação com filtro de horário:** `LocalSalesQuery` agora expõe `hasTimeFilter`. Sem filtro de horário, `listRecentSales` mantém a paginação direta do Watermelon com `take/skip`. Com filtro de horário, a consulta usa somente `baseClauses`, aplica `matchesTime` ao conjunto completo em memória, calcula `total`/`closing` sobre os registros filtrados e só depois aplica o `slice` da página.
+- **Total da venda gerada:** `createSaleFromOrder` calcula uma vez `unitPriceAtSale` por item, usando o preço histórico e mantendo o fallback para o preço atual quando necessário. A soma de `quantity * unitPriceAtSale` é usada tanto em `sales.total` quanto nos `sale_items` persistidos.
+- **Testes regressivos:** adicionados casos para uma venda válida posicionada depois de 50 vendas fora do horário e para a divergência entre total recalculado do pedido e preço histórico do item; também foi coberta a exposição de `hasTimeFilter`.
+
+Testes executados:
+
+```text
+npx jest database/__tests__/useVendaDatabse.test.tsx --runInBand --watchAll=false
+RED esperado antes da correção: 3 testes falharam (paginação, total histórico e hasTimeFilter); após a correção, 1 suíte e 13 testes aprovados
+
+npx jest database/__tests__/useVendaDatabse.test.tsx app/modais/__tests__/pedidoModal.test.tsx --runInBand --watchAll=false
+2 suítes, 14 testes aprovados
+
+npx jest --runInBand --watchAll=false
+32 suítes, 133 testes aprovados, 1 snapshot aprovado
+
+npx tsc --noEmit
+saída 0 (sem erros de TypeScript)
+
+git diff --check
+sem erros
+```
+
+A suíte completa continua exibindo apenas os diagnósticos já esperados dos testes de i18n e os avisos de `EXNativeModulesProxy`/fallback JSI do ambiente Jest; não houve falhas. O commit da correção é `78f57873688da50f4864e487f37f46244a494f82` (`fix-mobile-sale-filtering-and-totals`).
