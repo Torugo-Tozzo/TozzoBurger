@@ -108,3 +108,24 @@ testes de API/orquestração.
 
 - `04f2172` — `feat: add category onboarding` (implementação e testes).
 - O commit separado deste relatório será informado no handoff final.
+
+## Fix round 1
+
+Corrigido o bypass da rota direta `app/onboarding.tsx`: usuários cujo role não
+é exatamente `OWNER` são redirecionados para `/(tabs)` sem GET nem mutações, e
+um `OWNER` só vê a tela quando `GET /estabelecimentos` confirma
+`category === null`. A decisão de elegibilidade e a consulta foram extraídas
+para `useCategoryOnboardingAccess`, reutilizado pelo gate e pela rota; o gate
+continua desmontando o onboarding após a confirmação.
+
+Testes executados:
+
+- `npx --no-install jest app/__tests__/onboarding.test.tsx --runInBand` — **7
+  testes passando**.
+- `npx --no-install jest --runInBand` — **37 suítes, 157 testes passando; 1
+  snapshot passando**. Os diagnósticos do checker de i18n e avisos de módulos
+  nativos são os esperados pelas fixtures/testes existentes.
+- `npx tsc --noEmit` — **passou**, sem erros.
+- `rtk git diff --cached --check` — **passou**, sem erro de whitespace.
+
+Commit da correção: `6fd6bf6` — `fix: guard direct category onboarding route`.
