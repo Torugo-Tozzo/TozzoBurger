@@ -104,7 +104,7 @@ describe('Task 7C presentation i18n', () => {
     expect(text).not.toContain('Hambúrguer');
   });
 
-  it('translates machine order statuses in order cards', async () => {
+  it('does not render an order status badge in order cards', async () => {
     await act(async () => {
       await i18n.changeLanguage('pt-BR');
     });
@@ -126,7 +126,7 @@ describe('Task 7C presentation i18n', () => {
       </I18nextProvider>,
     );
 
-    expect(renderedText(renderer.toJSON())).toContain('Aberto');
+    expect(renderedText(renderer.toJSON())).not.toContain('Aberto');
   });
 
   it('localizes receipt labels and numbers without translating business content or printer controls', async () => {

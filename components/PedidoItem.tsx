@@ -13,9 +13,6 @@ type Props = {
 
 export function PedidoItem({ data, products, onEdit, onDelete }: Props) {
   const { t, i18n } = useTranslation();
-  const isOpen = data.isOpen !== false;
-  const statusLabel = isOpen ? t('status.open') : t('status.closed');
-  const statusColor = isOpen ? Colors.status.info : Colors.status.danger;
 
   const horaFormatada = new Date(data.openedAt).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
   const autorTrecho = data.createdByName ? t('common.createdBy', { name: data.createdByName }) : '';
@@ -29,8 +26,7 @@ export function PedidoItem({ data, products, onEdit, onDelete }: Props) {
 
   return (
     <RecordCard
-      accentColor={statusColor}
-      badge={{ label: statusLabel, color: statusColor }}
+      accentColor={Colors.light.textMuted}
       title={(data.customerName && String(data.customerName).trim().length > 0) ? data.customerName : t('common.customerUnknown')}
       subtitle={products.length > 0 ? products.join(', ') : undefined}
       meta={`${autorTrecho}${horaFormatada}`}
