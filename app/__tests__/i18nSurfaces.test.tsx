@@ -28,10 +28,6 @@ jest.mock('expo-splash-screen', () => ({
   hideAsync: jest.fn(),
 }));
 
-jest.mock('expo-sqlite', () => ({
-  SQLiteProvider: ({ children }: { children: unknown }) => children,
-}));
-
 jest.mock('@react-navigation/native', () => ({
   DarkTheme: {},
   DefaultTheme: {},
@@ -73,10 +69,6 @@ jest.mock('expo-router', () => {
     useFocusEffect: jest.fn(),
   };
 });
-
-jest.mock('@/database/initializeDatabase', () => ({
-  initializeDatabase: jest.fn(),
-}));
 
 jest.mock('@/context/AuthContext', () => ({
   AuthProvider: ({ children }: { children: unknown }) => children,

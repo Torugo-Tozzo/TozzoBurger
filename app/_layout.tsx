@@ -6,8 +6,6 @@ import * as SplashScreen from 'expo-splash-screen';
 import { Suspense, useEffect } from 'react';
 import { useState } from 'react';
 import 'react-native-reanimated';
-import { SQLiteProvider } from 'expo-sqlite';  // Importar o SQLiteProvider
-import { initializeDatabase } from '@/database/initializeDatabase';  // Importe sua função de inicialização
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { useAuth } from '@/context/AuthContext';
@@ -74,15 +72,13 @@ export default function RootLayout() {
         <AppLoadingScreen stage="initializing" />
       ) : (
         <Suspense fallback={<AppLoadingScreen stage="initializing" />}>
-          <SQLiteProvider databaseName="database.db" onInit={initializeDatabase} useSuspense>
-            <AuthProvider>
-              <AutoSyncProvider>
-                <CartProvider>
-                  <RootLayoutNav />
-                </CartProvider>
-              </AutoSyncProvider>
-            </AuthProvider>
-          </SQLiteProvider>
+          <AuthProvider>
+            <AutoSyncProvider>
+              <CartProvider>
+                <RootLayoutNav />
+              </CartProvider>
+            </AutoSyncProvider>
+          </AuthProvider>
         </Suspense>
       )}
     </I18nextProvider>

@@ -27,10 +27,6 @@ jest.mock('react-native', () => {
   };
 });
 
-jest.mock('expo-sqlite', () => ({
-  useSQLiteContext: jest.fn(),
-}));
-
 let mockDatabase: import('@nozbe/watermelondb').Database;
 
 jest.mock('../watermelon/database', () => ({
