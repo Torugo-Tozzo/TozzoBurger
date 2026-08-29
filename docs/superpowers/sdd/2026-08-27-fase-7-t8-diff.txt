@@ -1,0 +1,2058 @@
+3296ac9 fix: retry Watermelon sync conflicts
+a6623bb feat: replace mobile sync with WatermelonDB
+
+ components/SyncIndicator.tsx                   |   4 +-
+ context/AuthContext.tsx                        |   4 +-
+ context/AutoSyncContext.tsx                    |  19 +-
+ database/__tests__/useSyncDatabase.test.ts     |  98 -----
+ database/__tests__/watermelonSync.test.ts      | 388 ++++++++++++++++++++
+ database/__tests__/watermelonSyncRetry.test.ts | 104 ++++++
+ database/useSyncDatabase.ts                    | 472 -------------------------
+ database/watermelon/sync.ts                    | 450 +++++++++++++++++++++++
+ services/__tests__/syncApi.test.ts             | 137 +++++++
+ services/api.ts                                | 112 ++++--
+ 10 files changed, 1176 insertions(+), 612 deletions(-)
+
+diff --git a/components/SyncIndicator.tsx b/components/SyncIndicator.tsx
+index 18a879c..fcda97a 100644
+--- a/components/SyncIndicator.tsx
++++ b/components/SyncIndicator.tsx
+@@ -57,21 +57,23 @@ export default function SyncIndicator() {
+     let errorMsg: string | null = null;
+     let res: any = null;
+     try {
+       res = await triggerSync();
+     } catch (e: any) {
+       ok = false;
+       errorMsg = e?.message ?? String(e);
+       console.warn('triggerSync error', e);
+     }
+ 
+-    if (res === null || typeof res === 'undefined') {
++    // The native Watermelon synchronize() resolves void on success. Only a
++    // null result means the caller was skipped because no token/lock cycle ran.
++    if (res === null) {
+       ok = false;
+       if (!errorMsg) errorMsg = 'Sem resposta do servidor';
+     }
+ 
+     const elapsed = Date.now() - start;
+     const remaining = Math.max(0, minimum - elapsed);
+     if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
+ 
+     if (!mountedRef.current) return;
+ 
+diff --git a/context/AuthContext.tsx b/context/AuthContext.tsx
+index a9ef544..268cbb1 100644
+--- a/context/AuthContext.tsx
++++ b/context/AuthContext.tsx
+@@ -1,16 +1,16 @@
+ import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+ import * as api from '@/services/api';
+ import * as SecureStore from 'expo-secure-store';
+ import { useSQLiteContext } from 'expo-sqlite';
+ import { seedProductType } from '@/database/initializeDatabase';
+-import { synchronizeWithServer } from '@/database/useSyncDatabase';
++import { synchronizeWithServer } from '@/database/watermelon/sync';
+ import { runWithLock } from '@/database/syncGuard';
+ import { resetWatermelonLocalData } from '@/database/watermelon/database';
+ 
+ type User = {
+   id?: number | string;
+   name?: string;
+   email?: string;
+   establishmentId?: number | string | null;
+   role?: string | null;
+ };
+@@ -188,21 +188,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
+               ).catch((e) => console.warn('[auth] db op failed', e));
+               await database.runAsync('UPDATE TB_SCHEMA SET userId = ?', [meIdNum]).catch((e) => console.warn('[auth] db op failed', e));
+             }
+           }
+         } catch (err) {
+           console.warn('Failed to check/replace TB_USERS on login', err);
+         }
+         setToken(t);
+         // The first sync must not block navigation. The list screens show their
+         // skeletons while this background sync populates the local database.
+-        void runWithLock(() => synchronizeWithServer(database, t))
++        void runWithLock(() => synchronizeWithServer(t, (me as any)?.establishmentId))
+           .then((res) => {
+             if (res === null) console.log('[sync] skipped login-triggered sync; another sync is in progress');
+           })
+           .catch((err) => console.warn('sync after login failed', err));
+         
+       } catch (err) {
+         console.warn('Failed to fetch /usuarios/me', err);
+         return false;
+       }
+ 
+diff --git a/context/AutoSyncContext.tsx b/context/AutoSyncContext.tsx
+index 20ccf1c..90022c9 100644
+--- a/context/AutoSyncContext.tsx
++++ b/context/AutoSyncContext.tsx
+@@ -1,70 +1,65 @@
+ import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+ import { AppState, AppStateStatus } from 'react-native';
+ import NetInfo from '@react-native-community/netinfo';
+-import { useSQLiteContext } from 'expo-sqlite';
++import { hasUnsyncedChanges } from '@nozbe/watermelondb/sync';
+ import { useAuth } from '@/context/AuthContext';
+-import { synchronizeWithServer } from '@/database/useSyncDatabase';
++import { database as watermelonDatabase } from '@/database/watermelon/database';
++import { synchronizeWithServer } from '@/database/watermelon/sync';
+ import { runWithLock } from '@/database/syncGuard';
+ 
+ type LastSyncResult = { ok: boolean | null; message?: string | null; time?: number | null };
+ 
+ type AutoSyncContextType = {
+   isSyncing: boolean;
+   isOnline: boolean;
+   pendingCount: number;
+   lastSync: number | null;
+   lastSyncResult: LastSyncResult;
+   triggerSync: () => Promise<any | null | undefined>;
+ };
+ 
+ const AutoSyncContext = createContext<AutoSyncContextType | undefined>(undefined);
+ 
+ export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) => {
+-  const database = useSQLiteContext();
+-  const { token } = useAuth();
++  const { token, user } = useAuth();
+   const [isSyncing, setIsSyncing] = useState(false);
+   const [isOnline, setIsOnline] = useState(true);
+   const [pendingCount, setPendingCount] = useState(0);
+   const [lastSync, setLastSync] = useState<number | null>(null);
+   const [lastSyncResult, setLastSyncResult] = useState<LastSyncResult>({ ok: null, message: null, time: null });
+   const pendingRef = useRef(false);
+   const appStateRef = useRef<AppStateStatus>(AppState.currentState as AppStateStatus);
+ 
+   const refreshPendingCount = async () => {
+     try {
+-      const rows = await (database as any).getAllAsync(
+-        `SELECT
+-          (SELECT COUNT(*) FROM TB_PRODUCTS WHERE sync_status = 'pending') +
+-          (SELECT COUNT(*) FROM TB_SALES WHERE sync_status = 'pending') +
+-          (SELECT COUNT(*) FROM TB_ORDERS WHERE sync_status = 'pending') as total`
+-      );
+-      setPendingCount(rows?.[0]?.total ?? 0);
++      const hasPendingChanges = await hasUnsyncedChanges({ database: watermelonDatabase });
++      setPendingCount(hasPendingChanges ? 1 : 0);
+     } catch {
+       // ignore
+     }
+   };
+ 
+   const doSync = async () => {
+     if (!token) return null;
+     if (isSyncing) {
+       pendingRef.current = true;
+       return null;
+     }
+ 
+     await refreshPendingCount();
+     let res: any = null;
+     try {
+       res = await runWithLock(async () => {
+         setIsSyncing(true);
+         try {
+-          return await synchronizeWithServer(database as any, token);
++          return await synchronizeWithServer(token, user?.establishmentId);
+         } finally {
+           setIsSyncing(false);
+         }
+       });
+     } catch (err: any) {
+       // sync threw — record failure and return
+       const msg = err?.message ?? String(err);
+       setLastSyncResult({ ok: false, message: msg, time: Date.now() });
+       console.warn('AutoSync failed', err);
+       // schedule pending retry if needed
+diff --git a/database/__tests__/useSyncDatabase.test.ts b/database/__tests__/useSyncDatabase.test.ts
+deleted file mode 100644
+index 118dd9e..0000000
+--- a/database/__tests__/useSyncDatabase.test.ts
++++ /dev/null
+@@ -1,98 +0,0 @@
+-jest.mock('@/services/api', () => ({
+-  sincronizar: jest.fn(async () => ({})),
+-  getChanges: jest.fn(),
+-}));
+-
+-jest.mock('../tableWatermark', () => ({
+-  markChanged: jest.fn(),
+-}));
+-
+-jest.mock('../utils/uuid', () => ({
+-  generateUUID: jest.fn(() => 'generated-uuid'),
+-}));
+-
+-import * as api from '@/services/api';
+-import { markChanged } from '../tableWatermark';
+-import { sincronizarComServidor } from '../useSyncDatabase';
+-
+-const mockGetChanges = api.getChanges as jest.Mock;
+-const mockMarkChanged = markChanged as jest.Mock;
+-
+-function makeFakeDb() {
+-  return {
+-    getFirstAsync: jest.fn(async () => null),
+-    getAllAsync: jest.fn(async () => []),
+-    runAsync: jest.fn(async () => ({})),
+-    execAsync: jest.fn(async () => undefined),
+-  };
+-}
+-
+-describe('sincronizarComServidor — table watermark', () => {
+-  beforeEach(() => {
+-    mockMarkChanged.mockReset();
+-  });
+-
+-  it('marks products changed when the server sends new products', async () => {
+-    mockGetChanges.mockResolvedValue({
+-      products: [{ id: 'p1', name: 'X', price: 10, updated_at: Date.now() }],
+-      orders: [],
+-      sales: [],
+-      productTypes: [],
+-    });
+-
+-    await sincronizarComServidor(makeFakeDb() as any, 'token');
+-
+-    expect(mockMarkChanged).toHaveBeenCalledWith('products');
+-    expect(mockMarkChanged).not.toHaveBeenCalledWith('orders');
+-    expect(mockMarkChanged).not.toHaveBeenCalledWith('sales');
+-  });
+-
+-  it('marks products changed when the server sends new productTypes, even with no products', async () => {
+-    mockGetChanges.mockResolvedValue({
+-      products: [],
+-      orders: [],
+-      sales: [],
+-      productTypes: [{ id: 1, description: 'Bebida', updated_at: Date.now() }],
+-    });
+-
+-    await sincronizarComServidor(makeFakeDb() as any, 'token');
+-
+-    expect(mockMarkChanged).toHaveBeenCalledWith('products');
+-  });
+-
+-  it('marks orders changed when the server sends new orders', async () => {
+-    mockGetChanges.mockResolvedValue({
+-      products: [],
+-      orders: [{ id: 'ped1', status: 'ABERTO', updated_at: Date.now() }],
+-      sales: [],
+-      productTypes: [],
+-    });
+-
+-    await sincronizarComServidor(makeFakeDb() as any, 'token');
+-
+-    expect(mockMarkChanged).toHaveBeenCalledWith('orders');
+-    expect(mockMarkChanged).not.toHaveBeenCalledWith('products');
+-  });
+-
+-  it('marks sales changed when the server sends new sales', async () => {
+-    mockGetChanges.mockResolvedValue({
+-      products: [],
+-      orders: [],
+-      sales: [{ id: 'ven1', updated_at: Date.now() }],
+-      productTypes: [],
+-    });
+-
+-    await sincronizarComServidor(makeFakeDb() as any, 'token');
+-
+-    expect(mockMarkChanged).toHaveBeenCalledWith('sales');
+-    expect(mockMarkChanged).not.toHaveBeenCalledWith('products');
+-  });
+-
+-  it('marks nothing changed when the server has nothing new', async () => {
+-    mockGetChanges.mockResolvedValue({ products: [], orders: [], sales: [], productTypes: [] });
+-
+-    await sincronizarComServidor(makeFakeDb() as any, 'token');
+-
+-    expect(mockMarkChanged).not.toHaveBeenCalled();
+-  });
+-});
+diff --git a/database/__tests__/watermelonSync.test.ts b/database/__tests__/watermelonSync.test.ts
+new file mode 100644
+index 0000000..53a9f6e
+--- /dev/null
++++ b/database/__tests__/watermelonSync.test.ts
+@@ -0,0 +1,388 @@
++jest.mock('react-native', () => {
++  const databaseBridge = require('@nozbe/watermelondb/adapters/sqlite/sqlite-node/DatabaseBridge').default;
++  const bridgeMethods = [
++    'initialize',
++    'setUpWithSchema',
++    'setUpWithMigrations',
++    'find',
++    'query',
++    'queryIds',
++    'unsafeQueryRaw',
++    'count',
++    'batch',
++    'unsafeResetDatabase',
++    'getLocal',
++  ];
++  const asyncDatabaseBridge = bridgeMethods.reduce((bridge, method) => {
++    bridge[method] = (...args: unknown[]) =>
++      new Promise((resolve, reject) => {
++        databaseBridge[method](...args, resolve, reject);
++      });
++    return bridge;
++  }, {} as Record<string, (...args: unknown[]) => Promise<unknown>>);
++
++  return {
++    NativeModules: { WMDatabaseBridge: asyncDatabaseBridge },
++    Platform: { OS: 'ios' },
++  };
++});
++
++jest.mock('@/services/api', () => ({
++  pullChanges: jest.fn(),
++  pushChanges: jest.fn(),
++}));
++
++let mockDatabase: import('@nozbe/watermelondb').Database;
++
++jest.mock('../watermelon/database', () => ({
++  get database() {
++    return mockDatabase;
++  },
++}));
++
++jest.mock('../tableWatermark', () => ({
++  markChanged: jest.fn(),
++}));
++
++import { Database } from '@nozbe/watermelondb';
++import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
++import * as api from '@/services/api';
++import { runWithLock } from '../syncGuard';
++import { pullChanges, pushChanges, synchronizeWithServer } from '../watermelon/sync';
++import migrations from '../watermelon/migrations';
++import Order from '../watermelon/models/Order';
++import OrderItem from '../watermelon/models/OrderItem';
++import Product from '../watermelon/models/Product';
++import ProductType from '../watermelon/models/ProductType';
++import Sale from '../watermelon/models/Sale';
++import SaleItem from '../watermelon/models/SaleItem';
++import User from '../watermelon/models/User';
++import Printer from '../watermelon/models/Printer';
++import schema from '../watermelon/schema';
++
++const modelClasses = [Product, ProductType, Order, OrderItem, Sale, SaleItem, User, Printer];
++const mockPullChanges = api.pullChanges as jest.Mock;
++const mockPushChanges = api.pushChanges as jest.Mock;
++const consoleLog = jest.spyOn(console, 'log').mockImplementation(() => undefined);
++const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
++
++type TestTableChanges = {
++  created: Array<Record<string, unknown>>;
++  updated: Array<Record<string, unknown>>;
++  deleted: string[];
++};
++
++type TestChangeSet = {
++  products: TestTableChanges;
++  product_types: TestTableChanges;
++  orders: TestTableChanges;
++  order_items: TestTableChanges;
++  sales: TestTableChanges;
++  sale_items: TestTableChanges;
++};
++
++function makeDatabase() {
++  const adapter = new SQLiteAdapter({
++    schema,
++    migrations,
++    dbName: ':memory:',
++    jsi: true,
++    onSetUpError: (error) => {
++      throw error;
++    },
++  });
++
++  return new Database({ adapter, modelClasses });
++}
++
++function emptyChanges(): TestChangeSet {
++  return {
++    products: { created: [], updated: [], deleted: [] },
++    product_types: { created: [], updated: [], deleted: [] },
++    orders: { created: [], updated: [], deleted: [] },
++    order_items: { created: [], updated: [], deleted: [] },
++    sales: { created: [], updated: [], deleted: [] },
++    sale_items: { created: [], updated: [], deleted: [] },
++  };
++}
++
++describe('Watermelon sync transport', () => {
++  afterAll(() => {
++    consoleLog.mockRestore();
++    consoleWarn.mockRestore();
++  });
++
++  beforeEach(() => {
++    mockDatabase = makeDatabase();
++    mockPullChanges.mockReset();
++    mockPushChanges.mockReset();
++    mockPullChanges.mockResolvedValue({ changes: emptyChanges(), timestamp: 1_700_000_000_010 });
++    mockPushChanges.mockResolvedValue({ ignored: [], ignored_order_deletes: [] });
++  });
++
++  it('maps a server pull envelope and forwards the Watermelon cursor', async () => {
++    const changes = emptyChanges();
++    changes.products.created.push({
++      id: 'product-1',
++      name: 'Burger',
++      price: 25,
++      product_type_id: null,
++      source_product_id: null,
++      ingredients: null,
++      establishment_id: 'establishment-a',
++      created_at: 10,
++      updated_at: 20,
++    });
++    mockPullChanges.mockResolvedValue({ changes, timestamp: 30 });
++
++    const callback = pullChanges('token-123', 'establishment-a');
++    const result = await callback({
++      lastPulledAt: 20,
++      schemaVersion: 2,
++      migration: null,
++    } as any);
++
++    expect(result).toEqual({ changes, timestamp: 30 });
++    expect(mockPullChanges).toHaveBeenCalledWith('token-123', {
++      lastPulledAt: 20,
++      schemaVersion: 2,
++    });
++  });
++
++  it('posts only the six sync tables, strips Watermelon internals, and reports ignored items', async () => {
++    consoleWarn.mockClear();
++    const changes = emptyChanges();
++    changes.products.created.push({
++      id: 'product-1',
++      name: 'Burger',
++      price: 25,
++      establishment_id: 'establishment-a',
++      _status: 'created',
++      _changed: 'name,price',
++    });
++    (changes as any).users = { created: [{ id: 'user-1' }], updated: [], deleted: [] };
++    mockPushChanges.mockResolvedValue({
++      ignored: [{ type: 'product', entityId: 'product-1', reason: 'invalid' }],
++      ignored_order_deletes: [{ type: 'order', entityId: 'order-1', reason: 'open order' }],
++    });
++
++    const callback = pushChanges('token-123', 'establishment-a');
++    await expect(callback({ changes, lastPulledAt: 30 } as any)).resolves.toBeUndefined();
++
++    expect(mockPushChanges).toHaveBeenCalledWith('token-123', {
++      changes: {
++        ...emptyChanges(),
++        products: {
++          created: [{
++            id: 'product-1',
++            name: 'Burger',
++            price: 25,
++            establishment_id: 'establishment-a',
++          }],
++          updated: [],
++          deleted: [],
++        },
++      },
++      lastPulledAt: 30,
++    });
++    expect(consoleWarn).toHaveBeenCalledWith(
++      '[sync] server ignored push items',
++      expect.objectContaining({
++        ignored: expect.arrayContaining([expect.objectContaining({ entityId: 'product-1' })]),
++        ignored_order_deletes: expect.arrayContaining([expect.objectContaining({ entityId: 'order-1' })]),
++      }),
++    );
++  });
++
++  it('does not swallow a push conflict', async () => {
++    const conflict = Object.assign(new Error('server changed first'), {
++      status: 409,
++      code: 'SYNC_CONFLICT',
++    });
++    mockPushChanges.mockRejectedValue(conflict);
++
++    await expect(pushChanges('token-123', 'establishment-a')({
++      changes: emptyChanges(),
++      lastPulledAt: 30,
++    } as any)).rejects.toBe(conflict);
++  });
++
++  it('serializes concurrent native sync calls through the sync guard', async () => {
++    let activePulls = 0;
++    let maxActivePulls = 0;
++    let notifyFirstPullStarted!: () => void;
++    let releaseFirstPull!: () => void;
++    const firstPullStarted = new Promise<void>((resolve) => {
++      notifyFirstPullStarted = resolve;
++    });
++    const firstPullRelease = new Promise<void>((resolve) => {
++      releaseFirstPull = resolve;
++    });
++
++    mockPullChanges.mockImplementation(async () => {
++      activePulls += 1;
++      maxActivePulls = Math.max(maxActivePulls, activePulls);
++      notifyFirstPullStarted();
++      await firstPullRelease;
++      activePulls -= 1;
++      return { changes: emptyChanges(), timestamp: 1_700_000_000_010 };
++    });
++
++    const first = runWithLock(() => synchronizeWithServer('token-123', 'establishment-a'));
++    await firstPullStarted;
++    const second = runWithLock(() => synchronizeWithServer('token-123', 'establishment-a'));
++    releaseFirstPull();
++
++    await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined]);
++    expect(maxActivePulls).toBe(1);
++    expect(mockPullChanges).toHaveBeenCalledTimes(2);
++  });
++
++  it('rejects a pulled child row whose existing parent belongs to another establishment', async () => {
++    const foreignOrder = mockDatabase.get<Order>('orders').prepareCreateFromDirtyRaw({
++      id: 'foreign-order',
++      _status: 'synced',
++      _changed: '',
++      total: 10,
++      opened_at: 1_700_000_000_000,
++      customer_name: null,
++      is_open: true,
++      establishment_id: 'establishment-b',
++      seller_id: 'seller-b',
++      created_at: 1_700_000_000_000,
++      updated_at: 1_700_000_000_000,
++    });
++    await mockDatabase.write(() => mockDatabase.batch(foreignOrder));
++
++    const changes = emptyChanges();
++    changes.order_items.created.push({
++      id: 'foreign-order-item',
++      quantity: 1,
++      status: 'REQUESTED',
++      order_id: 'foreign-order',
++      product_id: 'product-1',
++      unit_price_at_order: 10,
++      created_at: 1_700_000_000_010,
++      updated_at: 1_700_000_000_010,
++    });
++    mockPullChanges.mockResolvedValue({ changes, timestamp: 1_700_000_000_020 });
++
++    await expect(pullChanges('token-123', 'establishment-a')({
++      lastPulledAt: 1_700_000_000_000,
++      schemaVersion: 2,
++      migration: null,
++    } as any)).rejects.toThrow(/another establishment/i);
++  });
++
++  it('rejects a pulled scoped root row without scope when its local id is foreign', async () => {
++    const foreignOrder = mockDatabase.get<Order>('orders').prepareCreateFromDirtyRaw({
++      id: 'foreign-order',
++      _status: 'synced',
++      _changed: '',
++      total: 10,
++      opened_at: 1_700_000_000_000,
++      customer_name: null,
++      is_open: true,
++      establishment_id: 'establishment-b',
++      seller_id: 'seller-b',
++      created_at: 1_700_000_000_000,
++      updated_at: 1_700_000_000_000,
++    });
++    await mockDatabase.write(() => mockDatabase.batch(foreignOrder));
++
++    const changes = emptyChanges();
++    changes.orders.updated.push({
++      id: 'foreign-order',
++      total: 10,
++      opened_at: 1_700_000_000_000,
++      customer_name: null,
++      is_open: false,
++      seller_id: 'seller-b',
++      created_at: 1_700_000_000_000,
++      updated_at: 1_700_000_000_010,
++    });
++    mockPullChanges.mockResolvedValue({ changes, timestamp: 1_700_000_000_020 });
++
++    await expect(pullChanges('token-123', 'establishment-a')({
++      lastPulledAt: 1_700_000_000_000,
++      schemaVersion: 2,
++      migration: null,
++    } as any)).rejects.toThrow(/another establishment/i);
++  });
++
++  it('applies remote is_open before pushing a new local order item', async () => {
++    const now = 1_700_000_000_000;
++    const products = mockDatabase.get<Product>('products');
++    const orders = mockDatabase.get<Order>('orders');
++    const orderItems = mockDatabase.get<OrderItem>('order_items');
++    const product = products.prepareCreateFromDirtyRaw({
++      id: 'product-1',
++      _status: 'synced',
++      _changed: '',
++      name: 'Burger',
++      price: 25,
++      product_type_id: null,
++      source_product_id: null,
++      ingredients: null,
++      establishment_id: 'establishment-a',
++      created_at: now,
++      updated_at: now,
++    });
++    const order = orders.prepareCreateFromDirtyRaw({
++      id: 'order-1',
++      _status: 'synced',
++      _changed: '',
++      total: 25,
++      opened_at: now,
++      customer_name: null,
++      is_open: true,
++      establishment_id: 'establishment-a',
++      seller_id: 'seller-a',
++      created_at: now,
++      updated_at: now,
++    });
++    const newItem = orderItems.prepareCreateFromDirtyRaw({
++      id: 'order-item-local',
++      _status: 'created',
++      _changed: '',
++      quantity: 1,
++      status: 'REQUESTED',
++      order_id: 'order-1',
++      product_id: 'product-1',
++      unit_price_at_order: 25,
++      created_at: now,
++      updated_at: now,
++    });
++
++    await mockDatabase.write(() => mockDatabase.batch(product, order, newItem));
++
++    const remoteOrder = {
++      id: 'order-1',
++      total: 25,
++      opened_at: now,
++      customer_name: null,
++      is_open: false,
++      establishment_id: 'establishment-a',
++      seller_id: 'seller-a',
++      created_at: now,
++      updated_at: now + 10,
++    };
++    const changes = emptyChanges();
++    changes.orders.updated.push(remoteOrder);
++    mockPullChanges.mockResolvedValue({ changes, timestamp: now + 20 });
++
++    let isOpenAtPush: boolean | undefined;
++    mockPushChanges.mockImplementation(async (_token: string, payload: any) => {
++      isOpenAtPush = (await orders.find('order-1')).isOpen;
++      expect(payload.changes.order_items.created).toEqual([
++        expect.objectContaining({ id: 'order-item-local', order_id: 'order-1' }),
++      ]);
++      return { ignored: [], ignored_order_deletes: [] };
++    });
++
++    await runWithLock(() => synchronizeWithServer('token-123', 'establishment-a'));
++
++    expect(isOpenAtPush).toBe(false);
++    await expect(orders.find('order-1')).resolves.toMatchObject({ isOpen: false });
++  });
++});
+diff --git a/database/__tests__/watermelonSyncRetry.test.ts b/database/__tests__/watermelonSyncRetry.test.ts
+new file mode 100644
+index 0000000..48192e8
+--- /dev/null
++++ b/database/__tests__/watermelonSyncRetry.test.ts
+@@ -0,0 +1,104 @@
++jest.mock('@nozbe/watermelondb/sync', () => ({
++  synchronize: jest.fn(),
++}));
++
++jest.mock('@/services/api', () => ({
++  ...jest.requireActual('@/services/api'),
++  pullChanges: jest.fn(),
++  pushChanges: jest.fn(),
++}));
++
++jest.mock('../watermelon/database', () => ({
++  database: {},
++}));
++
++jest.mock('../tableWatermark', () => ({
++  markChanged: jest.fn(),
++}));
++
++import { synchronize as watermelonSynchronize } from '@nozbe/watermelondb/sync';
++import { ApiHttpError, pullChanges as apiPullChanges, pushChanges as apiPushChanges } from '@/services/api';
++import { synchronizeWithServer } from '../watermelon/sync';
++
++const mockWatermelonSynchronize = watermelonSynchronize as jest.Mock;
++const mockPullChanges = apiPullChanges as jest.Mock;
++const mockPushChanges = apiPushChanges as jest.Mock;
++
++function emptyChanges() {
++  return {
++    products: { created: [], updated: [], deleted: [] },
++    product_types: { created: [], updated: [], deleted: [] },
++    orders: { created: [], updated: [], deleted: [] },
++    order_items: { created: [], updated: [], deleted: [] },
++    sales: { created: [], updated: [], deleted: [] },
++    sale_items: { created: [], updated: [], deleted: [] },
++  };
++}
++
++describe('Watermelon sync conflict retry', () => {
++  beforeEach(() => {
++    mockWatermelonSynchronize.mockReset();
++    mockPullChanges.mockReset();
++    mockPushChanges.mockReset();
++
++    mockPullChanges.mockResolvedValue({
++      changes: emptyChanges(),
++      timestamp: 1_700_000_000_010,
++    });
++    mockPushChanges.mockResolvedValue({ ignored: [], ignored_order_deletes: [] });
++    mockWatermelonSynchronize.mockImplementation(async (args: any) => {
++      const pullResult = await args.pullChanges({
++        lastPulledAt: null,
++        schemaVersion: 2,
++        migration: null,
++      });
++      await args.onDidPullChanges?.(pullResult);
++      await args.pushChanges({
++        changes: emptyChanges(),
++        lastPulledAt: pullResult.timestamp,
++      });
++    });
++  });
++
++  it('restarts the complete synchronize cycle after one sync conflict', async () => {
++    const conflict = new ApiHttpError(409, {
++      error: 'SYNC_CONFLICT',
++      message: 'server changed first',
++    });
++    mockPushChanges.mockRejectedValueOnce(conflict);
++
++    await expect(synchronizeWithServer('token-123')).resolves.toBeUndefined();
++
++    expect(mockWatermelonSynchronize).toHaveBeenCalledTimes(2);
++    expect(mockPullChanges).toHaveBeenCalledTimes(2);
++    expect(mockPushChanges).toHaveBeenCalledTimes(2);
++  });
++
++  it('propagates the final conflict after three complete synchronize attempts', async () => {
++    const conflicts = [1, 2, 3].map((attempt) => new ApiHttpError(409, {
++      code: 'SYNC_CONFLICT',
++      message: `server changed on attempt ${attempt}`,
++    }));
++    mockPushChanges
++      .mockRejectedValueOnce(conflicts[0])
++      .mockRejectedValueOnce(conflicts[1])
++      .mockRejectedValueOnce(conflicts[2]);
++
++    await expect(synchronizeWithServer('token-123')).rejects.toBe(conflicts[2]);
++
++    expect(mockWatermelonSynchronize).toHaveBeenCalledTimes(3);
++    expect(mockPullChanges).toHaveBeenCalledTimes(3);
++    expect(mockPushChanges).toHaveBeenCalledTimes(3);
++  });
++
++  it('propagates a non-conflict error without retrying', async () => {
++    const networkError = new TypeError('network unavailable');
++    mockPushChanges.mockRejectedValue(networkError);
++
++    await expect(synchronizeWithServer('token-123')).rejects.toBe(networkError);
++
++    expect(mockWatermelonSynchronize).toHaveBeenCalledTimes(1);
++    expect(mockPullChanges).toHaveBeenCalledTimes(1);
++    expect(mockPushChanges).toHaveBeenCalledTimes(1);
++  });
++});
+diff --git a/database/useSyncDatabase.ts b/database/useSyncDatabase.ts
+deleted file mode 100644
+index ce7f636..0000000
+--- a/database/useSyncDatabase.ts
++++ /dev/null
+@@ -1,472 +0,0 @@
+-import { type SQLiteDatabase } from 'expo-sqlite';
+-import * as api from '@/services/api';
+-import { generateUUID } from './utils/uuid';
+-import { markChanged } from './tableWatermark';
+-
+-function parseTimestamp(val: any): number | null {
+-  if (val === undefined || val === null) return null;
+-  if (typeof val === 'number' && !Number.isNaN(val)) return val;
+-  const s = String(val).trim();
+-  if (/^\d+$/.test(s)) return Number(s);
+-  const parsed = Date.parse(s);
+-  return Number.isNaN(parsed) ? null : parsed;
+-}
+-
+-export async function synchronizeWithServer(database: SQLiteDatabase, token: string) {
+-  try {
+-    // read last sync timestamp (if any)
+-    const schema = await database.getFirstAsync<{ lastSyncAt?: number }>(`SELECT lastSyncAt FROM TB_SCHEMA LIMIT 1`).catch(() => null);
+-    const since = schema && typeof schema.lastSyncAt !== 'undefined' ? schema.lastSyncAt : null;
+-
+-    // Collect local products to push: only items changed since last sync (if we have `since`), otherwise push all
+-    // Prefer explicit pending-state push: send only rows marked as pending
+-    const produtosLocal: any[] = await database.getAllAsync(
+-      `SELECT id, name, productTypeId, price, sourceProductId, ingredients, updated_at, deleted_at FROM TB_PRODUCTS WHERE sync_status = 'pending' OR sync_status IS NULL;`
+-    ).catch((e) => { console.warn('[sync] query failed', e); return []; });
+-
+-    // Collect vendas and pedidos to push: only those where every item already has sourceProductId (so we can reference server product ids)
+-    const vendasRows: any[] = await database.getAllAsync(`SELECT id, total, soldAt, customerName, isCancelled, updated_at, deleted_at, createdBy, createdByName FROM TB_SALES WHERE sync_status = 'pending' OR sync_status IS NULL;`).catch((e) => { console.warn('[sync] query failed', e); return []; });
+-
+-    const pedidosRows: any[] = await database.getAllAsync(`SELECT id, total, openedAt, customerName, status, updated_at, deleted_at, createdBy, createdByName FROM TB_ORDERS WHERE sync_status = 'pending' OR sync_status IS NULL;`).catch((e) => { console.warn('[sync] query failed', e); return []; });
+-
+-    const vendasLocal: any[] = [];
+-    for (const v of vendasRows) {
+-      // include relation id and prefer produto origem (server id) when available
+-      const items = await database.getAllAsync(
+-        `SELECT R.id as relId, R.saleId as saleId, R.productId as productId, R.quantity as quantity, P.sourceProductId as sourceProductId
+-         FROM RL_SALE_PRODUCT R
+-         LEFT JOIN TB_PRODUCTS P ON P.id = R.productId
+-         WHERE R.saleId = ?`,
+-        [String(v.id)]
+-      ).catch((e) => { console.warn('[sync] query failed', e); return []; });
+-
+-      const mappedItems: any[] = (items || []).map((it: any) => ({
+-        id: it.relId ? String(it.relId) : generateUUID(),
+-        saleId: String(v.id),
+-        productId: it.sourceProductId ? String(it.sourceProductId) : String(it.productId),
+-        quantity: Number(it.quantity ?? 1),
+-      }));
+-
+-      vendasLocal.push({ ...v, items: mappedItems, soldAt: v.soldAt });
+-    }
+-
+-    const pedidosLocal: any[] = [];
+-    for (const p of pedidosRows) {
+-      // include relation id and prefer produto origem (server id) when available
+-      const items = await database.getAllAsync(
+-        `SELECT R.id as relId, R.orderId as orderId, R.productId as productId, R.quantity as quantity, P.sourceProductId as sourceProductId
+-         FROM RL_ORDER_PRODUCT R
+-         LEFT JOIN TB_PRODUCTS P ON P.id = R.productId
+-         WHERE R.orderId = ?`,
+-        [String(p.id)]
+-      ).catch((e) => { console.warn('[sync] query failed', e); return []; });
+-
+-      const mappedItems: any[] = (items || []).map((it: any) => ({
+-        id: it.relId ? String(it.relId) : generateUUID(),
+-        orderId: String(p.id),
+-        productId: it.sourceProductId ? String(it.sourceProductId) : String(it.productId),
+-        quantity: Number(it.quantity ?? 1),
+-      }));
+-
+-      pedidosLocal.push({ ...p, items: mappedItems, openedAt: p.openedAt });
+-    }
+-
+-    const payload = { products: produtosLocal, sales: vendasLocal, orders: pedidosLocal };
+-    console.log('[sync] push: payload counts', { produtos: produtosLocal.length, vendas: vendasLocal.length, pedidos: pedidosLocal.length });
+-
+-    // Detailed debug: log full payload when there is anything to push
+-    try {
+-      if ((produtosLocal && produtosLocal.length) || (vendasLocal && vendasLocal.length) || (pedidosLocal && pedidosLocal.length)) {
+-        console.log('[sync] push payload full', {
+-          produtos: produtosLocal && produtosLocal.length ? produtosLocal : [],
+-          vendas: vendasLocal && vendasLocal.length ? vendasLocal : [],
+-          pedidos: pedidosLocal && pedidosLocal.length ? pedidosLocal : [],
+-        });
+-
+-        if (produtosLocal && produtosLocal.length) console.log('[sync] produtos ->', produtosLocal);
+-        if (vendasLocal && vendasLocal.length) console.log('[sync] vendas ->', vendasLocal);
+-        if (pedidosLocal && pedidosLocal.length) console.log('[sync] pedidos ->', pedidosLocal);
+-      }
+-    } catch (errLog) {
+-      console.warn('[sync] failed to log push payload', errLog);
+-    }
+-
+-    // push local data to server (POST /sincronizacao/push)
+-    const synchronize = api.synchronize ?? (api as any).sincronizar;
+-    const syncRes: any = await synchronize(token, payload).catch((err) => {
+-      console.warn('[sync] push failed', err);
+-      return null;
+-    });
+-
+-    // If server returned id maps (idMobile -> idServidor), apply them locally
+-    if (syncRes) {
+-      // If push succeeded but server did not return explicit maps for vendas/pedidos,
+-      // mark the records we pushed as 'synced' to avoid repeatedly re-sending them.
+-      // We do this only for vendas and pedidos (not produtos) because produtos
+-      // require server-origin IDs (sourceProductId) to be safe to mark fully synced.
+-      try {
+-        if (Array.isArray(vendasLocal) && vendasLocal.length) {
+-          for (const v of vendasLocal) {
+-            await database.runAsync('UPDATE TB_SALES SET sync_status = ? WHERE id = ?', ['synced', String(v.id)]).catch((e) => console.warn('[sync] db op failed', e));
+-          }
+-        }
+-        if (Array.isArray(pedidosLocal) && pedidosLocal.length) {
+-          for (const p of pedidosLocal) {
+-            await database.runAsync('UPDATE TB_ORDERS SET sync_status = ? WHERE id = ?', ['synced', String(p.id)]).catch((e) => console.warn('[sync] db op failed', e));
+-          }
+-        }
+-      } catch (err) {
+-        // ignore; we still proceed to per-map handling below
+-      }
+-      const mapaProdutos = syncRes.productIdMap || null;
+-      const mapaPedidos = syncRes.orderIdMap || null;
+-      const mapaVendas = syncRes.saleIdMap || null;
+-
+-      if (mapaProdutos && typeof mapaProdutos === 'object' && Object.keys(mapaProdutos).length > 0) {
+-        for (const localId of Object.keys(mapaProdutos)) {
+-          const serverId = String(mapaProdutos[localId]);
+-          await database.runAsync('UPDATE TB_PRODUCTS SET sourceProductId = ?, sync_status = ? WHERE id = ?', [serverId, 'synced', String(localId)]).catch((e) => console.warn('[sync] db op failed', e));
+-          console.log('[sync] mapaProdutos applied', { localId, serverId });
+-        }
+-      }
+-
+-      if (mapaPedidos && typeof mapaPedidos === 'object' && Object.keys(mapaPedidos).length > 0) {
+-        for (const localId of Object.keys(mapaPedidos)) {
+-          await database.runAsync('UPDATE TB_ORDERS SET sync_status = ? WHERE id = ?', ['synced', String(localId)]).catch((e) => console.warn('[sync] db op failed', e));
+-        }
+-      }
+-
+-      if (mapaVendas && typeof mapaVendas === 'object' && Object.keys(mapaVendas).length > 0) {
+-        console.log('[sync] mapaVendas', mapaVendas);
+-        for (const localId of Object.keys(mapaVendas)) {
+-          const serverId = String(mapaVendas[localId]);
+-          await database.runAsync('UPDATE TB_SALES SET sync_status = ? WHERE id = ?', ['synced', String(localId)]).catch((e) => console.warn('[sync] db op failed', e));
+-          console.log('[sync] mapaVendas applied', { localId, serverId });
+-        }
+-      }
+-    }
+-
+-    // then pull authoritative state from server (GET /sincronizacao/pull)
+-    // Convert stored lastSyncAt (epoch ms) to ISO string expected by the API.
+-    let sinceIso: string | undefined = undefined;
+-    if (schema && typeof schema.lastSyncAt !== 'undefined' && schema.lastSyncAt !== null) {
+-      const raw = schema.lastSyncAt;
+-      const s = raw == null ? '' : String(raw).trim();
+-      const num = /^\d+$/.test(s) ? Number(s) : NaN;
+-      if (!Number.isNaN(num)) {
+-        sinceIso = new Date(num).toISOString();
+-      }
+-    }
+-
+-    const changes = sinceIso
+-      ? await api.getChanges(token, sinceIso).catch((err) => {
+-          console.warn('[sync] pull failed', err);
+-          return null;
+-        })
+-      : await api.getChanges(token).catch((err) => {
+-          console.warn('[sync] pull failed', err);
+-          return null;
+-        });
+-
+-    // Debug: log full changes payload for diagnosis of missing deletions
+-    try {
+-      console.log('[sync] pull changes', changes);
+-    } catch (err) {
+-      // ignore logging errors
+-    }
+-
+-    // derive a base server timestamp to use when individual items don't provide `updated_at`
+-    // support several possible server time fields including `checkpoint`
+-    const baseServerTimeRaw = changes
+-      ? parseTimestamp((changes.serverTime || changes.now || changes.timestamp || changes.checkpoint) as any)
+-      : null;
+-    const baseServerTime = baseServerTimeRaw !== null ? baseServerTimeRaw : Date.now();
+-
+-    // Replace TB_PRODUCT_TYPES if server provided tipos
+-    if (changes && Array.isArray(changes.productTypes) && changes.productTypes.length > 0) {
+-      try {
+-        await database.execAsync('BEGIN;');
+-        // Apply tipos received from server using conditional upserts:
+-        // - do INSERT when local row doesn't exist
+-        // - do UPDATE only when server updated_at >= local.updated_at
+-        // - honor deleted_at by setting deleted_at and isActive = 0
+-        for (const t of changes.productTypes) {
+-          const idNum = Number(t.id);
+-          if (Number.isNaN(idNum)) continue;
+-          const description = String(t.description ?? '');
+-          const color = t.color ? String(t.color) : '#9E9E9E';
+-          const isActive = typeof t.isActive !== 'undefined' && t.isActive !== null ? (t.isActive ? 1 : 0) : 1;
+-          const updatedAtRaw = parseTimestamp(t.updated_at ?? t.updatedAt);
+-          const updatedAt = updatedAtRaw !== null ? updatedAtRaw : Date.now();
+-          const deletedAtRaw = parseTimestamp(t.deleted_at ?? t.deletedAt);
+-          const deletedAt = deletedAtRaw !== null ? deletedAtRaw : null;
+-
+-          const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_PRODUCT_TYPES WHERE id = ? LIMIT 1`, [idNum]).catch(() => null);
+-
+-          if (!local) {
+-            await database.runAsync(
+-              'INSERT OR IGNORE INTO TB_PRODUCT_TYPES (id, description, color, isActive, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?)',
+-              [idNum, description, color, isActive, updatedAt, deletedAt]
+-            ).catch((e) => console.warn('[sync] db op failed', e));
+-            continue;
+-          }
+-
+-          const localUpdated = Number(parseTimestamp(local.updated_at) || 0);
+-          if (updatedAt >= localUpdated) {
+-            await database.runAsync(
+-              'UPDATE TB_PRODUCT_TYPES SET description = ?, color = ?, isActive = ?, updated_at = ?, deleted_at = ? WHERE id = ?',
+-              [description, color, isActive, updatedAt, deletedAt, idNum]
+-            ).catch((e) => console.warn('[sync] db op failed', e));
+-          }
+-        }
+-        await database.execAsync('COMMIT;');
+-        markChanged('products');
+-      } catch (err) {
+-        await database.execAsync('ROLLBACK;').catch((e) => console.warn('[sync] db op failed', e));
+-      }
+-    }
+-
+-    // Upsert produtos: match by sourceProductId OR id to avoid duplicates; respect deleted_at
+-    if (changes && Array.isArray(changes.products) && changes.products.length > 0) {
+-      try {
+-        await database.execAsync('BEGIN;');
+-        for (const p of changes.products) {
+-          const id = String(p.id);
+-          const name = String(p.name ?? '');
+-          const ingredients = p.ingredients ? String(p.ingredients) : null;
+-          const productTypeId = typeof p.productTypeId !== 'undefined' && p.productTypeId !== null ? Number(p.productTypeId) : null;
+-          const sourceProductId = p.sourceProductId ? String(p.sourceProductId) : null;
+-          const updatedAtRaw = parseTimestamp(p.updated_at ?? p.updatedAt);
+-          const updatedAt = updatedAtRaw !== null ? updatedAtRaw : baseServerTime;
+-          const deletedAtRaw = parseTimestamp(p.deleted_at ?? p.deletedAt);
+-          const deletedAt = deletedAtRaw !== null ? deletedAtRaw : null;
+-          console.log('[sync] produto recebido', {
+-            id, name, price: p.price, productTypeId: p.productTypeId,
+-            sourceProductId: p.sourceProductId,
+-            updated_at: updatedAt, deleted_at: deletedAt,
+-          });
+-
+-          const local = await database.getFirstAsync<{ updated_at?: number; id?: string }>(`SELECT id, updated_at FROM TB_PRODUCTS WHERE sourceProductId = ? OR id = ? LIMIT 1`, [id, id]).catch(() => null);
+-
+-          if (deletedAt !== null && !Number.isNaN(deletedAt)) {
+-            await database.runAsync(
+-              'UPDATE TB_PRODUCTS SET deleted_at = ?, updated_at = ? WHERE id = ? OR sourceProductId = ?',
+-              [deletedAt, updatedAt, id, id]
+-            ).catch((e) => console.warn('[sync] db op failed', e));
+-            continue;
+-          }
+-
+-          if (!local) {
+-            await database.runAsync(
+-              'INSERT OR IGNORE INTO TB_PRODUCTS (id, name, productTypeId, price, sourceProductId, ingredients, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+-              [id, name, productTypeId, Number(p.price ?? 0), sourceProductId, ingredients, updatedAt, deletedAt]
+-            ).catch((e) => console.warn('[sync] db op failed', e));
+-          } else {
+-            const localUpdated = Number(parseTimestamp(local.updated_at) || 0);
+-            if (updatedAt >= localUpdated) {
+-              const targetId = String(local.id ?? id);
+-              await database.runAsync(
+-                'UPDATE TB_PRODUCTS SET name = ?, productTypeId = ?, price = ?, sourceProductId = ?, ingredients = ?, updated_at = ?, deleted_at = ?, sync_status = ? WHERE id = ?',
+-                [name, productTypeId, Number(p.price ?? 0), sourceProductId, ingredients, updatedAt, deletedAt, 'synced', targetId]
+-              ).catch((e) => console.warn('[sync] db op failed', e));
+-            }
+-          }
+-        }
+-        await database.execAsync('COMMIT;');
+-        markChanged('products');
+-      } catch (err) {
+-        await database.execAsync('ROLLBACK;').catch((e) => console.warn('[sync] db op failed', e));
+-      }
+-    }
+-
+-    // Upsert pedidos (orders) from server
+-    if (changes && Array.isArray(changes.orders) && changes.orders.length > 0) {
+-      try {
+-        await database.execAsync('BEGIN;');
+-        for (const ped of changes.orders) {
+-          const id = String(ped.id);
+-          const openedAt = ped.openedAt ? String(ped.openedAt) : new Date().toISOString();
+-          const customerName = typeof ped.customerName !== 'undefined' && ped.customerName !== null ? String(ped.customerName) : null;
+-          const status = ped.status ? String(ped.status) : 'OPEN';
+-          const updatedAtRaw = parseTimestamp(ped.updated_at ?? ped.updatedAt);
+-          const updatedAt = updatedAtRaw !== null ? updatedAtRaw : baseServerTime;
+-          const deletedAtRaw = parseTimestamp(ped.deleted_at ?? ped.deletedAt);
+-          const deletedAt = deletedAtRaw !== null ? deletedAtRaw : null;
+-
+-          if (status === 'CLOSED' || (deletedAt !== null && !Number.isNaN(deletedAt))) {
+-            await database.runAsync('DELETE FROM RL_ORDER_PRODUCT WHERE orderId = ?', [id]).catch((e) => console.warn('[sync] db op failed', e));
+-            await database.runAsync('DELETE FROM TB_ORDERS WHERE id = ?', [id]).catch((e) => console.warn('[sync] db op failed', e));
+-            continue;
+-          }
+-
+-          const itemsArray = Array.isArray(ped.items) ? ped.items : [];
+-
+-          const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_ORDERS WHERE id = ?`, [id]).catch(() => null);
+-
+-          const createdBy = ped.createdBy ? String(ped.createdBy) : null;
+-          const createdByName = ped.createdByName ? String(ped.createdByName) : null;
+-
+-          if (!local) {
+-            await database.runAsync(
+-              'INSERT INTO TB_ORDERS (id, total, openedAt, customerName, status, updated_at, deleted_at, createdBy, createdByName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+-              [id, Number(ped.total ?? 0), openedAt, customerName, status, updatedAt, deletedAt, createdBy, createdByName]
+-            ).catch((e) => console.warn('[sync] db op failed', e));
+-            for (const it of itemsArray) {
+-              const productId = String(it.productId);
+-              const relId = it.id ? String(it.id) : generateUUID();
+-              await database.runAsync(
+-                'INSERT INTO RL_ORDER_PRODUCT (id, orderId, productId, quantity) VALUES (?, ?, ?, ?)',
+-                [relId, id, productId, Number(it.quantity ?? 1)]
+-              ).catch((e) => console.warn('[sync] db op failed', e));
+-            }
+-          } else {
+-            const localUpdated = Number(local.updated_at || 0);
+-            if (updatedAt >= localUpdated) {
+-              await database.runAsync(
+-                'UPDATE TB_ORDERS SET total = ?, openedAt = ?, customerName = ?, status = ?, updated_at = ?, deleted_at = ?, createdBy = ?, createdByName = ?, sync_status = ? WHERE id = ?',
+-                [Number(ped.total ?? 0), openedAt, customerName, status, updatedAt, deletedAt, createdBy, createdByName, 'synced', id]
+-              ).catch((e) => console.warn('[sync] db op failed', e));
+-              await database.runAsync('DELETE FROM RL_ORDER_PRODUCT WHERE orderId = ?', [id]).catch((e) => console.warn('[sync] db op failed', e));
+-              for (const it of itemsArray) {
+-                const productId = String(it.productId);
+-                const relId = it.id ? String(it.id) : generateUUID();
+-                await database.runAsync(
+-                  'INSERT INTO RL_ORDER_PRODUCT (id, orderId, productId, quantity) VALUES (?, ?, ?, ?)',
+-                  [relId, id, productId, Number(it.quantity ?? 1)]
+-                ).catch((e) => console.warn('[sync] db op failed', e));
+-              }
+-            }
+-          }
+-        }
+-        await database.execAsync('COMMIT;');
+-        markChanged('orders');
+-      } catch (err) {
+-        await database.execAsync('ROLLBACK;').catch((e) => console.warn('[sync] db op failed', e));
+-      }
+-    }
+-
+-    // Upsert vendas (completed sales) from server
+-    if (changes && Array.isArray(changes.sales) && changes.sales.length > 0) {
+-      try {
+-        await database.execAsync('BEGIN;');
+-        for (const ven of changes.sales) {
+-          const id = String(ven.id);
+-          const soldAt = ven.soldAt ? String(ven.soldAt) : new Date().toISOString();
+-          const customerName = typeof ven.customerName !== 'undefined' && ven.customerName !== null ? String(ven.customerName) : null;
+-          const isCancelled = ven.isCancelled ? 1 : 0;
+-          const updatedAtRaw = parseTimestamp(ven.updated_at ?? ven.updatedAt);
+-          const updatedAt = updatedAtRaw !== null ? updatedAtRaw : baseServerTime;
+-          const deletedAtRaw = parseTimestamp(ven.deleted_at ?? ven.deletedAt);
+-          const deletedAt = deletedAtRaw !== null ? deletedAtRaw : null;
+-
+-          const isSaleDeleted = (deletedAt !== null && !Number.isNaN(deletedAt)) || isCancelled === 1;
+-          if (isSaleDeleted) {
+-            const deletedEpoch = deletedAt !== null && !Number.isNaN(deletedAt) ? deletedAt : updatedAt;
+-            await database.runAsync(
+-              'UPDATE TB_SALES SET deleted_at = ?, updated_at = ?, isCancelled = 1 WHERE id = ?',
+-              [deletedEpoch, updatedAt, id]
+-            ).catch((e) => console.warn('[sync] db op failed', e));
+-            continue;
+-          }
+-
+-          const itemsArray = Array.isArray(ven.items) ? ven.items : [];
+-          console.log('[sync] sale items', { id, itemsArray });
+-
+-          const createdBy = ven.createdBy ? String(ven.createdBy) : null;
+-          const createdByName = ven.createdByName ? String(ven.createdByName) : null;
+-
+-          const local = await database.getFirstAsync<{ updated_at?: number }>(`SELECT updated_at FROM TB_SALES WHERE id = ?`, [id]).catch(() => null);
+-
+-          if (!local) {
+-            await database.runAsync(
+-              'INSERT INTO TB_SALES (id, total, soldAt, customerName, isCancelled, updated_at, deleted_at, createdBy, createdByName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+-              [id, Number(ven.total ?? 0), soldAt, customerName, isCancelled, updatedAt, deletedAt, createdBy, createdByName]
+-            ).catch((e) => console.warn('[sync] db op failed', e));
+-            for (const it of itemsArray) {
+-              const productId = String(it.productId);
+-              const relId = it.id ? String(it.id) : generateUUID();
+-              await database.runAsync(
+-                'INSERT INTO RL_SALE_PRODUCT (id, saleId, productId, quantity) VALUES (?, ?, ?, ?)',
+-                [relId, id, productId, Number(it.quantity ?? 1)]
+-              ).catch((e) => console.warn('[sync] db op failed', e));
+-            }
+-          } else {
+-            const localUpdated = Number(local.updated_at || 0);
+-            if (updatedAt >= localUpdated) {
+-              await database.runAsync(
+-                'UPDATE TB_SALES SET total = ?, soldAt = ?, customerName = ?, isCancelled = ?, updated_at = ?, deleted_at = ?, createdBy = ?, createdByName = ?, sync_status = ? WHERE id = ?',
+-                [Number(ven.total ?? 0), soldAt, customerName, isCancelled, updatedAt, deletedAt, createdBy, createdByName, 'synced', id]
+-              ).catch((e) => console.warn('[sync] db op failed', e));
+-              await database.runAsync('DELETE FROM RL_SALE_PRODUCT WHERE saleId = ?', [id]).catch((e) => console.warn('[sync] db op failed', e));
+-              for (const it of itemsArray) {
+-                const productId = String(it.productId);
+-                const relId = it.id ? String(it.id) : generateUUID();
+-                await database.runAsync(
+-                  'INSERT INTO RL_SALE_PRODUCT (id, saleId, productId, quantity) VALUES (?, ?, ?, ?)',
+-                  [relId, id, productId, Number(it.quantity ?? 1)]
+-                ).catch((e) => console.warn('[sync] db op failed', e));
+-              }
+-            }
+-          }
+-        }
+-        await database.execAsync('COMMIT;');
+-        markChanged('sales');
+-      } catch (err) {
+-        await database.execAsync('ROLLBACK;').catch((e) => console.warn('[sync] db op failed', e));
+-      }
+-    }
+-
+-    // Limpeza local baseada na política retornada pelo servidor
+-    if (changes) {
+-      const vendasDias = changes.politica?.vendasDias ?? 7;
+-      const vendasLimite = new Date(Date.now() - vendasDias * 24 * 60 * 60 * 1000).toISOString();
+-
+-      try {
+-        // Remove vendas antigas que já foram sincronizadas
+-        await database.runAsync(
+-          'DELETE FROM RL_SALE_PRODUCT WHERE saleId IN (SELECT id FROM TB_SALES WHERE soldAt < ? AND sync_status = ?)',
+-          [vendasLimite, 'synced']
+-        ).catch((e) => console.warn('[sync] db op failed', e));
+-        await database.runAsync(
+-          'DELETE FROM TB_SALES WHERE soldAt < ? AND sync_status = ?',
+-          [vendasLimite, 'synced']
+-        ).catch((e) => console.warn('[sync] db op failed', e));
+-
+-        // Remove qualquer pedido FECHADO que ainda reste localmente
+-        await database.runAsync(
+-          'DELETE FROM RL_ORDER_PRODUCT WHERE orderId IN (SELECT id FROM TB_ORDERS WHERE status = ? AND sync_status = ?)',
+-          ['CLOSED', 'synced']
+-        ).catch((e) => console.warn('[sync] db op failed', e));
+-        await database.runAsync(
+-          'DELETE FROM TB_ORDERS WHERE status = ? AND sync_status = ?',
+-          ['CLOSED', 'synced']
+-        ).catch((e) => console.warn('[sync] db op failed', e));
+-      } catch (err) {
+-        console.warn('[sync] limpeza local falhou', err);
+-      }
+-    }
+-
+-    // update lastSyncAt in schema — only if push and pull were successful
+-    try {
+-      if (syncRes && changes !== null) {
+-        // prefer server-provided timestamp if present
+-        const serverTime = (changes && (changes.serverTime || changes.now || changes.timestamp)) || null;
+-        const nowToStore = serverTime && typeof serverTime === 'string' ? Date.parse(serverTime) : (typeof serverTime === 'number' ? serverTime : Date.now());
+-        if (!Number.isNaN(nowToStore)) {
+-          await database.runAsync('UPDATE TB_SCHEMA SET lastSyncAt = ?', [nowToStore]).catch((e) => console.warn('[sync] db op failed', e));
+-        }
+-      }
+-    } catch (err) {
+-      // ignore
+-    }
+-    
+-    return changes;
+-  } catch (err) {
+-    console.warn('Sincronização falhou', err);
+-    throw err;
+-  }
+-}
+-
+-/** @deprecated Use synchronizeWithServer. */
+-export const sincronizarComServidor = synchronizeWithServer;
+-export default synchronizeWithServer;
+diff --git a/database/watermelon/sync.ts b/database/watermelon/sync.ts
+new file mode 100644
+index 0000000..f08fd04
+--- /dev/null
++++ b/database/watermelon/sync.ts
+@@ -0,0 +1,450 @@
++import {
++  synchronize as watermelonSynchronize,
++  type SyncPullArgs,
++  type SyncPullResult,
++  type SyncPushArgs,
++} from '@nozbe/watermelondb/sync';
++import { Q } from '@nozbe/watermelondb';
++
++import * as api from '@/services/api';
++import { markChanged } from '../tableWatermark';
++import { database } from './database';
++
++const SYNC_TABLES = [
++  'products',
++  'product_types',
++  'orders',
++  'order_items',
++  'sales',
++  'sale_items',
++] as const;
++
++type SyncTableName = typeof SYNC_TABLES[number];
++type SyncTableChanges = {
++  created: Record<string, unknown>[];
++  updated: Record<string, unknown>[];
++  deleted: string[];
++};
++type SyncChangeSet = Record<SyncTableName, SyncTableChanges>;
++type EstablishmentId = string | number | null | undefined;
++type OnPulledChanges = (changes: SyncChangeSet) => void;
++
++const MAX_SYNC_ATTEMPTS = 3;
++
++function isRecord(value: unknown): value is Record<string, any> {
++  return value !== null && typeof value === 'object' && !Array.isArray(value);
++}
++
++function normalizeEstablishmentId(value: EstablishmentId): string | null {
++  if (value === null || value === undefined) return null;
++  const normalized = String(value).trim();
++  return normalized.length > 0 ? normalized : null;
++}
++
++function normalizeRecord(
++  value: unknown,
++  tableName: SyncTableName,
++  establishmentId: string | null,
++): Record<string, unknown> {
++  if (!isRecord(value)) {
++    throw new Error(`[sync] invalid ${tableName} record`);
++  }
++
++  const id = value.id;
++  if (id === null || id === undefined || String(id).trim().length === 0) {
++    throw new Error(`[sync] invalid ${tableName} record id`);
++  }
++
++  const { _status: ignoredStatus, _changed: ignoredChanged, ...record } = value;
++  void ignoredStatus;
++  void ignoredChanged;
++
++  if (
++    establishmentId !== null
++    && Object.prototype.hasOwnProperty.call(record, 'establishment_id')
++    && normalizeEstablishmentId(record.establishment_id) !== establishmentId
++  ) {
++    throw new Error(`[sync] ${tableName} record belongs to another establishment`);
++  }
++
++  return { ...record, id: String(id) };
++}
++
++function normalizeDeletedIds(value: unknown, tableName: SyncTableName): string[] {
++  if (!Array.isArray(value)) {
++    throw new Error(`[sync] invalid ${tableName}.deleted`);
++  }
++
++  return value.map((id) => {
++    if (id === null || id === undefined || String(id).trim().length === 0) {
++      throw new Error(`[sync] invalid ${tableName} deleted id`);
++    }
++    return String(id);
++  });
++}
++
++function normalizeTableChanges(
++  value: unknown,
++  tableName: SyncTableName,
++  establishmentId: string | null,
++): SyncTableChanges {
++  if (!isRecord(value)) {
++    throw new Error(`[sync] invalid ${tableName} changes`);
++  }
++
++  const created = value.created === undefined ? [] : value.created;
++  const updated = value.updated === undefined ? [] : value.updated;
++
++  if (!Array.isArray(created) || !Array.isArray(updated)) {
++    throw new Error(`[sync] invalid ${tableName} changes`);
++  }
++
++  return {
++    created: created.map((record) => normalizeRecord(record, tableName, establishmentId)),
++    updated: updated.map((record) => normalizeRecord(record, tableName, establishmentId)),
++    deleted: normalizeDeletedIds(value.deleted ?? [], tableName),
++  };
++}
++
++function normalizeChangeSet(value: unknown, establishmentId: EstablishmentId): SyncChangeSet {
++  if (!isRecord(value)) {
++    throw new Error('[sync] invalid changes envelope');
++  }
++
++  const normalizedEstablishmentId = normalizeEstablishmentId(establishmentId);
++  return Object.fromEntries(
++    SYNC_TABLES.map((tableName) => [
++      tableName,
++      normalizeTableChanges(value[tableName] ?? {}, tableName, normalizedEstablishmentId),
++    ]),
++  ) as SyncChangeSet;
++}
++
++function normalizeTimestamp(value: unknown): number {
++  const timestamp = Number(value);
++  if (!Number.isFinite(timestamp) || timestamp <= 0) {
++    throw new Error('[sync] pull response has an invalid timestamp');
++  }
++  return timestamp;
++}
++
++function rawRecords(changes: SyncChangeSet, tableName: SyncTableName): Record<string, unknown>[] {
++  return [...changes[tableName].created, ...changes[tableName].updated];
++}
++
++async function recordsByIds(tableName: SyncTableName, ids: string[]): Promise<any[]> {
++  if (ids.length === 0) return [];
++  return await database
++    .get(tableName as any)
++    .query(Q.where('id', Q.oneOf(ids)))
++    .fetch() as any[];
++}
++
++function modelEstablishmentId(record: any): string | null {
++  return normalizeEstablishmentId(
++    record?.establishmentId ?? record?.establishment_id ?? record?._raw?.establishment_id,
++  );
++}
++
++function ensureRecordBelongsToEstablishment(
++  tableName: SyncTableName,
++  record: any,
++  establishmentId: string,
++): void {
++  if (modelEstablishmentId(record) !== establishmentId) {
++    throw new Error(`[sync] ${tableName} record belongs to another establishment`);
++  }
++}
++
++async function ensureDeletedRootsBelongToEstablishment(
++  tableName: 'products' | 'orders' | 'sales',
++  ids: string[],
++  establishmentId: string,
++): Promise<void> {
++  const records = await recordsByIds(tableName, ids);
++  for (const record of records) {
++    ensureRecordBelongsToEstablishment(tableName, record, establishmentId);
++  }
++}
++
++async function ensureRootChangesBelongToEstablishment(
++  changes: SyncChangeSet,
++  tableName: 'products' | 'orders' | 'sales',
++  establishmentId: string,
++): Promise<void> {
++  const records = rawRecords(changes, tableName);
++  if (records.length === 0) return;
++
++  const localRecords = await recordsByIds(
++    tableName,
++    records.map((record) => String(record.id)),
++  );
++  const localRecordsById = new Map(localRecords.map((record) => [String(record.id), record]));
++
++  // Check the local row even when the incoming payload has a scope. An ID
++  // collision must not let a remote row replace another tenant's local row.
++  for (const record of localRecords) {
++    ensureRecordBelongsToEstablishment(tableName, record, establishmentId);
++  }
++
++  for (const record of records) {
++    if (!Object.prototype.hasOwnProperty.call(record, 'establishment_id')
++      && !localRecordsById.has(String(record.id))) {
++      throw new Error(`[sync] ${tableName} record has no establishment_id`);
++    }
++  }
++}
++
++async function ensureChildReferencesBelongToEstablishment(
++  changes: SyncChangeSet,
++  childTable: 'order_items' | 'sale_items',
++  childReferenceColumn: 'order_id' | 'sale_id',
++  childReferenceProperty: 'orderId' | 'saleId',
++  parentTable: 'orders' | 'sales',
++  establishmentId: string,
++): Promise<void> {
++  const childChanges = changes[childTable];
++  const referenceIds = new Set<string>();
++
++  for (const record of rawRecords(changes, childTable)) {
++    const referenceId = record[childReferenceColumn];
++    if (referenceId !== null && referenceId !== undefined && String(referenceId).trim().length > 0) {
++      referenceIds.add(String(referenceId));
++    }
++  }
++
++  const deletedChildren = await recordsByIds(childTable, childChanges.deleted);
++  for (const record of deletedChildren) {
++    const referenceId = record?.[childReferenceProperty];
++    if (referenceId !== null && referenceId !== undefined && String(referenceId).trim().length > 0) {
++      referenceIds.add(String(referenceId));
++    }
++  }
++
++  if (referenceIds.size === 0) return;
++
++  const incomingParentIds = new Set(rawRecords(changes, parentTable).map((record) => String(record.id)));
++  const localParentIds = [...referenceIds].filter((id) => !incomingParentIds.has(id));
++  const localParents = await recordsByIds(parentTable, localParentIds);
++  const foundLocalParentIds = new Set(localParents.map((record) => String(record.id)));
++
++  for (const record of localParents) {
++    ensureRecordBelongsToEstablishment(parentTable, record, establishmentId);
++  }
++
++  for (const id of localParentIds) {
++    if (!foundLocalParentIds.has(id)) {
++      throw new Error(`[sync] ${childTable} record references an unknown ${parentTable} record`);
++    }
++  }
++}
++
++async function ensureProductReferencesBelongToEstablishment(
++  changes: SyncChangeSet,
++  childTable: 'order_items' | 'sale_items',
++  establishmentId: string,
++): Promise<void> {
++  const referenceIds = new Set<string>();
++  for (const record of rawRecords(changes, childTable)) {
++    const referenceId = record.product_id;
++    if (referenceId !== null && referenceId !== undefined && String(referenceId).trim().length > 0) {
++      referenceIds.add(String(referenceId));
++    }
++  }
++
++  const deletedChildren = await recordsByIds(childTable, changes[childTable].deleted);
++  for (const record of deletedChildren) {
++    const referenceId = record?.productId;
++    if (referenceId !== null && referenceId !== undefined && String(referenceId).trim().length > 0) {
++      referenceIds.add(String(referenceId));
++    }
++  }
++
++  if (referenceIds.size === 0) return;
++
++  const incomingProductIds = new Set(rawRecords(changes, 'products').map((record) => String(record.id)));
++  const localProductIds = [...referenceIds].filter((id) => !incomingProductIds.has(id));
++  const localProducts = await recordsByIds('products', localProductIds);
++  const foundLocalProductIds = new Set(localProducts.map((record) => String(record.id)));
++
++  for (const record of localProducts) {
++    ensureRecordBelongsToEstablishment('products', record, establishmentId);
++  }
++
++  for (const id of localProductIds) {
++    if (!foundLocalProductIds.has(id)) {
++      throw new Error(`[sync] ${childTable} record references an unknown products record`);
++    }
++  }
++}
++
++async function ensureTenantScope(changes: SyncChangeSet, establishmentId: EstablishmentId): Promise<void> {
++  const normalizedEstablishmentId = normalizeEstablishmentId(establishmentId);
++  if (normalizedEstablishmentId === null) return;
++
++  await ensureRootChangesBelongToEstablishment(
++    changes,
++    'products',
++    normalizedEstablishmentId,
++  );
++  await ensureRootChangesBelongToEstablishment(
++    changes,
++    'orders',
++    normalizedEstablishmentId,
++  );
++  await ensureRootChangesBelongToEstablishment(
++    changes,
++    'sales',
++    normalizedEstablishmentId,
++  );
++  await ensureDeletedRootsBelongToEstablishment(
++    'products',
++    changes.products.deleted,
++    normalizedEstablishmentId,
++  );
++  await ensureDeletedRootsBelongToEstablishment(
++    'orders',
++    changes.orders.deleted,
++    normalizedEstablishmentId,
++  );
++  await ensureDeletedRootsBelongToEstablishment(
++    'sales',
++    changes.sales.deleted,
++    normalizedEstablishmentId,
++  );
++  await ensureChildReferencesBelongToEstablishment(
++    changes,
++    'order_items',
++    'order_id',
++    'orderId',
++    'orders',
++    normalizedEstablishmentId,
++  );
++  await ensureChildReferencesBelongToEstablishment(
++    changes,
++    'sale_items',
++    'sale_id',
++    'saleId',
++    'sales',
++    normalizedEstablishmentId,
++  );
++  await ensureProductReferencesBelongToEstablishment(changes, 'order_items', normalizedEstablishmentId);
++  await ensureProductReferencesBelongToEstablishment(changes, 'sale_items', normalizedEstablishmentId);
++}
++
++function hasTableChanges(changes: SyncTableChanges): boolean {
++  return changes.created.length > 0 || changes.updated.length > 0 || changes.deleted.length > 0;
++}
++
++function markPulledTables(changes: SyncChangeSet): void {
++  if (hasTableChanges(changes.products) || hasTableChanges(changes.product_types)) {
++    markChanged('products');
++  }
++  if (hasTableChanges(changes.orders) || hasTableChanges(changes.order_items)) {
++    markChanged('orders');
++  }
++  if (hasTableChanges(changes.sales) || hasTableChanges(changes.sale_items)) {
++    markChanged('sales');
++  }
++}
++
++function reportIgnoredPushItems(response: api.SyncPushResponse | undefined): void {
++  const ignored = Array.isArray(response?.ignored) ? response.ignored : [];
++  const ignoredOrderDeletes = Array.isArray(response?.ignored_order_deletes)
++    ? response.ignored_order_deletes
++    : [];
++
++  if (ignored.length > 0 || ignoredOrderDeletes.length > 0) {
++    console.warn('[sync] server ignored push items', {
++      ignored,
++      ignored_order_deletes: ignoredOrderDeletes,
++    });
++  }
++}
++
++function isSyncConflictError(error: unknown): boolean {
++  if (!isRecord(error)) return false;
++
++  if (error.status === 409) return true;
++  if (error.code === 'SYNC_CONFLICT' || error.error === 'SYNC_CONFLICT') return true;
++
++  const body = isRecord(error.body) ? error.body : null;
++  return body?.code === 'SYNC_CONFLICT' || body?.error === 'SYNC_CONFLICT';
++}
++
++/**
++ * Creates the callback consumed by WatermelonDB's native synchronize().
++ * The API already returns Watermelon raw records, so this boundary only
++ * normalizes the fixed table set and rejects records from another tenant.
++ */
++export function pullChanges(
++  token: string,
++  establishmentId?: EstablishmentId,
++  onPulledChanges?: OnPulledChanges,
++): (args: SyncPullArgs) => Promise<SyncPullResult> {
++  return async ({ lastPulledAt, schemaVersion }: SyncPullArgs) => {
++    const response = await api.pullChanges(token, { lastPulledAt, schemaVersion });
++    const changes = normalizeChangeSet(response?.changes, establishmentId);
++    const timestamp = normalizeTimestamp(response?.timestamp);
++    await ensureTenantScope(changes, establishmentId);
++    onPulledChanges?.(changes);
++    return { changes, timestamp };
++  };
++}
++
++/**
++ * Creates the callback consumed by WatermelonDB's native synchronize().
++ * A 409 is intentionally allowed to reject this promise; the caller retries
++ * the complete native synchronization cycle when it is a sync conflict.
++ */
++export function pushChanges(
++  token: string,
++  establishmentId?: EstablishmentId,
++): (args: SyncPushArgs) => Promise<void> {
++  return async ({ changes, lastPulledAt }: SyncPushArgs) => {
++    const normalizedChanges = normalizeChangeSet(changes, establishmentId);
++    await ensureTenantScope(normalizedChanges, establishmentId);
++    const response = await api.pushChanges(token, {
++      changes: normalizedChanges,
++      lastPulledAt,
++    });
++    reportIgnoredPushItems(response);
++  };
++}
++
++/**
++ * Runs one complete Watermelon pull/apply/push cycle. Callers must invoke
++ * this function through database/syncGuard.runWithLock.
++ */
++export async function synchronizeWithServer(
++  token: string,
++  establishmentId?: EstablishmentId,
++): Promise<void> {
++  let attempt = 0;
++
++  while (true) {
++    attempt += 1;
++    let pulledChanges: SyncChangeSet | null = null;
++
++    try {
++      await watermelonSynchronize({
++        database,
++        pullChanges: pullChanges(token, establishmentId, (changes) => {
++          pulledChanges = changes;
++        }),
++        pushChanges: pushChanges(token, establishmentId),
++        migrationsEnabledAtVersion: 1,
++        onDidPullChanges: async () => {
++          if (pulledChanges) markPulledTables(pulledChanges);
++        },
++      });
++      return;
++    } catch (error) {
++      if (!isSyncConflictError(error) || attempt >= MAX_SYNC_ATTEMPTS) {
++        throw error;
++      }
++    }
++  }
++}
++
++export default synchronizeWithServer;
+diff --git a/services/__tests__/syncApi.test.ts b/services/__tests__/syncApi.test.ts
+new file mode 100644
+index 0000000..329f726
+--- /dev/null
++++ b/services/__tests__/syncApi.test.ts
+@@ -0,0 +1,137 @@
++import { pullChanges, pushChanges, ApiHttpError } from '../api';
++
++describe('Watermelon sync API client', () => {
++  const fetchMock = jest.spyOn(global, 'fetch');
++  const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
++
++  afterEach(() => {
++    fetchMock.mockReset();
++    consoleError.mockClear();
++  });
++
++  afterAll(() => {
++    fetchMock.mockRestore();
++    consoleError.mockRestore();
++  });
++
++  it('sends the Watermelon pull cursor and schema version to /sync/pull', async () => {
++    const response = {
++      changes: {
++        products: { created: [], updated: [], deleted: [] },
++        product_types: { created: [], updated: [], deleted: [] },
++        orders: { created: [], updated: [], deleted: [] },
++        order_items: { created: [], updated: [], deleted: [] },
++        sales: { created: [], updated: [], deleted: [] },
++        sale_items: { created: [], updated: [], deleted: [] },
++      },
++      timestamp: 1_700_000_000_001,
++    };
++    fetchMock.mockResolvedValue({
++      ok: true,
++      text: jest.fn(async () => JSON.stringify(response)),
++    } as unknown as Response);
++
++    await expect(pullChanges('token-123', {
++      lastPulledAt: 1_700_000_000_000,
++      schemaVersion: 2,
++    })).resolves.toEqual(response);
++
++    expect(fetchMock).toHaveBeenCalledTimes(1);
++    const [requestUrl, requestOptions] = fetchMock.mock.calls[0];
++    const parsedUrl = new URL(String(requestUrl));
++    expect(parsedUrl.pathname).toBe('/sync/pull');
++    expect(parsedUrl.searchParams.get('lastPulledAt')).toBe('1700000000000');
++    expect(parsedUrl.searchParams.get('schemaVersion')).toBe('2');
++    expect(requestOptions).toEqual({
++      method: 'GET',
++      headers: expect.objectContaining({
++        Authorization: 'Bearer token-123',
++        Accept: 'application/json',
++      }),
++    });
++  });
++
++  it('omits the first-sync cursor while still sending schemaVersion', async () => {
++    fetchMock.mockResolvedValue({
++      ok: true,
++      text: jest.fn(async () => JSON.stringify({ changes: {}, timestamp: 1 })),
++    } as unknown as Response);
++
++    await pullChanges('token-123', { lastPulledAt: null, schemaVersion: 2 });
++
++    const [requestUrl] = fetchMock.mock.calls[0];
++    const parsedUrl = new URL(String(requestUrl));
++    expect(parsedUrl.pathname).toBe('/sync/pull');
++    expect(parsedUrl.searchParams.has('lastPulledAt')).toBe(false);
++    expect(parsedUrl.searchParams.get('schemaVersion')).toBe('2');
++  });
++
++  it('posts the exact Watermelon push envelope to /sync/push', async () => {
++    const payload = {
++      changes: {
++        products: { created: [], updated: [], deleted: [] },
++        product_types: { created: [], updated: [], deleted: [] },
++        orders: { created: [], updated: [], deleted: [] },
++        order_items: { created: [], updated: [], deleted: [] },
++        sales: { created: [], updated: [], deleted: [] },
++        sale_items: { created: [], updated: [], deleted: [] },
++      },
++      lastPulledAt: 1_700_000_000_001,
++    };
++    const response = { ignored: [], ignored_order_deletes: [] };
++    fetchMock.mockResolvedValue({
++      ok: true,
++      text: jest.fn(async () => JSON.stringify(response)),
++    } as unknown as Response);
++
++    await expect(pushChanges('token-123', payload)).resolves.toEqual(response);
++
++    expect(fetchMock).toHaveBeenCalledTimes(1);
++    const [requestUrl, requestOptions] = fetchMock.mock.calls[0];
++    expect(new URL(String(requestUrl)).pathname).toBe('/sync/push');
++    expect(requestOptions).toEqual(expect.objectContaining({
++      method: 'POST',
++      headers: expect.objectContaining({
++        Authorization: 'Bearer token-123',
++        'Content-Type': 'application/json',
++      }),
++      body: JSON.stringify(payload),
++    }));
++  });
++
++  it('preserves the 409 SYNC_CONFLICT error for synchronize to handle', async () => {
++    fetchMock.mockResolvedValue({
++      ok: false,
++      status: 409,
++      text: jest.fn(async () => JSON.stringify({
++        code: 'SYNC_CONFLICT',
++        message: 'server changed first',
++        details: [{ table: 'orders', id: 'order-1' }],
++      })),
++    } as unknown as Response);
++
++    await expect(pushChanges('token-123', {
++      changes: {
++        products: { created: [], updated: [], deleted: [] },
++        product_types: { created: [], updated: [], deleted: [] },
++        orders: { created: [], updated: [], deleted: [] },
++        order_items: { created: [], updated: [], deleted: [] },
++        sales: { created: [], updated: [], deleted: [] },
++        sale_items: { created: [], updated: [], deleted: [] },
++      },
++      lastPulledAt: 1_700_000_000_001,
++    })).rejects.toMatchObject({
++      status: 409,
++      code: 'SYNC_CONFLICT',
++      details: [{ table: 'orders', id: 'order-1' }],
++    });
++
++    expect(consoleError).toHaveBeenCalledWith(
++      'API sync push error:',
++      expect.stringContaining('/sync/push'),
++      expect.stringContaining('server changed first'),
++    );
++    expect(consoleError.mock.calls.some((call) => call[0] === 'Network/sync push request failed')).toBe(false);
++    expect(new ApiHttpError(400, 'bad request')).toBeInstanceOf(Error);
++  });
++});
+diff --git a/services/api.ts b/services/api.ts
+index d7972ac..5ce9413 100644
+--- a/services/api.ts
++++ b/services/api.ts
+@@ -1,32 +1,87 @@
+ import { buildSalesQueryParams, DEFAULT_SALES_LIMIT, DEFAULT_SALES_PAGE, SalesFilters, SalesListResponse, SalesPagination } from './sales';
+-import { fromLegacySyncResponse, fromLegacyUser, toLegacySyncPayload } from './legacyWire';
++import { fromLegacySyncResponse, fromLegacyUser } from './legacyWire';
+ 
+ // Fallback = produção. Para dev/homolog, defina EXPO_PUBLIC_API_URL no .env (ver .env.example).
+ export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.tozzo.uk';
+ 
+ // Túnel ngrok (dev local) mostra uma pagina de aviso HTML pro primeiro acesso de
+ // qualquer client sem esse header, mesmo pra requests que nao sao de browser —
+ // isso quebraria o parse de JSON das respostas. Sem efeito em tozzo.uk/dev-api.tozzo.uk.
+ const NGROK_HEADERS: Record<string, string> = BASE_URL.includes('ngrok')
+   ? { 'ngrok-skip-browser-warning': 'true' }
+   : {};
+ 
+ async function handleJsonResponse(res: Response) {
+   const txt = await res.text();
+   try {
+     return txt ? JSON.parse(txt) : {};
+   } catch (err) {
+     return txt;
+   }
+ }
+ 
++export type WatermelonSyncTableChangeSet = {
++  created: unknown[];
++  updated: unknown[];
++  deleted: string[];
++};
++
++export type WatermelonSyncChangeSet = Record<string, WatermelonSyncTableChangeSet>;
++
++export type SyncPullRequest = {
++  lastPulledAt?: number | null;
++  schemaVersion: number;
++};
++
++export type SyncPullResponse = {
++  changes: WatermelonSyncChangeSet;
++  timestamp: number;
++};
++
++export type SyncIgnoredItem = {
++  type: string;
++  entityId: string | null;
++  reason: string;
++};
++
++export type SyncPushResponse = {
++  ignored?: SyncIgnoredItem[];
++  ignored_order_deletes?: SyncIgnoredItem[];
++};
++
++export class ApiHttpError extends Error {
++  readonly status: number;
++  readonly body: unknown;
++  readonly code?: string;
++  readonly details?: unknown;
++
++  constructor(status: number, body: unknown, fallbackMessage = `HTTP ${status}`) {
++    const record = body && typeof body === 'object' ? body as Record<string, unknown> : null;
++    const message = typeof record?.message === 'string'
++      ? record.message
++      : typeof body === 'string' && body.trim().length > 0
++        ? body
++        : fallbackMessage;
++    super(message);
++    this.name = 'ApiHttpError';
++    this.status = status;
++    this.body = body;
++    this.code = typeof record?.code === 'string'
++      ? record.code
++      : typeof record?.error === 'string'
++        ? record.error
++        : undefined;
++    this.details = record?.details;
++  }
++}
++
+ function positiveInteger(value: unknown, fallback: number): number {
+   const parsed = Number(typeof value === 'string' ? value.trim() : value);
+   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+ }
+ 
+ function nonNegativeInteger(value: unknown): number | undefined {
+   const parsed = Number(typeof value === 'string' ? value.trim() : value);
+   return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
+ }
+ 
+@@ -99,65 +154,71 @@ export async function getMe(token: string) {
+       throw new Error(message);
+     }
+ 
+     return fromLegacyUser(await handleJsonResponse(res));
+   } catch (err: any) {
+     console.error('Network/getMe request failed', url, err?.message ?? err);
+     throw err;
+   }
+ }
+ 
+-export async function synchronize(token: string, payload: any) {
+-  const url = `${BASE_URL}/sincronizacao/push`;
++export async function pullChanges(token: string, params: SyncPullRequest): Promise<SyncPullResponse> {
++  const url = new URL('/sync/pull', BASE_URL);
++  url.searchParams.set('schemaVersion', String(params.schemaVersion));
++  if (params.lastPulledAt !== undefined && params.lastPulledAt !== null) {
++    url.searchParams.set('lastPulledAt', String(params.lastPulledAt));
++  }
++
+   try {
+     const res = await fetch(url, {
+-      method: 'POST',
+-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
+-      body: JSON.stringify(toLegacySyncPayload(payload)),
++      method: 'GET',
++      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
+     });
+ 
+     if (!res.ok) {
+       const errBody = await handleJsonResponse(res).catch(() => null);
+-      const message = (errBody && (errBody.message || JSON.stringify(errBody))) || `HTTP ${res.status}`;
+-      console.error('API sincronizar error:', url, message);
+-      throw new Error(message);
++      const error = new ApiHttpError(res.status, errBody);
++      console.error('API sync pull error:', url.toString(), error.message);
++      throw error;
+     }
+ 
+-    return fromLegacySyncResponse(await handleJsonResponse(res));
++    return await handleJsonResponse(res) as SyncPullResponse;
+   } catch (err: any) {
+-    console.error('Network/synchronize request failed', url, err?.message ?? err);
++    if (err instanceof ApiHttpError) throw err;
++    console.error('Network/sync pull request failed', url.toString(), err?.message ?? err);
+     throw err;
+   }
+ }
+ 
+-export async function getChanges(token: string, since?: string | null) {
+-  let url = `${BASE_URL}/sincronizacao/pull`;
+-  if (since) {
+-    const q = encodeURIComponent(String(since));
+-    url = `${url}?since=${q}`;
+-  }
++export async function pushChanges(
++  token: string,
++  payload: { changes: WatermelonSyncChangeSet; lastPulledAt: number },
++): Promise<SyncPushResponse> {
++  const url = new URL('/sync/push', BASE_URL);
+   try {
+     const res = await fetch(url, {
+-      method: 'GET',
+-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
++      body: JSON.stringify(payload),
+     });
+ 
+     if (!res.ok) {
+       const errBody = await handleJsonResponse(res).catch(() => null);
+-      const message = (errBody && (errBody.message || JSON.stringify(errBody))) || `HTTP ${res.status}`;
+-      console.error('API getChanges error:', url, message);
+-      throw new Error(message);
++      const error = new ApiHttpError(res.status, errBody);
++      console.error('API sync push error:', url.toString(), error.message);
++      throw error;
+     }
+ 
+-    return fromLegacySyncResponse(await handleJsonResponse(res));
++    return await handleJsonResponse(res) as SyncPushResponse;
+   } catch (err: any) {
+-    console.error('Network/getChanges request failed', url, err?.message ?? err);
++    if (err instanceof ApiHttpError) throw err;
++    console.error('Network/sync push request failed', url.toString(), err?.message ?? err);
+     throw err;
+   }
+ }
+ 
+ export async function listSales(token: string, filters: SalesFilters = {}): Promise<SalesListResponse> {
+   const url = new URL('/vendas', BASE_URL);
+   url.search = buildSalesQueryParams(filters).toString();
+ 
+   try {
+     const res = await fetch(url.toString(), {
+@@ -182,13 +243,10 @@ export async function listSales(token: string, filters: SalesFilters = {}): Prom
+       pagination: pagination ?? fallbackSalesPagination(res, filters, sales.length),
+     };
+   } catch (err: any) {
+     console.error('Network/listVendas request failed', url.toString(), err?.message ?? err);
+     throw err;
+   }
+ }
+ 
+ /** @deprecated Use listSales; the public URL remains /vendas. */
+ export const listVendas = listSales;
+-
+-/** @deprecated Use synchronize; kept for clients compiled against the old service name. */
+-export const sincronizar = synchronize;

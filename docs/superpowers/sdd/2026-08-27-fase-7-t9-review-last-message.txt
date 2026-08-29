@@ -1,0 +1,22 @@
+Relatório gravado em [2026-08-27-fase-7-t9-review.md](C:/RN/TozzoBurger/docs/superpowers/sdd/2026-08-27-fase-7-t9-review.md).
+
+Veredito: Reprovado pelo bypass do ruling `OWNER`-only na rota direta. A falha não-atômica foi aceita como Minor isoladamente. Testes e typecheck passaram; nenhum código foi alterado, commit ou push executado.
+
+# Task 9 — Review
+
+## Spec compliance
+
+❌ RBAC `OWNER`-only: `app/onboarding.tsx` não verifica `user.role`; um `MANAGER` pode abrir `/onboarding` diretamente e executar PATCH seguido de POSTs 403. Detalhes e demais itens estão no relatório gravado.
+
+## Falha parcial não-atômica (avaliação)
+
+Aceitar como limitação documentada — Minor/não-bloqueante, isoladamente. A UI mostra erro, permite retry, mas não oferece saída normal durante a sessão. Retry pode duplicar POSTs já concluídos. Reordenar POST/PATCH não resolve idempotência e pode piorar o cenário.
+
+## Achados
+
+- [Important] A proteção `OWNER`-only existe apenas no gate, não na própria rota `app/onboarding.tsx:31-39,67-89`.
+- [Minor] A confirmação não é retomável/idempotente; retries podem reenviar e duplicar tipos já criados.
+
+## Veredito
+
+Reprovado — corrigir o bypass de RBAC antes da aprovação.

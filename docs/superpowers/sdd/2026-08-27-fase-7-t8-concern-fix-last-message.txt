@@ -1,0 +1,8 @@
+Correção concluída:
+
+- Retry limitado a 3 ciclos apenas para conflitos `409`/`SYNC_CONFLICT`.
+- Erros não conflitantes propagam imediatamente.
+- Testes de sucesso após retry, esgotamento e não-retry adicionados em [watermelonSyncRetry.test.ts](/C:/RN/TozzoBurger/database/__tests__/watermelonSyncRetry.test.ts:1).
+- Relatório atualizado; sem push/PR. Commit contém somente código/teste.
+
+DONE — `3296ac9572810d97ffb05b3b3288ab7a608c2cfb` — focada 4/4 suites, completa 34/34 suites, 142 testes e `tsc --noEmit` OK.

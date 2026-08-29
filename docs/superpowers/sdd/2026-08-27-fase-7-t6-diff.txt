@@ -1,0 +1,3112 @@
+4f04a5f feat-mobile-orders-watermelon-item-status
+bdcaab1 docs(sdd): relatórios de worker/review das Tasks 4-5 da Fase 7 (mobile)
+
+ app/(tabs)/pedidos.tsx                             |  13 +-
+ app/modais/pedidoModal.tsx                         | 179 +++--
+ components/PedidoItem.tsx                          |  20 +-
+ components/__tests__/task7c1Status.test.tsx        |   2 +-
+ components/__tests__/task7cI18n.test.tsx           |   2 +-
+ database/__tests__/usePedidoDatabase.test.tsx      | 327 +++++++--
+ database/types/Order.ts                            |  48 +-
+ database/useOrderDatabase.ts                       | 805 ++++++++++++---------
+ .../sdd/2026-08-27-fase-7-t4-mobile-worker.md      |  90 +++
+ .../superpowers/sdd/2026-08-27-fase-7-t4-review.md | 285 ++++++++
+ .../sdd/2026-08-27-fase-7-t5-mobile-worker-fix.md  |  90 +++
+ .../sdd/2026-08-27-fase-7-t5-mobile-worker.md      | 131 ++++
+ .../superpowers/sdd/2026-08-27-fase-7-t5-review.md | 201 +++++
+ .../sdd/2026-08-27-fase-7-t5-review2.md            | 233 ++++++
+ i18n/locales/en/status.json                        |   2 +
+ i18n/locales/es/status.json                        |   2 +
+ i18n/locales/fr/status.json                        |   2 +
+ i18n/locales/hi/status.json                        |   2 +
+ i18n/locales/pt-BR/status.json                     |   2 +
+ i18n/locales/zh/status.json                        |   2 +
+ 20 files changed, 1923 insertions(+), 515 deletions(-)
+
+diff --git a/app/(tabs)/pedidos.tsx b/app/(tabs)/pedidos.tsx
+index 5c14a51..7fa467d 100644
+--- a/app/(tabs)/pedidos.tsx
++++ b/app/(tabs)/pedidos.tsx
+@@ -27,21 +27,25 @@ function isPedidosPorDataEqual(
+   b: Record<string, OrderWithProducts[]>
+ ): boolean {
+   const aKeys = Object.keys(a);
+   const bKeys = Object.keys(b);
+   if (aKeys.length !== bKeys.length) return false;
+   for (const key of aKeys) {
+     const aList = a[key];
+     const bList = b[key];
+     if (!bList || aList.length !== bList.length) return false;
+     for (let i = 0; i < aList.length; i++) {
+-      if (aList[i].id !== bList[i].id || aList[i].updated_at !== bList[i].updated_at) return false;
++      if (
++        aList[i].id !== bList[i].id ||
++        aList[i].updated_at !== bList[i].updated_at ||
++        aList[i].isOpen !== bList[i].isOpen
++      ) return false;
+     }
+   }
+   return true;
+ }
+ 
+ export default function Pedidos() {
+   const { t } = useTranslation();
+   const { listRecentOrders, listRecentOrdersByUser, removeOrder } = useOrderDatabase();
+   const { lastSync } = useAutoSync();
+   const { user } = useAuth();
+@@ -50,21 +54,26 @@ export default function Pedidos() {
+   const isCliente = user?.role === 'CUSTOMER';
+   const [ordersByDate, setOrdersByDate] = useState<Record<string, OrderWithProducts[]>>({});
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   async function load() {
+     setIsLoading(true);
+     try {
+       const data = isCliente && user?.id
+         ? await listRecentOrdersByUser(user.id)
+         : await listRecentOrders();
+-      setOrdersByDate((prev) => (isPedidosPorDataEqual(prev, data) ? prev : data));
++      const openOrdersByDate = Object.fromEntries(
++        Object.entries(data)
++          .map(([date, orders]) => [date, orders.filter((order) => order.isOpen)] as const)
++          .filter(([, orders]) => orders.length > 0),
++      );
++      setOrdersByDate((prev) => (isPedidosPorDataEqual(prev, openOrdersByDate) ? prev : openOrdersByDate));
+     } catch (err) {
+       console.error('Erro ao carregar pedidos:', err);
+     } finally {
+       setIsLoading(false);
+     }
+   }
+ 
+   useFocusEffect(
+     useCallback(() => {
+       if (shouldReloadPedidos()) load();
+diff --git a/app/modais/pedidoModal.tsx b/app/modais/pedidoModal.tsx
+index d7e5938..b0a75c2 100644
+--- a/app/modais/pedidoModal.tsx
++++ b/app/modais/pedidoModal.tsx
+@@ -1,63 +1,76 @@
+ import React, { useEffect, useState } from 'react';
+ import { StyleSheet, View as RNView, TextInput, TouchableOpacity, Alert, FlatList, Modal, Pressable, useColorScheme } from 'react-native';
+ import FontAwesome from '@expo/vector-icons/FontAwesome';
+ import { View, Text } from '@/components/Themed';
+ import { useLocalSearchParams, router } from 'expo-router';
+ import { useOrderDatabase } from '@/database/useOrderDatabase';
+ import { useProductDatabase } from '@/database/useProductDatabase';
+ import { useSaleDatabase } from '@/database/useSaleDatabase';
+-import { ORDER_STATUS } from '@/database/types/Order';
++import { ORDER_ITEM_STATUS, type OrderItemStatus } from '@/database/types/Order';
+ import { useAuth } from '@/context/AuthContext';
+ import { useAutoSync } from '@/context/AutoSyncContext';
+ import Colors from '@/constants/Colors';
+ import { Button } from '@/components/ui/Button';
++import { Badge } from '@/components/ui/Badge';
+ import { ListItem } from '@/components/ui/ListItem';
+ import { spacing } from '@/constants/theme';
+ import { useTranslation } from 'react-i18next';
+ 
+-type OrderStatus = typeof ORDER_STATUS[keyof typeof ORDER_STATUS];
++const ORDER_ITEM_STATUSES = [
++  ORDER_ITEM_STATUS.REQUESTED,
++  ORDER_ITEM_STATUS.IN_PREPARATION,
++  ORDER_ITEM_STATUS.DELIVERED,
++] as const;
+ 
+-function translateStatus(status: OrderStatus, t: (key: string) => string): string {
++function isOrderItemStatus(value: unknown): value is OrderItemStatus {
++  return ORDER_ITEM_STATUSES.includes(value as OrderItemStatus);
++}
++
++function translateItemStatus(status: OrderItemStatus, t: (key: string) => string): string {
++  switch (status) {
++    case ORDER_ITEM_STATUS.REQUESTED: return t('status.requested');
++    case ORDER_ITEM_STATUS.IN_PREPARATION: return t('status.inPreparation');
++    case ORDER_ITEM_STATUS.DELIVERED: return t('status.delivered');
++  }
++}
++
++function itemStatusColor(status: OrderItemStatus): string {
+   switch (status) {
+-    case ORDER_STATUS.OPEN: return t('status.open');
+-    case ORDER_STATUS.IN_PREPARATION: return t('status.inPreparation');
+-    case ORDER_STATUS.DELIVERING: return t('status.delivering');
+-    case ORDER_STATUS.CLOSED: return t('status.closed');
++    case ORDER_ITEM_STATUS.REQUESTED: return Colors.status.info;
++    case ORDER_ITEM_STATUS.IN_PREPARATION: return Colors.status.warning;
++    case ORDER_ITEM_STATUS.DELIVERED: return Colors.status.success;
+   }
+-  return t('status.open');
+ }
+ 
+ export default function PedidoModal() {
+   const params = useLocalSearchParams();
+   const orderId = String((params as any)?.orderId ?? '');
+   const { getOrderById, updateOrder, removeOrder } = useOrderDatabase();
+   const { showAdd, show: showProduto, searchByName } = useProductDatabase();
+   const { createSale } = useSaleDatabase();
+ 
+   const [pedido, setPedido] = useState<any | null>(null);
+   const [customerName, setCliente] = useState('');
+-  const [status, setStatus] = useState<OrderStatus>(ORDER_STATUS.OPEN);
+   const [pickerVisible, setPickerVisible] = useState(false);
+   const [searchText, setSearchText] = useState('');
+   const [searchResults, setSearchResults] = useState<any[]>([]);
+   const { user } = useAuth();
+   const isCliente = user?.role === 'CUSTOMER';
+   const { triggerSync } = useAutoSync();
+   const colorScheme = useColorScheme() ?? 'light';
+   const isDarkMode = colorScheme === 'dark';
+   const colors = Colors[colorScheme];
+   const { t, i18n } = useTranslation();
+   const formatCurrency = (value: number) => new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(value);
+ 
+-  const orderAccepted = status !== ORDER_STATUS.OPEN;
+-  const clienteBloqueado = isCliente;
++  const isReadOnly = isCliente || pedido?.isOpen === false;
+ 
+   const surface = colors.surface;
+   const textColor = colors.text;
+   const subText = colors.textMuted;
+   const inputBorder = colors.border;
+ 
+   useEffect(() => {
+     async function load() {
+       if (!orderId) return;
+       try {
+@@ -69,43 +82,45 @@ export default function PedidoModal() {
+               const info = await showAdd(item.productId);
+               return { ...item, name: info?.name ?? item.productId, price: info?.price ?? 0 };
+             } catch (e) {
+               return { ...item, name: item.productId, price: 0 };
+             }
+           })
+         );
+ 
+         setPedido({ ...order, items: enrichedItems });
+         setCliente(order.customerName ?? '');
+-        const isValidStatus = (v: any): v is OrderStatus => Object.values(ORDER_STATUS).includes(v);
+-        setStatus(isValidStatus(order.status) ? order.status : ORDER_STATUS.OPEN);
+       } catch (err) {
+         console.error('Erro ao carregar pedido:', err);
+       }
+     }
+     load();
+   }, [orderId]);
+ 
+   async function searchProducts(q: string) {
+     try {
+       const res = await searchByName(q);
+       setSearchResults(Array.isArray(res) ? res : []);
+     } catch (e) {
+       setSearchResults([]);
+     }
+   }
+ 
+   const handleSave = async () => {
+-    if (!pedido) return;
++    if (!pedido || isReadOnly) return;
+     try {
+-      const itemsPayload = (pedido.items || []).map((item: any) => ({ productId: item.productId, quantity: item.quantity }));
+-      await updateOrder(pedido.id, itemsPayload, customerName, status);
++      const itemsPayload = (pedido.items || []).map((item: any) => ({
++        productId: item.productId,
++        quantity: item.quantity,
++        status: isOrderItemStatus(item.status) ? item.status : ORDER_ITEM_STATUS.REQUESTED,
++      }));
++      await updateOrder(pedido.id, itemsPayload, customerName);
+       triggerSync().catch((e) => console.warn('[sync] trigger failed', e));
+       Alert.alert(t('common.success'), t('orders.updated'));
+       router.back();
+     } catch (err) {
+       console.error(err);
+       Alert.alert(t('common.error'), t('errors.saveFailed'));
+     }
+   };
+ 
+   const handleDelete = async () => {
+@@ -118,150 +133,162 @@ export default function PedidoModal() {
+ 
+   const handleEditInConta = () => {
+     // open product picker to add items
+     if (!pedido) return;
+     setSearchText('');
+     searchProducts('');
+     setPickerVisible(true);
+   };
+ 
+   const handleGerarVenda = async () => {
+-    if (!pedido) return;
++    if (!pedido || isReadOnly) return;
+     try {
+       const items = (pedido.items || []).map((item: any) => ({ productId: item.productId, quantity: item.quantity }));
+       const { saleId } = await createSale(items, customerName ?? '', user?.id, user?.name ?? null);
+-      await updateOrder(pedido.id, undefined, undefined, ORDER_STATUS.CLOSED);
++      await updateOrder(pedido.id, undefined, undefined, false);
+       Alert.alert(t('orders.generatedSaleTitle'), t('orders.generatedSaleMessage', { id: saleId }));
+       router.back();
+     } catch (err) {
+       console.error(err);
+       Alert.alert(t('common.error'), t('errors.saveFailed'));
+     }
+   };
+ 
+-  const renderProduto = ({ item }: { item: any }) => (
++  const changeItemStatus = (index: number, nextStatus: OrderItemStatus) => {
++    if (!pedido || isReadOnly) return;
++    const items = Array.isArray(pedido.items) ? [...pedido.items] : [];
++    if (!items[index]) return;
++    items[index] = { ...items[index], status: nextStatus };
++    setPedido({ ...pedido, items });
++  };
++
++  const renderProduto = ({ item, index }: { item: any; index: number }) => {
++    const currentStatus: OrderItemStatus = isOrderItemStatus(item.status)
++      ? item.status
++      : ORDER_ITEM_STATUS.REQUESTED;
++
++    return (
+     <ListItem
+       title={item.name ?? item.productId}
+       subtitle={`${formatCurrency(Number(item.price ?? 0))} / ${t('charts.units')}`}
+       trailing={
+-        clienteBloqueado ? (
+-          <Text style={[styles.qtyText, { color: textColor }]}>{item.quantity}</Text>
+-        ) : (
+-          <RNView style={styles.quantityRow}>
+-            <TouchableOpacity
+-              onPress={() => changeQuantidade(item.productId, -1)}
+-              style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}
+-              accessibilityRole="button"
+-              accessibilityLabel={t('common.decreaseQuantity')}
+-            >
+-              <Text style={[styles.qtyBtnText, { color: colors.background }]}>-</Text>
+-            </TouchableOpacity>
+-            <Text style={[styles.qtyText, { color: textColor }]}>{item.quantity}</Text>
+-            <TouchableOpacity
+-              onPress={() => changeQuantidade(item.productId, 1)}
+-              style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}
+-              accessibilityRole="button"
+-              accessibilityLabel={t('common.increaseQuantity')}
+-            >
+-              <Text style={[styles.qtyBtnText, { color: colors.background }]}>+</Text>
+-            </TouchableOpacity>
++        <RNView style={styles.itemTrailing}>
++          <RNView style={styles.statusActions}>
++            {isReadOnly ? (
++              <Badge label={translateItemStatus(currentStatus, t)} color={itemStatusColor(currentStatus)} />
++            ) : (
++              ORDER_ITEM_STATUSES.map((itemStatus) => {
++                const active = currentStatus === itemStatus;
++                return (
++                  <TouchableOpacity
++                    key={itemStatus}
++                    onPress={() => changeItemStatus(index, itemStatus)}
++                    accessibilityRole="button"
++                    accessibilityLabel={translateItemStatus(itemStatus, t)}
++                    accessibilityState={{ selected: active }}
++                  >
++                    <Badge
++                      label={translateItemStatus(itemStatus, t)}
++                      color={active ? itemStatusColor(itemStatus) : colors.textMuted}
++                    />
++                  </TouchableOpacity>
++                );
++              })
++            )}
+           </RNView>
+-        )
++          {isReadOnly ? (
++            <Text style={[styles.qtyText, { color: textColor }]}>{item.quantity}</Text>
++          ) : (
++            <RNView style={styles.quantityRow}>
++              <TouchableOpacity
++                onPress={() => changeQuantidade(item.productId, -1)}
++                style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}
++                accessibilityRole="button"
++                accessibilityLabel={t('common.decreaseQuantity')}
++              >
++                <Text style={[styles.qtyBtnText, { color: colors.background }]}>-</Text>
++              </TouchableOpacity>
++              <Text style={[styles.qtyText, { color: textColor }]}>{item.quantity}</Text>
++              <TouchableOpacity
++                onPress={() => changeQuantidade(item.productId, 1)}
++                style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}
++                accessibilityRole="button"
++                accessibilityLabel={t('common.increaseQuantity')}
++              >
++                <Text style={[styles.qtyBtnText, { color: colors.background }]}>+</Text>
++              </TouchableOpacity>
++            </RNView>
++          )}
++        </RNView>
+       }
+     />
+-  );
++    );
++  };
+ 
+   const itensTotal = (() => {
+     if (!pedido || !Array.isArray(pedido.items)) return 0;
+     return pedido.items.reduce((acc: number, item: any) => {
+       const price = Number(item.price ?? 0);
+       const quantity = Number(item.quantity ?? 0);
+       return acc + price * quantity;
+     }, 0);
+   })();
+ 
+   function changeQuantidade(productId: string, delta: number) {
+-    if (!pedido) return;
++    if (!pedido || isReadOnly) return;
+     const items = Array.isArray(pedido.items) ? [...pedido.items] : [];
+     const idx = items.findIndex((item: any) => item.productId === productId);
+     if (idx === -1) return;
+     const nextItem = { ...items[idx] };
+     nextItem.quantity = Math.max(0, (nextItem.quantity || 0) + delta);
+     if (nextItem.quantity <= 0) {
+       items.splice(idx, 1);
+     } else {
+       items[idx] = nextItem;
+     }
+     setPedido({ ...pedido, items });
+   }
+ 
+   function addProdutoToPedido(prod: any) {
+     if (!pedido) return;
+     const items = Array.isArray(pedido.items) ? [...pedido.items] : [];
+     const idx = items.findIndex((item: any) => item.productId === prod.id);
+     if (idx === -1) {
+-      items.push({ productId: prod.id, quantity: 1, name: prod.name, price: prod.price ?? 0 });
++      items.push({ productId: prod.id, quantity: 1, status: ORDER_ITEM_STATUS.REQUESTED, name: prod.name, price: prod.price ?? 0 });
+     } else {
+       items[idx] = { ...items[idx], quantity: (items[idx].quantity || 0) + 1 };
+     }
+     setPedido({ ...pedido, items });
+     setPickerVisible(false);
+   }
+ 
+   return (
+     <View style={styles.container}>
+       <Text style={[styles.title, { color: textColor }]}>{t('orders.title')}</Text>
+ 
+       <Text style={[styles.label, { color: textColor }]}>{t('orders.customer')}</Text>
+-      <TextInput style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} value={customerName} onChangeText={setCliente} placeholder={t('sales.customer')} accessibilityLabel={t('sales.customer')} placeholderTextColor={subText} editable={!clienteBloqueado} />
+-
+-      <Text style={[styles.label, { color: textColor }]}>{t('orders.status')}</Text>
+-      {isCliente ? (
+-        <RNView style={styles.statusRow}>
+-          <RNView style={[styles.statusBtn, { borderColor: inputBorder, backgroundColor: colors.primary }]}>
+-            <Text style={{ color: colors.background }}>{translateStatus(status, t)}</Text>
+-          </RNView>
+-        </RNView>
+-      ) : (
+-        <RNView style={styles.statusRow}>
+-          {([ORDER_STATUS.OPEN, ORDER_STATUS.IN_PREPARATION, ORDER_STATUS.DELIVERING, ORDER_STATUS.CLOSED] as const).map((s) => {
+-            const active = status === s;
+-            return (
+-              <TouchableOpacity
+-                key={s}
+-                onPress={() => setStatus(s)}
+-                style={[styles.statusBtn, { borderColor: inputBorder }, active && { backgroundColor: colors.primary }]}
+-                accessibilityRole="button"
+-                accessibilityLabel={translateStatus(s, t)}
+-                accessibilityState={{ selected: active }}
+-              >
+-                <Text style={{ color: active ? colors.background : textColor }}>{translateStatus(s, t)}</Text>
+-              </TouchableOpacity>
+-            );
+-          })}
+-        </RNView>
+-      )}
++      <TextInput style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} value={customerName} onChangeText={setCliente} placeholder={t('sales.customer')} accessibilityLabel={t('sales.customer')} placeholderTextColor={subText} editable={!isReadOnly} />
+ 
+       <Text style={[styles.label, { color: textColor }]}>{t('orders.items')}</Text>
+       <FlatList
+         data={pedido?.items ?? []}
+         keyExtractor={(it: any, i: number) => it.productId + i}
+         renderItem={renderProduto}
+         style={{ backgroundColor: 'transparent' }}
+       />
+ 
+       <RNView style={[styles.totalRow, { backgroundColor: 'transparent' }]}>
+         <Text style={[styles.totalLabel, { color: textColor }]}>{t('orders.totalItems')}:</Text>
+         <Text style={[styles.totalValue, { color: textColor }]}>{formatCurrency(itensTotal)}</Text>
+       </RNView>
+ 
+-      {!clienteBloqueado && (
++      {!isReadOnly && (
+         <RNView style={styles.buttonsRow}>
+           <Button title={t('orders.addItem')} onPress={handleEditInConta} variant="outline" style={styles.btnSpacing} />
+           {!isCliente && <Button title={t('orders.generateSale')} onPress={handleGerarVenda} style={{ flex: 1 }} />}
+         </RNView>
+       )}
+ 
+       <Modal visible={pickerVisible} transparent animationType="slide">
+         <Pressable style={[styles.modalOverlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.4)' }]} onPress={() => setPickerVisible(false)} />
+         <RNView style={[styles.modalContainer, { backgroundColor: surface }] }>
+           <Text style={[styles.title, { color: textColor }]}>{t('orders.addItem')}</Text>
+@@ -271,21 +298,21 @@ export default function PedidoModal() {
+               title={item.name}
+               subtitle={formatCurrency(Number(item.price || 0))}
+               onPress={() => addProdutoToPedido(item)}
+             />
+           )} />
+           <RNView style={{height:12}} />
+           <Button title={t('common.close')} onPress={() => setPickerVisible(false)} variant="outline" style={{ marginTop: spacing.sm }} />
+         </RNView>
+       </Modal>
+ 
+-      {clienteBloqueado ? (
++      {isReadOnly ? (
+         <RNView style={[styles.totalRow, { backgroundColor: 'transparent', marginTop: 12 }]}>
+           <Text style={{ color: subText, fontStyle: 'italic' }}>{t('orders.readOnly')}</Text>
+         </RNView>
+       ) : (
+         <RNView style={styles.buttonsRow}>
+           {!isCliente && (
+             <TouchableOpacity
+               style={[styles.deleteBtn, { backgroundColor: Colors.status.danger }]}
+               onPress={handleDelete}
+               accessibilityRole="button"
+@@ -299,22 +326,22 @@ export default function PedidoModal() {
+       )}
+     </View>
+   );
+ }
+ 
+ const styles = StyleSheet.create({
+   container: { flex: 1, padding: 16, borderColor: 'black', borderWidth: 1 },
+   title: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
+   label: { marginTop: 8, fontWeight: '600' },
+   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 8, marginTop: 6 },
+-  statusRow: { flexDirection: 'row', marginTop: 8, flexWrap: 'wrap' },
+-  statusBtn: { padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#ccc', marginRight: 8, marginBottom: 8 },
++  itemTrailing: { alignItems: 'flex-end', gap: 8, maxWidth: '70%' },
++  statusActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 4 },
+   quantityRow: { flexDirection: 'row', alignItems: 'center' },
+   qtyBtn: { paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#1976D2', borderRadius: 8, marginHorizontal: 8, backgroundColor: '#2196F3', alignItems: 'center', justifyContent: 'center' },
+   qtyBtnText: { color: '#fff', fontWeight: '900', fontSize: 16, textAlign: 'center' },
+   qtyText: { minWidth: 36, textAlign: 'center', fontWeight: '400', fontSize: 16 },
+   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+   modalContainer: { position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '70%', backgroundColor: '#fff', padding: 16, borderTopLeftRadius: 12, borderTopRightRadius: 12 },
+   listFooter: { flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderTopWidth: 1, borderTopColor: '#eee', marginTop: 8 },
+   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
+   totalLabel: { fontWeight: '600', fontSize: 16 },
+   totalValue: { fontWeight: '700', fontSize: 16 },
+diff --git a/components/PedidoItem.tsx b/components/PedidoItem.tsx
+index b85a756..5c4f411 100644
+--- a/components/PedidoItem.tsx
++++ b/components/PedidoItem.tsx
+@@ -1,51 +1,43 @@
+ import React from 'react';
+ import { RecordCard, RecordCardAction } from '@/components/ui/RecordCard';
+-import { getStatusColor, normalizeOrderStatus } from '@/constants/status';
+ import { Order } from '@/database/types/Order';
++import Colors from '@/constants/Colors';
+ import { useTranslation } from 'react-i18next';
+ 
+ type Props = {
+   data: Order;
+   products: string[];
+   onEdit: () => void;
+   onDelete?: () => void;
+ };
+ 
+ export function PedidoItem({ data, products, onEdit, onDelete }: Props) {
+   const { t, i18n } = useTranslation();
+-  const statusLabel = data.status ?? 'OPEN';
+-  const normalizedStatus = normalizeOrderStatus(statusLabel);
++  const isOpen = data.isOpen !== false;
++  const statusLabel = isOpen ? t('status.open') : t('status.closed');
++  const statusColor = isOpen ? Colors.status.info : Colors.status.danger;
+ 
+   const horaFormatada = new Date(data.openedAt).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
+   const autorTrecho = data.createdByName ? t('common.createdBy', { name: data.createdByName }) : '';
+ 
+   const actions: RecordCardAction[] = [
+     { icon: 'pencil', label: t('common.editOrder'), onPress: onEdit },
+   ];
+   if (onDelete) {
+     actions.push({ icon: 'trash', label: t('common.deleteOrder'), onPress: onDelete, destructive: true });
+   }
+ 
+   return (
+     <RecordCard
+-      accentColor={getStatusColor(statusLabel)}
+-      badge={{ label: t(`status.${statusKey(normalizedStatus)}`), color: getStatusColor(statusLabel) }}
++      accentColor={statusColor}
++      badge={{ label: statusLabel, color: statusColor }}
+       title={(data.customerName && String(data.customerName).trim().length > 0) ? data.customerName : t('common.customerUnknown')}
+       subtitle={products.length > 0 ? products.join(', ') : undefined}
+       meta={`${autorTrecho}${horaFormatada}`}
+       total={data.total ?? 0}
+       actions={actions}
+     />
+   );
+ }
+ 
+-function statusKey(status: ReturnType<typeof normalizeOrderStatus>): string {
+-  switch (status) {
+-    case 'OPEN': return 'open';
+-    case 'IN_PREPARATION': return 'inPreparation';
+-    case 'DELIVERING': return 'delivering';
+-    case 'CLOSED': return 'closed';
+-  }
+-}
+-
+ export default PedidoItem;
+diff --git a/components/__tests__/task7c1Status.test.tsx b/components/__tests__/task7c1Status.test.tsx
+index 42dad0e..19a3306 100644
+--- a/components/__tests__/task7c1Status.test.tsx
++++ b/components/__tests__/task7c1Status.test.tsx
+@@ -39,21 +39,21 @@ describe('shared order status translations', () => {
+     });
+ 
+     const renderer = create(
+       <I18nextProvider i18n={i18n}>
+         <PedidoItem
+           data={{
+             id: 'order-1',
+             total: 25,
+             openedAt: '2026-08-25T15:04:05.000Z',
+             customerName: 'Cliente persistido',
+-            status: 'OPEN',
++            isOpen: true,
+             updated_at: 1,
+           }}
+           products={['Produto persistido']}
+           onEdit={jest.fn()}
+         />
+       </I18nextProvider>,
+     );
+ 
+     const text = renderedText(renderer.toJSON());
+     expect(text).toContain('Aberto');
+diff --git a/components/__tests__/task7cI18n.test.tsx b/components/__tests__/task7cI18n.test.tsx
+index 3744243..8c35f1f 100644
+--- a/components/__tests__/task7cI18n.test.tsx
++++ b/components/__tests__/task7cI18n.test.tsx
+@@ -110,21 +110,21 @@ describe('Task 7C presentation i18n', () => {
+     });
+ 
+     const renderer = create(
+       <I18nextProvider i18n={i18n}>
+         <PedidoItem
+           data={{
+             id: 'order-1',
+             total: 25,
+             openedAt: '2026-08-25T15:04:05.000Z',
+             customerName: null,
+-            status: 'OPEN',
++            isOpen: true,
+             updated_at: 1,
+           }}
+           products={[]}
+           onEdit={jest.fn()}
+         />
+       </I18nextProvider>,
+     );
+ 
+     expect(renderedText(renderer.toJSON())).toContain('Aberto');
+   });
+diff --git a/database/__tests__/usePedidoDatabase.test.tsx b/database/__tests__/usePedidoDatabase.test.tsx
+index 0b54136..8b9813c 100644
+--- a/database/__tests__/usePedidoDatabase.test.tsx
++++ b/database/__tests__/usePedidoDatabase.test.tsx
+@@ -1,100 +1,327 @@
+-// database/__tests__/useOrderDatabase.test.tsx
+-import React from 'react';
+-import TestRenderer, { act } from 'react-test-renderer';
++jest.mock('react-native', () => {
++  const databaseBridge = require('@nozbe/watermelondb/adapters/sqlite/sqlite-node/DatabaseBridge').default;
++  const bridgeMethods = [
++    'initialize',
++    'setUpWithSchema',
++    'setUpWithMigrations',
++    'find',
++    'query',
++    'queryIds',
++    'unsafeQueryRaw',
++    'count',
++    'batch',
++    'unsafeResetDatabase',
++    'getLocal',
++  ];
++  const asyncDatabaseBridge = bridgeMethods.reduce((bridge, method) => {
++    bridge[method] = (...args: unknown[]) =>
++      new Promise((resolve, reject) => {
++        databaseBridge[method](...args, resolve, reject);
++      });
++    return bridge;
++  }, {} as Record<string, (...args: unknown[]) => Promise<unknown>>);
++
++  return {
++    NativeModules: { WMDatabaseBridge: asyncDatabaseBridge },
++    Platform: { OS: 'ios' },
++  };
++});
+ 
+ jest.mock('expo-sqlite', () => ({
+   useSQLiteContext: jest.fn(),
+ }));
+ 
+-jest.mock('../utils/uuid', () => ({
+-  generateUUID: jest.fn(() => 'generated-uuid'),
++let mockDatabase: import('@nozbe/watermelondb').Database;
++
++jest.mock('../watermelon/database', () => ({
++  get database() {
++    return mockDatabase;
++  },
+ }));
+ 
+ jest.mock('../tableWatermark', () => ({
+   markChanged: jest.fn(),
+ }));
+ 
+-import { useSQLiteContext } from 'expo-sqlite';
++jest.mock('../../context/AuthContext', () => ({
++  useAuth: jest.fn(),
++}));
++
++import React from 'react';
++import TestRenderer, { act } from 'react-test-renderer';
++import { Database, Q } from '@nozbe/watermelondb';
++import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
++
++import { useAuth } from '../../context/AuthContext';
+ import { markChanged } from '../tableWatermark';
+ import { useOrderDatabase } from '../useOrderDatabase';
+-import { ORDER_STATUS } from '../types/Order';
++import migrations from '../watermelon/migrations';
++import Order from '../watermelon/models/Order';
++import OrderItem from '../watermelon/models/OrderItem';
++import Printer from '../watermelon/models/Printer';
++import Product from '../watermelon/models/Product';
++import ProductType from '../watermelon/models/ProductType';
++import Sale from '../watermelon/models/Sale';
++import SaleItem from '../watermelon/models/SaleItem';
++import User from '../watermelon/models/User';
++import schema from '../watermelon/schema';
+ 
+-const mockUseSQLiteContext = useSQLiteContext as jest.Mock;
++const modelClasses = [Product, ProductType, Order, OrderItem, Sale, SaleItem, User, Printer];
+ const mockMarkChanged = markChanged as jest.Mock;
++const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+ 
+-function makeStatement() {
+-  return {
+-    executeAsync: jest.fn(async () => ({})),
+-    finalizeAsync: jest.fn(async () => {}),
+-  };
++function setCurrentEstablishment(establishmentId: string | number | null) {
++  mockUseAuth.mockReturnValue({
++    user: { establishmentId },
++  } as ReturnType<typeof useAuth>);
++}
++
++function makeDatabase() {
++  const adapter = new SQLiteAdapter({
++    schema,
++    migrations,
++    dbName: ':memory:',
++    jsi: true,
++    onSetUpError: (error) => {
++      throw error;
++    },
++  });
++
++  return new Database({ adapter, modelClasses });
+ }
+ 
+-function renderPedidosDbHook() {
++async function seedProduct(
++  database: Database,
++  data: { id: string; name: string; price: number; establishmentId: string },
++) {
++  const now = Date.now();
++  const preparedProduct = database.get<Product>('products').prepareCreateFromDirtyRaw({
++    id: data.id,
++    _status: 'synced',
++    _changed: '',
++    name: data.name,
++    price: data.price,
++    product_type_id: null,
++    source_product_id: null,
++    ingredients: null,
++    establishment_id: data.establishmentId,
++    created_at: now,
++    updated_at: now,
++  });
++
++  await database.write(() => database.batch(preparedProduct));
++  return preparedProduct;
++}
++
++function renderOrderDatabase() {
+   let result!: ReturnType<typeof useOrderDatabase>;
++
+   function Harness() {
+     result = useOrderDatabase();
+     return null;
+   }
++
+   act(() => {
+     TestRenderer.create(<Harness />);
+   });
++
+   return result;
+ }
+ 
+-describe('useOrderDatabase — table watermark', () => {
++describe('useOrderDatabase', () => {
+   beforeEach(() => {
++    mockDatabase = makeDatabase();
+     mockMarkChanged.mockReset();
++    setCurrentEstablishment('establishment-1');
+   });
+ 
+-  it('createPedido() marks orders changed', async () => {
+-    const db = {
+-      prepareAsync: jest.fn(async () => makeStatement()),
+-      getFirstAsync: jest.fn(async () => ({ price: 10 })),
+-    };
+-    mockUseSQLiteContext.mockReturnValue(db);
++  it('creates an open order and requested items by default', async () => {
++    await seedProduct(mockDatabase, {
++      id: 'product-1',
++      name: 'X-Salada',
++      price: 25.5,
++      establishmentId: 'establishment-1',
++    });
++
++    const { createOrder, getOrderById } = renderOrderDatabase();
++    const { orderId } = await createOrder([{ productId: 'product-1', quantity: 2 }], 'Ana');
+ 
+-    const { createPedido } = renderPedidosDbHook();
+-    await createPedido([{ productId: 'p1', quantity: 2 }], 'Cliente X');
++    await expect(mockDatabase.get<Order>('orders').find(orderId)).resolves.toMatchObject({
++      id: orderId,
++      total: 51,
++      customerName: 'Ana',
++      isOpen: true,
++      establishmentId: 'establishment-1',
++      syncStatus: 'created',
++    });
+ 
++    const items = await mockDatabase.get<OrderItem>('order_items').query(Q.where('order_id', orderId)).fetch();
++    expect(items).toHaveLength(1);
++    expect(items[0]).toMatchObject({
++      orderId,
++      productId: 'product-1',
++      quantity: 2,
++      status: 'REQUESTED',
++    });
++    await expect(getOrderById(orderId)).resolves.toMatchObject({
++      id: orderId,
++      isOpen: true,
++      items: [expect.objectContaining({ status: 'REQUESTED' })],
++    });
+     expect(mockMarkChanged).toHaveBeenCalledWith('orders');
+   });
+ 
+-  it('createFromSync() marks orders changed', async () => {
+-    const db = { prepareAsync: jest.fn(async () => makeStatement()) };
+-    mockUseSQLiteContext.mockReturnValue(db);
++  it('allows item status changes, including a direct requested-to-delivered transition', async () => {
++    await seedProduct(mockDatabase, {
++      id: 'product-1',
++      name: 'X-Salada',
++      price: 25.5,
++      establishmentId: 'establishment-1',
++    });
+ 
+-    const { createFromSync } = renderPedidosDbHook();
+-    await createFromSync({
+-      id: 'ped-1',
+-      total: 10,
+-      openedAt: new Date().toISOString(),
+-      status: ORDER_STATUS.ABERTO,
+-    } as any);
++    const { createOrder, getOrderById, updateOrder } = renderOrderDatabase();
++    const { orderId } = await createOrder([{ productId: 'product-1', quantity: 1 }]);
+ 
+-    expect(mockMarkChanged).toHaveBeenCalledWith('orders');
++    await updateOrder(orderId, [{ productId: 'product-1', quantity: 1, status: 'IN_PREPARATION' }]);
++    await expect(getOrderById(orderId)).resolves.toMatchObject({
++      items: [expect.objectContaining({ status: 'IN_PREPARATION' })],
++    });
++
++    await updateOrder(orderId, [{ productId: 'product-1', quantity: 1, status: 'DELIVERED' }]);
++    await expect(getOrderById(orderId)).resolves.toMatchObject({
++      items: [expect.objectContaining({ status: 'DELIVERED' })],
++    });
+   });
+ 
+-  it('updatePedido() marks orders changed', async () => {
+-    const db = {
+-      prepareAsync: jest.fn(async () => makeStatement()),
+-      getAllAsync: jest.fn(async () => []),
+-      getFirstAsync: jest.fn(async () => ({ price: 10 })),
+-    };
+-    mockUseSQLiteContext.mockReturnValue(db);
++  it('closes an order by setting isOpen false and removes it from open lists immediately', async () => {
++    await seedProduct(mockDatabase, {
++      id: 'product-1',
++      name: 'X-Salada',
++      price: 25.5,
++      establishmentId: 'establishment-1',
++    });
+ 
+-    const { updatePedido } = renderPedidosDbHook();
+-    await updatePedido('ped-1', undefined, 'Novo Cliente');
++    const { createOrder, listRecentOrders, updateOrder } = renderOrderDatabase();
++    const { orderId } = await createOrder([{ productId: 'product-1', quantity: 1 }]);
+ 
+-    expect(mockMarkChanged).toHaveBeenCalledWith('orders');
++    await expect(listRecentOrders()).resolves.toEqual(
++      expect.objectContaining({
++        [new Date().toLocaleDateString()]: [expect.objectContaining({ id: orderId, isOpen: true })],
++      }),
++    );
++
++    await updateOrder(orderId, undefined, undefined, false);
++
++    await expect(mockDatabase.get<Order>('orders').find(orderId)).resolves.toMatchObject({ isOpen: false });
++    await expect(listRecentOrders()).resolves.toEqual({});
+   });
+ 
+-  it('removePedido() marks orders changed', async () => {
+-    const db = { prepareAsync: jest.fn(async () => makeStatement()) };
+-    mockUseSQLiteContext.mockReturnValue(db);
++  it('keeps every order read and mutation scoped to the authenticated establishment', async () => {
++    await seedProduct(mockDatabase, {
++      id: 'product-a',
++      name: 'Produto A',
++      price: 10,
++      establishmentId: 'establishment-a',
++    });
++    await seedProduct(mockDatabase, {
++      id: 'product-b',
++      name: 'Produto B',
++      price: 20,
++      establishmentId: 'establishment-b',
++    });
+ 
+-    const { removePedido } = renderPedidosDbHook();
+-    await removePedido('ped-1');
++    setCurrentEstablishment('establishment-a');
++    const orderDatabaseA = renderOrderDatabase();
++    const { orderId: orderA } = await orderDatabaseA.createOrder(
++      [{ productId: 'product-a', quantity: 1 }],
++      'Cliente A',
++      true,
++      'user-a',
++    );
+ 
+-    expect(mockMarkChanged).toHaveBeenCalledWith('orders');
++    setCurrentEstablishment('establishment-b');
++    const orderDatabaseB = renderOrderDatabase();
++    const { orderId: orderB } = await orderDatabaseB.createOrder(
++      [{ productId: 'product-b', quantity: 1 }],
++      'Cliente B',
++      true,
++      'user-b',
++    );
++
++    await expect(orderDatabaseB.listRecentOrders()).resolves.toEqual(
++      expect.objectContaining({
++        [new Date().toLocaleDateString()]: [expect.objectContaining({ id: orderB })],
++      }),
++    );
++    await expect(orderDatabaseB.listRecentOrdersByUser('user-b')).resolves.toEqual(
++      expect.objectContaining({
++        [new Date().toLocaleDateString()]: [expect.objectContaining({ id: orderB })],
++      }),
++    );
++    await expect(orderDatabaseB.countOpenOrders('user-b')).resolves.toBe(1);
++    await expect(orderDatabaseB.getProductsByOrderId(orderA)).rejects.toThrow(/não encontrado/);
++
++    await orderDatabaseB.updateOrder(orderA, undefined, 'Acesso indevido', false);
++    await orderDatabaseB.removeOrder(orderA);
++
++    setCurrentEstablishment('establishment-a');
++    await expect(orderDatabaseA.getOrderById(orderA)).resolves.toMatchObject({
++      customerName: 'Cliente A',
++      isOpen: true,
++    });
++    await expect(orderDatabaseA.listRecentOrders()).resolves.toEqual(
++      expect.objectContaining({
++        [new Date().toLocaleDateString()]: [expect.objectContaining({ id: orderA })],
++      }),
++    );
++  });
++
++  it('creates a synced order and defaults synced items without a status to requested', async () => {
++    await seedProduct(mockDatabase, {
++      id: 'product-1',
++      name: 'X-Salada',
++      price: 10,
++      establishmentId: 'establishment-1',
++    });
++
++    const { createFromSync } = renderOrderDatabase();
++
++    await expect(createFromSync({
++      id: 'synced-order-1',
++      total: 10,
++      openedAt: '2026-08-27T10:00:00.000Z',
++      customerName: 'Sync',
++      isOpen: true,
++      establishmentId: 'establishment-1',
++      sellerId: 'seller-1',
++      updated_at: 1234,
++      items: [{ productId: 'product-1', quantity: 1 }],
++    })).resolves.toEqual({ orderId: 'synced-order-1' });
++
++    await expect(mockDatabase.get<Order>('orders').find('synced-order-1')).resolves.toMatchObject({
++      isOpen: true,
++      establishmentId: 'establishment-1',
++      updatedAt: new Date(1234),
++      syncStatus: 'synced',
++    });
++    await expect(mockDatabase.get<OrderItem>('order_items').query(Q.where('order_id', 'synced-order-1')).fetch()).resolves.toEqual([
++      expect.objectContaining({ status: 'REQUESTED', quantity: 1 }),
++    ]);
++  });
++
++  it('rejects synced orders from another establishment instead of persisting them locally', async () => {
++    const { createFromSync } = renderOrderDatabase();
++
++    await expect(createFromSync({
++      id: 'foreign-order',
++      total: 10,
++      openedAt: '2026-08-27T10:00:00.000Z',
++      isOpen: true,
++      establishmentId: 'establishment-other',
++      sellerId: 'seller-other',
++      updated_at: 1,
++    })).rejects.toThrow(/establishment/i);
++
++    await expect(mockDatabase.get<Order>('orders').query().fetch()).resolves.toEqual([]);
+   });
+ });
+diff --git a/database/types/Order.ts b/database/types/Order.ts
+index 65335d6..8b0d53e 100644
+--- a/database/types/Order.ts
++++ b/database/types/Order.ts
+@@ -1,29 +1,47 @@
+-export type OrderItem = { id?: string; productId: string; quantity: number };
++export const ORDER_ITEM_STATUS = {
++  REQUESTED: 'REQUESTED',
++  IN_PREPARATION: 'IN_PREPARATION',
++  DELIVERED: 'DELIVERED',
++} as const;
+ 
+-export type Order = {
+-  id: string;
+-  total: number;
+-  openedAt: string;
+-  customerName?: string | null;
+-  status: OrderStatus;
+-  updated_at: number;
+-  deleted_at?: number | null;
+-  sync_status?: string | null;
+-  createdBy?: string | null;
+-  createdByName?: string | null;
+-};
++export type OrderItemStatus = typeof ORDER_ITEM_STATUS[keyof typeof ORDER_ITEM_STATUS];
++
++/** @deprecated Used only by the legacy sync adapter until Task 8 removes it. */
++export type OrderStatus = 'OPEN' | 'IN_PREPARATION' | 'DELIVERING' | 'CLOSED' | 'NOT_CLOSED';
+ 
++/** @deprecated Used only by the legacy sync adapter until Task 8 removes it. */
+ export const ORDER_STATUS = {
+   OPEN: 'OPEN',
+   IN_PREPARATION: 'IN_PREPARATION',
+   DELIVERING: 'DELIVERING',
+   CLOSED: 'CLOSED',
+   NOT_CLOSED: 'NOT_CLOSED',
+-  /** @deprecated legacy source aliases; persisted values remain English. */
+   ABERTO: 'OPEN',
+   EM_PREPARO: 'IN_PREPARATION',
+   ENTREGANDO: 'DELIVERING',
+   FECHADO: 'CLOSED',
+ } as const;
+ 
+-export type OrderStatus = typeof ORDER_STATUS[keyof typeof ORDER_STATUS];
++export type OrderItem = {
++  id?: string;
++  orderId?: string;
++  productId: string;
++  quantity: number;
++  status?: OrderItemStatus;
++  unitPriceAtOrder?: number;
++};
++
++export type Order = {
++  id: string;
++  total: number;
++  openedAt: string;
++  customerName?: string | null;
++  isOpen: boolean;
++  establishmentId?: string | null;
++  sellerId?: string | null;
++  updated_at: number;
++  deleted_at?: number | null;
++  sync_status?: string | null;
++  createdBy?: string | null;
++  createdByName?: string | null;
++};
+diff --git a/database/useOrderDatabase.ts b/database/useOrderDatabase.ts
+index fafecb2..736380d 100644
+--- a/database/useOrderDatabase.ts
++++ b/database/useOrderDatabase.ts
+@@ -1,430 +1,523 @@
+-import { useSQLiteContext } from "expo-sqlite";
+-import { OrderItem, Order, ORDER_STATUS } from "./types/Order";
+-import { generateUUID } from "./utils/uuid";
+-import { markChanged } from "./tableWatermark";
++import { Q } from '@nozbe/watermelondb';
++import type { Clause } from '@nozbe/watermelondb/QueryDescription';
++
++import { useAuth } from '../context/AuthContext';
++import type {
++  Order as OrderData,
++  OrderItem as OrderItemData,
++  OrderItemStatus,
++} from './types/Order';
++import { ORDER_ITEM_STATUS } from './types/Order';
++import { markChanged } from './tableWatermark';
++import { generateUUID } from './utils/uuid';
++import { database } from './watermelon/database';
++import OrderModel from './watermelon/models/Order';
++import OrderItemModel from './watermelon/models/OrderItem';
++import ProductModel from './watermelon/models/Product';
++
++type OrderWithProducts = OrderData & { products: string[] };
++type OrderSyncInput = OrderData & {
++  items?: OrderItemData[];
++  created_at?: number;
++  updatedAt?: number;
++  opened_at?: number | string;
++  customer_name?: string | null;
++  is_open?: boolean;
++  establishment_id?: string | number | null;
++  seller_id?: string | number | null;
++};
++type OrderItemSyncInput = OrderItemData & {
++  product_id?: string;
++  unit_price_at_order?: number;
++  created_at?: number;
++  updated_at?: number;
++};
++
++function asEstablishmentId(value: string | number | null | undefined): string {
++  return value == null || value === '' ? '' : String(value);
++}
+ 
+-type OrderStatus = typeof ORDER_STATUS[keyof typeof ORDER_STATUS];
++function normalizeEstablishmentId(value: string | number | null | undefined): string | null {
++  const normalized = asEstablishmentId(value);
++  return normalized === '' ? null : normalized;
++}
+ 
+-function isValidStatus(value: any): value is OrderStatus {
++function isOrderItemStatus(value: unknown): value is OrderItemStatus {
+   return (
+-    value === ORDER_STATUS.OPEN ||
+-    value === ORDER_STATUS.IN_PREPARATION ||
+-    value === ORDER_STATUS.DELIVERING ||
+-    value === ORDER_STATUS.CLOSED
++    value === ORDER_ITEM_STATUS.REQUESTED ||
++    value === ORDER_ITEM_STATUS.IN_PREPARATION ||
++    value === ORDER_ITEM_STATUS.DELIVERED
+   );
+ }
+ 
+-export function useOrderDatabase() {
+-  const database = useSQLiteContext();
++function orderItemStatus(value: unknown): OrderItemStatus {
++  if (value == null) return ORDER_ITEM_STATUS.REQUESTED;
++  if (!isOrderItemStatus(value)) throw new Error('Status de item inválido');
++  return value;
++}
+ 
+-  async function calculateTotal(items: OrderItem[]): Promise<number> {
+-    let total = 0;
++function epoch(value: unknown, fallback: number): number {
++  if (value instanceof Date) {
++    const timestamp = value.getTime();
++    return Number.isFinite(timestamp) ? timestamp : fallback;
++  }
+ 
+-    for (const { productId, quantity } of items) {
+-      const product = await database.getFirstAsync<{ price: number }>(
+-        "SELECT price FROM TB_PRODUCTS WHERE id = ?",
+-        [productId]
+-      );
++  if (typeof value === 'number' && Number.isFinite(value)) return value;
+ 
+-      if (product) {
+-        total += product.price * quantity;
+-      }
+-    }
++  if (typeof value === 'string') {
++    const timestamp = Date.parse(value);
++    if (Number.isFinite(timestamp)) return timestamp;
++  }
++
++  return fallback;
++}
++
++function orderCollection() {
++  return database.get<OrderModel>('orders');
++}
++
++function orderItemCollection() {
++  return database.get<OrderItemModel>('order_items');
++}
++
++function productCollection() {
++  return database.get<ProductModel>('products');
++}
++
++function toOrderData(order: OrderModel): OrderData {
++  return {
++    id: order.id,
++    total: order.total,
++    openedAt: order.openedAt.toISOString(),
++    customerName: order.customerName,
++    isOpen: order.isOpen,
++    establishmentId: order.establishmentId,
++    sellerId: order.sellerId || null,
++    updated_at: order.updatedAt.getTime(),
++    deleted_at: null,
++    sync_status: order.syncStatus === 'synced' ? 'synced' : 'pending',
++    createdBy: order.sellerId || null,
++    createdByName: null,
++  };
++}
++
++function toOrderItemData(item: OrderItemModel): OrderItemData {
++  return {
++    id: item.id,
++    orderId: item.orderId,
++    productId: item.productId,
++    quantity: item.quantity,
++    status: orderItemStatus(item.status),
++    unitPriceAtOrder: item.unitPriceAtOrder,
++  };
++}
++
++async function findOrder(id: string, establishmentId: string | null): Promise<OrderModel | null> {
++  if (!establishmentId) return null;
+ 
+-    return total;
++  const [order] = await orderCollection()
++    .query(Q.where('id', id), Q.where('establishment_id', establishmentId))
++    .fetch();
++  return order ?? null;
++}
++
++async function findProduct(id: string, establishmentId: string): Promise<ProductModel | null> {
++  const [product] = await productCollection()
++    .query(Q.where('id', id), Q.where('establishment_id', establishmentId))
++    .fetch();
++  return product ?? null;
++}
++
++async function productPrice(productId: string, establishmentId: string): Promise<number> {
++  const product = await findProduct(productId, establishmentId);
++  return product?.price ?? 0;
++}
++
++async function calculateTotal(items: OrderItemData[], establishmentId: string): Promise<number> {
++  const prices = await Promise.all(
++    items.map((item) => productPrice(String(item.productId), establishmentId)),
++  );
++
++  return items.reduce(
++    (total, item, index) => total + prices[index] * Number(item.quantity),
++    0,
++  );
++}
++
++async function fetchOrderItems(orderId: string, establishmentId: string): Promise<OrderItemModel[]> {
++  return orderItemCollection()
++    .query(
++      Q.where('order_id', orderId),
++      Q.on('orders', Q.where('establishment_id', establishmentId)),
++    )
++    .fetch();
++}
++
++async function productNamesForItems(
++  items: OrderItemModel[],
++  establishmentId: string,
++): Promise<{ name: string; quantity: number }[]> {
++  const rows = await Promise.all(
++    items.map(async (item) => {
++      const product = await findProduct(item.productId, establishmentId);
++      return product ? { name: product.name, quantity: item.quantity } : null;
++    }),
++  );
++
++  return rows.filter((row): row is { name: string; quantity: number } => row !== null);
++}
++
++function displayedProducts(products: { name: string; quantity: number }[]): string[] {
++  const productNames = products.map((product) => `( ${product.quantity}x ) ${product.name}`);
++  return productNames.length > 3
++    ? [...productNames.slice(0, 3), '...']
++    : productNames;
++}
++
++async function toOrderWithProducts(
++  order: OrderModel,
++  establishmentId: string,
++): Promise<OrderWithProducts> {
++  const items = await fetchOrderItems(order.id, establishmentId);
++  const products = await productNamesForItems(items, establishmentId);
++  return { ...toOrderData(order), products: displayedProducts(products) };
++}
++
++function groupOrdersByDate(orders: OrderWithProducts[]): Record<string, OrderWithProducts[]> {
++  const ordersByDate: Record<string, OrderWithProducts[]> = {};
++
++  for (const order of orders) {
++    const date = new Date(order.openedAt).toLocaleDateString();
++    if (!ordersByDate[date]) ordersByDate[date] = [];
++    ordersByDate[date].push(order);
+   }
+ 
++  return ordersByDate;
++}
++
++export function useOrderDatabase() {
++  const { user } = useAuth();
++  const currentEstablishmentId = normalizeEstablishmentId(user?.establishmentId);
++
+   async function createOrder(
+-    items: OrderItem[],
++    items: OrderItemData[],
+     customerName?: string,
+-    status: OrderStatus = ORDER_STATUS.OPEN,
++    isOpen = true,
+     createdBy?: string | number | null,
+-    createdByName?: string | null
++    createdByName?: string | null,
+   ) {
+-    const stmt = await database.prepareAsync(
+-      "INSERT INTO TB_ORDERS (id, total, openedAt, customerName, status, updated_at, sync_status, createdBy, createdByName) VALUES ($id, $total, $openedAt, $customerName, $status, $updated_at, $sync_status, $createdBy, $createdByName)"
+-    );
++    if (!currentEstablishmentId) {
++      throw new Error('Cannot create an order without an authenticated establishment');
++    }
++    if (typeof isOpen !== 'boolean') throw new Error('isOpen inválido');
++
++    // Keep the positional argument for createdByName for public compatibility.
++    void createdByName;
+ 
+-    try {
+-      const total = await calculateTotal(items);
+-      const openedAt = new Date().toISOString();
+-
+-      if (!isValidStatus(status)) throw new Error('Status inválido');
+-
+-      const orderId = generateUUID();
+-      const updatedAt = Date.now();
+-
+-      await stmt.executeAsync({
+-        $id: orderId,
+-        $total: total,
+-        $openedAt: openedAt,
+-        $customerName: customerName ?? null,
+-        $status: status,
+-        $updated_at: updatedAt,
+-        $sync_status: 'pending',
+-        $createdBy: createdBy != null ? String(createdBy) : null,
+-        $createdByName: createdByName ?? null,
++    const now = new Date();
++    const total = await calculateTotal(items, currentEstablishmentId);
++    const prices = await Promise.all(
++      items.map((item) => productPrice(String(item.productId), currentEstablishmentId)),
++    );
++    const sellerId = createdBy == null ? '' : String(createdBy);
++
++    const order = await database.write(async () => {
++      const createdOrder = await orderCollection().create((record) => {
++        record.total = total;
++        record.openedAt = now;
++        record.customerName = customerName ?? null;
++        record.isOpen = isOpen;
++        record.establishmentId = currentEstablishmentId;
++        record.sellerId = sellerId;
++        record.createdAt = now;
++        record.updatedAt = now;
+       });
+ 
+-      for (const { productId, quantity } of items) {
+-        const relId = generateUUID();
+-        const relStmt = await database.prepareAsync(
+-          'INSERT INTO RL_ORDER_PRODUCT (id, orderId, productId, quantity) VALUES ($id, $orderId, $productId, $quantity)'
+-        );
+-        try {
+-          await relStmt.executeAsync({ $id: relId, $orderId: orderId, $productId: productId, $quantity: quantity });
+-        } finally {
+-          await relStmt.finalizeAsync();
+-        }
++      const itemsCollection = orderItemCollection();
++      for (const [index, item] of items.entries()) {
++        await itemsCollection.create((record) => {
++          record.quantity = Number(item.quantity);
++          record.status = ORDER_ITEM_STATUS.REQUESTED;
++          record.orderId = createdOrder.id;
++          record.order.set(createdOrder);
++          record.productId = String(item.productId);
++          record.unitPriceAtOrder = prices[index];
++          record.createdAt = now;
++          record.updatedAt = now;
++        });
+       }
+ 
+-      markChanged('orders')
++      return createdOrder;
++    });
+ 
+-      return { orderId };
+-    } finally {
+-      await stmt.finalizeAsync();
+-    }
++    markChanged('orders');
++    return { orderId: order.id };
+   }
+ 
+-  async function createFromSync(data: Order & { items?: OrderItem[] }) {
+-    const stmt = await database.prepareAsync(
+-      "INSERT INTO TB_ORDERS (id, total, openedAt, customerName, status, updated_at, sync_status) VALUES ($id, $total, $openedAt, $customerName, $status, $updated_at, $sync_status)"
++  async function createFromSync(data: OrderData & { items?: OrderItemData[] }) {
++    if (!currentEstablishmentId) {
++      throw new Error('Cannot sync an order without an authenticated establishment');
++    }
++
++    const raw = data as unknown as OrderSyncInput;
++    const incomingEstablishmentId = normalizeEstablishmentId(
++      raw.establishmentId ?? raw.establishment_id,
+     );
++    if (incomingEstablishmentId && incomingEstablishmentId !== currentEstablishmentId) {
++      throw new Error('Cannot sync an order from another establishment');
++    }
+ 
+-    try {
+-      if (!isValidStatus(data.status)) throw new Error('Status inválido');
+-
+-      await stmt.executeAsync({
+-        $id: data.id,
+-        $total: data.total,
+-        $openedAt: data.openedAt,
+-        $customerName: data.customerName ?? null,
+-        $status: data.status,
+-        $updated_at: (data as any).updated_at ?? Date.now(),
+-        $sync_status: 'synced',
++    const id = String(raw.id ?? '');
++    if (!id) throw new Error('ID inválido');
++
++    const now = Date.now();
++    const updatedAt = epoch(raw.updated_at ?? raw.updatedAt, now);
++    const createdAt = epoch(raw.created_at, updatedAt);
++    const openedAt = epoch(raw.openedAt ?? raw.opened_at, createdAt);
++    const isOpen = typeof raw.isOpen === 'boolean'
++      ? raw.isOpen
++      : typeof raw.is_open === 'boolean'
++        ? raw.is_open
++        : true;
++    const total = Number(raw.total ?? 0);
++    const customer = raw.customerName ?? raw.customer_name ?? null;
++    const seller = raw.sellerId ?? raw.seller_id ?? raw.createdBy ?? '';
++    const items = Array.isArray(raw.items) ? raw.items : [];
++
++    const preparedOrder = orderCollection().prepareCreateFromDirtyRaw({
++      id,
++      _status: 'synced',
++      _changed: '',
++      total,
++      opened_at: openedAt,
++      customer_name: customer,
++      is_open: isOpen,
++      establishment_id: currentEstablishmentId,
++      seller_id: seller == null ? '' : String(seller),
++      created_at: createdAt,
++      updated_at: updatedAt,
++    });
++
++    const preparedItems = items.map((item) => {
++      const rawItem = item as OrderItemSyncInput;
++      const itemId = rawItem.id ? String(rawItem.id) : generateUUID();
++      const itemCreatedAt = epoch(rawItem.created_at, createdAt);
++      const itemUpdatedAt = epoch(rawItem.updated_at, updatedAt);
++
++      return orderItemCollection().prepareCreateFromDirtyRaw({
++        id: itemId,
++        _status: 'synced',
++        _changed: '',
++        quantity: Number(rawItem.quantity),
++        status: orderItemStatus(rawItem.status),
++        order_id: id,
++        product_id: String(rawItem.productId ?? rawItem.product_id ?? ''),
++        unit_price_at_order: Number(rawItem.unitPriceAtOrder ?? rawItem.unit_price_at_order ?? 0),
++        created_at: itemCreatedAt,
++        updated_at: itemUpdatedAt,
+       });
++    });
+ 
+-      if (Array.isArray(data.items)) {
+-        for (const { productId, quantity } of data.items) {
+-          const relId = generateUUID();
+-          const relStmt = await database.prepareAsync(
+-            'INSERT INTO RL_ORDER_PRODUCT (id, orderId, productId, quantity) VALUES ($id, $orderId, $productId, $quantity)'
+-          );
+-          try {
+-            await relStmt.executeAsync({ $id: relId, $orderId: data.id, $productId: productId, $quantity: quantity });
+-          } finally {
+-            await relStmt.finalizeAsync();
+-          }
+-        }
+-      }
+-
+-      markChanged('orders')
+-
+-      return { orderId: data.id };
+-    } finally {
+-      await stmt.finalizeAsync();
+-    }
++    await database.write(() => database.batch(preparedOrder, ...preparedItems));
++    markChanged('orders');
++    return { orderId: id };
+   }
+ 
+   async function getOrderById(orderId: string) {
+-    try {
+-      const order = await database.getFirstAsync<Order>(
+-        "SELECT * FROM TB_ORDERS WHERE id = ?",
+-        [orderId]
+-      );
+-
+-      if (!order) throw new Error(`Pedido com ID ${orderId} não encontrado.`);
+-
+-      const items = await database.getAllAsync<OrderItem>(
+-        "SELECT productId, quantity FROM RL_ORDER_PRODUCT WHERE orderId = ?",
+-        [orderId]
+-      );
+-
+-      return { ...order, items };
+-    } catch (error) {
+-      throw error;
+-    }
++    const order = await findOrder(String(orderId), currentEstablishmentId);
++
++    if (!order) throw new Error(`Pedido com ID ${orderId} não encontrado.`);
++
++    const items = await fetchOrderItems(order.id, currentEstablishmentId!);
++    return {
++      ...toOrderData(order),
++      items: items.map(toOrderItemData),
++    };
+   }
+ 
+   async function updateOrder(
+     orderId: string,
+-    items?: OrderItem[],
++    items?: OrderItemData[],
+     customerName?: string,
+-    status?: OrderStatus
++    isOpen?: boolean,
+   ) {
+-    try {
+-      if (Array.isArray(items)) {
+-        const existing = await database.getAllAsync<{ id: string; productId: string; quantity: number }>(
+-          `SELECT id, productId, quantity FROM RL_ORDER_PRODUCT WHERE orderId = ?`,
+-          [orderId]
+-        );
+-
+-        const existingMap = new Map<string, string[]>();
+-        for (const row of existing || []) {
+-          const key = String(row.productId);
+-          if (!existingMap.has(key)) existingMap.set(key, []);
+-          existingMap.get(key)!.push(row.id);
+-        }
++    if (typeof isOpen !== 'undefined' && typeof isOpen !== 'boolean') {
++      throw new Error('isOpen inválido');
++    }
+ 
+-        const usedIds = new Set<string>();
+-
+-        for (const { productId, quantity } of items) {
+-          const prodKey = String(productId);
+-          let relId: string | undefined;
+-
+-          const list = existingMap.get(prodKey);
+-          if (list && list.length) {
+-            relId = list.shift()!;
+-            const updateRelStmt = await database.prepareAsync(
+-              'UPDATE RL_ORDER_PRODUCT SET quantity = $quantity WHERE id = $id'
+-            );
+-            try {
+-              await updateRelStmt.executeAsync({ $quantity: Number(quantity), $id: relId });
+-            } finally {
+-              await updateRelStmt.finalizeAsync();
+-            }
+-          } else {
+-            relId = generateUUID();
+-            const insertRelStmt = await database.prepareAsync(
+-              'INSERT INTO RL_ORDER_PRODUCT (id, orderId, productId, quantity) VALUES ($id, $orderId, $productId, $quantity)'
+-            );
+-            try {
+-              await insertRelStmt.executeAsync({ $id: relId, $orderId: orderId, $productId: productId, $quantity: Number(quantity) });
+-            } finally {
+-              await insertRelStmt.finalizeAsync();
+-            }
+-          }
++    const order = await findOrder(String(orderId), currentEstablishmentId);
++    if (!order) {
++      // Keep the old no-op behavior for an unknown ID while ensuring an ID
++      // from another establishment cannot be mutated.
++      markChanged('orders');
++      return;
++    }
+ 
+-          if (relId) usedIds.add(relId);
+-        }
++    const hasItemsUpdate = Array.isArray(items);
++    const existingItems = hasItemsUpdate
++      ? await fetchOrderItems(order.id, currentEstablishmentId!)
++      : [];
++    const prices = hasItemsUpdate
++      ? await Promise.all(items!.map((item) => productPrice(String(item.productId), currentEstablishmentId!)))
++      : [];
++    const total = hasItemsUpdate
++      ? items!.reduce((sum, item, index) => sum + prices[index] * Number(item.quantity), 0)
++      : order.total;
++    const existingByProduct = new Map<string, OrderItemModel[]>();
++
++    for (const existingItem of existingItems) {
++      const key = String(existingItem.productId);
++      const group = existingByProduct.get(key) ?? [];
++      group.push(existingItem);
++      existingByProduct.set(key, group);
++    }
+ 
+-        // remove leftover relations
+-        try {
+-          const toDelete = (existing || []).filter(r => !usedIds.has(r.id));
+-          for (const row of toDelete) {
+-            const delStmt = await database.prepareAsync('DELETE FROM RL_ORDER_PRODUCT WHERE id = $id');
+-            try {
+-              await delStmt.executeAsync({ $id: row.id });
+-            } finally {
+-              await delStmt.finalizeAsync();
+-            }
++    const usedItems = new Set<string>();
++    const now = new Date();
++
++    await database.write(async () => {
++      if (hasItemsUpdate) {
++        const itemsCollection = orderItemCollection();
++
++        for (const [index, item] of items!.entries()) {
++          const key = String(item.productId);
++          const existingItem = existingByProduct.get(key)?.shift();
++          const nextStatus = item.status == null ? undefined : orderItemStatus(item.status);
++
++          if (existingItem) {
++            usedItems.add(existingItem.id);
++            await existingItem.update((record) => {
++              record.quantity = Number(item.quantity);
++              if (nextStatus) record.status = nextStatus;
++              record.updatedAt = now;
++            });
++          } else {
++            await itemsCollection.create((record) => {
++              record.quantity = Number(item.quantity);
++              record.status = nextStatus ?? ORDER_ITEM_STATUS.REQUESTED;
++              record.orderId = order.id;
++              record.order.set(order);
++              record.productId = key;
++              record.unitPriceAtOrder = prices[index];
++              record.createdAt = now;
++              record.updatedAt = now;
++            });
+           }
+-        } catch (errDel) {
+-          // if delete fails, ignore silently
+         }
+ 
+-        const total = await calculateTotal(items);
+-        const updateTotalStmt = await database.prepareAsync(
+-          'UPDATE TB_ORDERS SET total = $total, updated_at = $updatedAt, sync_status = $syncStatus WHERE id = $id'
+-        );
+-        try {
+-          await updateTotalStmt.executeAsync({ $total: total, $updatedAt: Date.now(), $syncStatus: 'pending', $id: orderId });
+-        } finally {
+-          await updateTotalStmt.finalizeAsync();
++        for (const existingItem of existingItems) {
++          if (!usedItems.has(existingItem.id)) await existingItem.markAsDeleted();
+         }
+       }
+ 
+-      if (typeof customerName !== 'undefined') {
+-        const updateClienteStmt = await database.prepareAsync(
+-          'UPDATE TB_ORDERS SET customerName = $customerName, updated_at = $updatedAt, sync_status = $syncStatus WHERE id = $id'
+-        );
+-        try {
+-          await updateClienteStmt.executeAsync({ $customerName: customerName ?? null, $updatedAt: Date.now(), $syncStatus: 'pending', $id: orderId });
+-        } finally {
+-          await updateClienteStmt.finalizeAsync();
+-        }
++      if (hasItemsUpdate || typeof customerName !== 'undefined' || typeof isOpen !== 'undefined') {
++        await order.update((record) => {
++          if (hasItemsUpdate) record.total = total;
++          if (typeof customerName !== 'undefined') record.customerName = customerName ?? null;
++          if (typeof isOpen !== 'undefined') record.isOpen = isOpen;
++          record.updatedAt = now;
++        });
+       }
++    });
+ 
+-      if (typeof status !== 'undefined') {
+-        if (status !== null && !isValidStatus(status)) throw new Error('Status inválido');
+-        const updateStatusStmt = await database.prepareAsync(
+-          'UPDATE TB_ORDERS SET status = $status, updated_at = $updatedAt, sync_status = $syncStatus WHERE id = $id'
+-        );
+-        try {
+-          await updateStatusStmt.executeAsync({ $status: status ?? null, $updatedAt: Date.now(), $syncStatus: 'pending', $id: orderId });
+-        } finally {
+-          await updateStatusStmt.finalizeAsync();
+-        }
+-      }
+-
+-      markChanged('orders')
+-    } catch (error) {
+-      throw error;
+-    }
++    markChanged('orders');
+   }
+ 
+   async function removeOrder(orderId: string) {
+-    try {
+-      const now = Date.now();
+-      const stmt = await database.prepareAsync(
+-        'UPDATE TB_ORDERS SET deleted_at = $deletedAt, updated_at = $updatedAt, sync_status = $syncStatus WHERE id = $id'
+-      );
+-      try {
+-        await stmt.executeAsync({ $deletedAt: now, $updatedAt: now, $syncStatus: 'pending', $id: orderId });
+-      } finally {
+-        await stmt.finalizeAsync();
+-      }
++    const order = await findOrder(String(orderId), currentEstablishmentId);
+ 
+-      markChanged('orders')
+-    } catch (error) {
+-      throw error;
+-    }
++    if (order) await database.write(() => order.markAsDeleted());
++    markChanged('orders');
+   }
+ 
+-  async function listRecentOrders() {
+-    try {
+-      const tresDiasAtras = new Date();
+-      tresDiasAtras.setDate(tresDiasAtras.getDate() - 3);
+-      const iso = tresDiasAtras.toISOString();
+-
+-      const orders = await database.getAllAsync<Order>(
+-        `SELECT * FROM TB_ORDERS WHERE (deleted_at IS NULL) AND openedAt >= ? ORDER BY openedAt DESC LIMIT 500`,
+-        [iso]
+-      );
+-
+-      const ordersWithProducts = await Promise.all(
+-        orders.map(async (order) => {
+-          const products = await database.getAllAsync<{ name: string; quantity: number }>(
+-            `SELECT P.name, PP.quantity
+-             FROM RL_ORDER_PRODUCT PP
+-             JOIN TB_PRODUCTS P ON PP.productId = P.id
+-             WHERE PP.orderId = ?`,
+-            [order.id]
+-          );
+-
+-          const productNames = products.map(p => `( ${p.quantity}x ) ${p.name}`);
+-
+-          const displayedProducts = productNames.length > 3 ? [...productNames.slice(0, 3), "..."] : productNames;
+-
+-          return { ...order, products: displayedProducts };
+-        })
+-      );
+-
+-      const ordersByDate: Record<string, (Order & { products: string[] })[]> = {};
+-
+-      for (const order of ordersWithProducts) {
+-        const date = new Date(order.openedAt).toLocaleDateString();
+-        if (!ordersByDate[date]) ordersByDate[date] = [];
+-        ordersByDate[date].push(order);
+-      }
+-
+-      return ordersByDate;
+-    } catch (error) {
+-      throw error;
+-    }
++  async function listRecentOrders(): Promise<Record<string, OrderWithProducts[]>> {
++    if (!currentEstablishmentId) return {};
++
++    const threeDaysAgo = new Date();
++    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
++
++    const orders = await orderCollection()
++      .query(
++        Q.where('establishment_id', currentEstablishmentId),
++        Q.where('is_open', true),
++        Q.where('opened_at', Q.gte(threeDaysAgo.getTime())),
++        Q.sortBy('opened_at', Q.desc),
++        Q.sortBy('id', Q.desc),
++        Q.take(500),
++      )
++      .fetch();
++
++    return groupOrdersByDate(
++      await Promise.all(orders.map((order) => toOrderWithProducts(order, currentEstablishmentId!))),
++    );
+   }
+ 
+-  async function listOrdersByDay(data: string) {
+-    try {
+-      const inicioDoDia = `${data}T00:00:00.000Z`;
+-      const fimDoDia = `${data}T23:59:59.999Z`;
+-
+-      const orders = await database.getAllAsync<Order>(
+-        "SELECT * FROM TB_ORDERS WHERE openedAt BETWEEN ? AND ? AND (deleted_at IS NULL)",
+-        [inicioDoDia, fimDoDia]
+-      );
+-
+-      const ordersWithProducts = await Promise.all(
+-        orders.map(async (order) => {
+-          const products = await database.getAllAsync<{ name: string; quantity: number }>(
+-            `SELECT P.name, PP.quantity
+-             FROM RL_ORDER_PRODUCT PP
+-             JOIN TB_PRODUCTS P ON PP.productId = P.id
+-             WHERE PP.orderId = ?`,
+-            [order.id]
+-          );
+-
+-          const productNames = products.map(p => `( ${p.quantity}x ) ${p.name}`);
+-
+-          const displayedProducts = productNames.length > 3 ? [...productNames.slice(0, 3), "..."] : productNames;
+-
+-          return { ...order, products: displayedProducts };
+-        })
+-      );
+-
+-      return ordersWithProducts;
+-    } catch (error) {
+-      throw error;
+-    }
++  async function listOrdersByDay(data: string): Promise<OrderWithProducts[]> {
++    if (!currentEstablishmentId) return [];
++
++    const startOfDay = new Date(`${data}T00:00:00.000Z`).getTime();
++    const endOfDay = new Date(`${data}T23:59:59.999Z`).getTime();
++    const orders = await orderCollection()
++      .query(
++        Q.where('establishment_id', currentEstablishmentId),
++        Q.where('is_open', true),
++        Q.where('opened_at', Q.gte(startOfDay)),
++        Q.where('opened_at', Q.lte(endOfDay)),
++        Q.sortBy('opened_at', Q.desc),
++        Q.sortBy('id', Q.desc),
++      )
++      .fetch();
++
++    return Promise.all(orders.map((order) => toOrderWithProducts(order, currentEstablishmentId!)));
+   }
+ 
+   async function getProductsByOrderId(orderId: string) {
+-    try {
+-      const products = await database.getAllAsync<{ name: string; quantity: number }>(
+-        `SELECT P.name, PP.quantity
+-         FROM RL_ORDER_PRODUCT PP
+-         JOIN TB_PRODUCTS P ON PP.productId = P.id
+-         WHERE PP.orderId = ?`,
+-        [orderId]
+-      );
+-
+-      return products;
+-    } catch (err) {
+-      throw err;
+-    }
+-  }
++    const order = await findOrder(String(orderId), currentEstablishmentId);
+ 
+-  async function listRecentOrdersByUser(userId: string | number) {
+-    try {
+-      const tresDiasAtras = new Date();
+-      tresDiasAtras.setDate(tresDiasAtras.getDate() - 3);
+-      const iso = tresDiasAtras.toISOString();
+-
+-      const orders = await database.getAllAsync<Order>(
+-        `SELECT * FROM TB_ORDERS WHERE (deleted_at IS NULL) AND openedAt >= ? AND createdBy = ? AND status IN (?, ?) ORDER BY openedAt DESC`,
+-        [iso, String(userId), ORDER_STATUS.OPEN, ORDER_STATUS.IN_PREPARATION]
+-      );
+-
+-      const ordersWithProducts = await Promise.all(
+-        orders.map(async (order) => {
+-          const products = await database.getAllAsync<{ name: string; quantity: number }>(
+-            `SELECT P.name, PP.quantity
+-             FROM RL_ORDER_PRODUCT PP
+-             JOIN TB_PRODUCTS P ON PP.productId = P.id
+-             WHERE PP.orderId = ?`,
+-            [order.id]
+-          );
+-
+-          const productNames = products.map(p => `( ${p.quantity}x ) ${p.name}`);
+-          const displayedProducts = productNames.length > 3 ? [...productNames.slice(0, 3), "..."] : productNames;
+-
+-          return { ...order, products: displayedProducts };
+-        })
+-      );
+-
+-      const ordersByDate: Record<string, (Order & { products: string[] })[]> = {};
+-      for (const order of ordersWithProducts) {
+-        const date = new Date(order.openedAt).toLocaleDateString();
+-        if (!ordersByDate[date]) ordersByDate[date] = [];
+-        ordersByDate[date].push(order);
+-      }
++    if (!order) throw new Error(`Pedido com ID ${orderId} não encontrado.`);
+ 
+-      return ordersByDate;
+-    } catch (error) {
+-      throw error;
+-    }
++    const items = await fetchOrderItems(order.id, currentEstablishmentId!);
++    return productNamesForItems(items, currentEstablishmentId!);
+   }
+ 
+-  async function countOpenOrders(userId?: string | number | null): Promise<number> {
+-    if (userId) {
+-      const row = await database.getFirstAsync<{ total: number }>(
+-        `SELECT COUNT(*) as total FROM TB_ORDERS WHERE status = ? AND deleted_at IS NULL AND createdBy = ?`,
+-        [ORDER_STATUS.OPEN, String(userId)]
+-      );
+-      return row?.total ?? 0;
+-    }
+-    const row = await database.getFirstAsync<{ total: number }>(
+-      `SELECT COUNT(*) as total FROM TB_ORDERS WHERE status = ? AND deleted_at IS NULL`,
+-      [ORDER_STATUS.OPEN]
++  async function listRecentOrdersByUser(userId: string | number): Promise<Record<string, OrderWithProducts[]>> {
++    if (!currentEstablishmentId) return {};
++
++    const threeDaysAgo = new Date();
++    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
++    const orders = await orderCollection()
++      .query(
++        Q.where('establishment_id', currentEstablishmentId),
++        Q.where('is_open', true),
++        Q.where('seller_id', String(userId)),
++        Q.where('opened_at', Q.gte(threeDaysAgo.getTime())),
++        Q.sortBy('opened_at', Q.desc),
++        Q.sortBy('id', Q.desc),
++      )
++      .fetch();
++
++    return groupOrdersByDate(
++      await Promise.all(orders.map((order) => toOrderWithProducts(order, currentEstablishmentId!))),
+     );
+-    return row?.total ?? 0;
++  }
++
++  async function countOpenOrders(userId?: string | number | null): Promise<number> {
++    if (!currentEstablishmentId) return 0;
++
++    const clauses: Clause[] = [
++      Q.where('establishment_id', currentEstablishmentId),
++      Q.where('is_open', true),
++    ];
++    if (userId !== undefined && userId !== null) clauses.push(Q.where('seller_id', String(userId)));
++
++    return (await orderCollection().query(...clauses).fetch()).length;
+   }
+ 
+   return {
+     createOrder,
+     createFromSync,
+     getOrderById,
+     getProductsByOrderId,
+     updateOrder,
+     removeOrder,
+     listRecentOrders,
+diff --git a/docs/superpowers/sdd/2026-08-27-fase-7-t4-mobile-worker.md b/docs/superpowers/sdd/2026-08-27-fase-7-t4-mobile-worker.md
+new file mode 100644
+index 0000000..6222041
+--- /dev/null
++++ b/docs/superpowers/sdd/2026-08-27-fase-7-t4-mobile-worker.md
+@@ -0,0 +1,90 @@
++# Fase 7 — Task 4: WatermelonDB: schema e models (mobile)
++
++Data: 2026-08-27  
++Repositório: `C:\RN\TozzoBurger`  
++Branch: `feat/fase-7-sync-status-categoria`
++
++## Pacotes instalados
++
++- `@nozbe/watermelondb@0.28.0` — dependência de produção, declarada como
++  `^0.28.0` em `package.json` e registrada no `package-lock.json`.
++- `better-sqlite3@13.0.3` — `devDependency` usada somente pelo teste Jest
++  com o adapter SQLite Node, conforme a seção NodeJS (SQLite) da
++  [documentação oficial de instalação do WatermelonDB](https://watermelondb.dev/docs/Installation).
++- `@nozbe/with-observables` não foi instalado. A documentação oficial atual
++  usa `withObservables` exportado por `@nozbe/watermelondb/react`, portanto não
++  há pacote separado necessário para a Task 8.
++
++O `SQLiteAdapter` instalado aceita `jsi: true`; a instância da aplicação usa
++  essa opção com `dbName: 'tozzoburger'` e `onSetUpError`.
++
++## Estrutura criada
++
++- `database/watermelon/schema.ts`
++  - `appSchema({ version: 1, tables: [...] })` com `products`,
++    `product_types`, `orders`, `order_items`, `sales`, `sale_items`, `users`
++    e `printers`.
++  - Colunas em `snake_case`; `_status`/`_changed` não são declaradas porque
++    são campos internos do WatermelonDB. `created_at`/`updated_at` são usados
++    como colunas especiais numéricas para os decorators `@date`.
++  - Foreign keys `_id` são strings, conforme a convenção de relações do
++    WatermelonDB; a adaptação dos IDs numéricos de `ProductType` vindos do
++    wire fica para a Task 8.
++- `database/watermelon/models/Product.ts`
++- `database/watermelon/models/ProductType.ts`
++- `database/watermelon/models/Order.ts`
++- `database/watermelon/models/OrderItem.ts`
++- `database/watermelon/models/Sale.ts`
++- `database/watermelon/models/SaleItem.ts`
++- `database/watermelon/models/User.ts`
++- `database/watermelon/models/Printer.ts`
++  - Decorators `@field`, `@date`, `@relation` e `@children` correspondentes
++    às tabelas; `Order.isOpen` e `OrderItem.status` estão no modelo novo.
++- `database/watermelon/database.ts`
++  - Instância compartilhada de `Database`, `SQLiteAdapter` com `jsi: true`,
++    `migrations`, `schema`, `dbName: 'tozzoburger'` e `onSetUpError`.
++- `database/watermelon/migrations.ts`
++  - `schemaMigrations({ migrations: [] })`.
++- `database/__tests__/watermelonDatabase.test.ts`
++  - Teste isolado com SQLite real em memória; cria e lê um registro de cada
++    uma das oito tabelas e verifica as relações/children.
++
++Também foi habilitado `experimentalDecorators` em `tsconfig.json`, exigido
++para os decorators legados usados pelos models.
++
++Nenhum hook existente foi migrado ou alterado.
++
++## Verificações
++
++Teste focado:
++
++```text
++npx jest database/__tests__/watermelonDatabase.test.ts --watchAll=false --runInBand --silent
++1 passed, 1 total
++1 test passed, 1 total
++exit code: 0
++```
++
++Suíte completa, comando solicitado:
++
++```text
++npx jest --watchAll=false --runInBand
++28 passed, 28 total test suites
++117 passed, 117 total tests
++1 passed, 1 total snapshot
++exit code: 0
++```
++
++TypeScript, comando solicitado:
++
++```text
++npx tsc --noEmit
++sem saída de erro
++exit code: 0
++```
++
++A suíte exibiu apenas os logs/erros esperados já cobertos pelos testes de
++i18n/BLE e o warning do Jest de fallback para o adapter assíncrono no Node,
++pois JSI nativo não está disponível no ambiente de teste.
++
++O relatório é deliberadamente mantido fora do commit desta task.
+diff --git a/docs/superpowers/sdd/2026-08-27-fase-7-t4-review.md b/docs/superpowers/sdd/2026-08-27-fase-7-t4-review.md
+new file mode 100644
+index 0000000..6849074
+--- /dev/null
++++ b/docs/superpowers/sdd/2026-08-27-fase-7-t4-review.md
+@@ -0,0 +1,285 @@
++# Revisão independente — Fase 7, Task 4 (WatermelonDB: schema e models)
++
++Data: 2026-08-27  
++Repositório: `C:\RN\TozzoBurger`  
++Branch: `feat/fase-7-sync-status-categoria`  
++Commit revisado: `f5f5dbec100726052ca6cbf747491aa01719196b` (`feat-mobile-watermelondb-schema-models`)
++
++## Veredito final
++
++**APROVADO**
++
++Não encontrei achado Critical ou Important. O commit atende o escopo da
++Task 4: adiciona apenas a infraestrutura WatermelonDB, sem migrar hooks, e
++os nomes/colunas dos seis conjuntos sincronizados coincidem com o controller
++da Task 3. Há um risco LOW de integração futura, registrado abaixo, que deve
++ser fechado na Task 8 antes de habilitar o sync do mobile, mas não bloqueia
++esta task isolada.
++
++## Resumo de severidade
++
++| Severidade | Quantidade | Bloqueia a Task 4 |
++|---|---:|---|
++| Critical | 0 | — |
++| Important | 0 | — |
++| Medium | 0 | — |
++| Low | 1 | Não |
++| Informativo | 2 | Não |
++
++Risco geral do commit: **LOW**. O código novo ainda não possui callers de
++produção; o impacto operacional começa quando as Tasks 5–8 passarem a usar a
++instância e o sync.
++
++## O que mudou
++
++`git show f5f5dbe --stat --oneline` reportou **15 arquivos e 675 linhas
++adicionadas**:
++
++- schema WatermelonDB v1 com `products`, `product_types`, `orders`,
++  `order_items`, `sales`, `sale_items`, `users` e `printers`;
++- oito models com decorators, relações e children;
++- singleton `Database` com `SQLiteAdapter`, `jsi: true`, `dbName:
++  'tozzoburger'` e migrations vazias para a versão inicial;
++- dependência `@nozbe/watermelondb@0.28.0`, `better-sqlite3@13.0.3` para o
++  teste Node e `experimentalDecorators`;
++- teste de criação/leitura de um registro em cada tabela e de todas as
++  relações declaradas.
++
++O diff completo de `f5f5dbe` foi lido. Não há remoção de código de validação,
++autorização ou segurança; os arquivos de domínio existentes não aparecem no
++commit.
++
++## Checklist da Task 4
++
++### 1. Compatibilidade com o payload da Task 3
++
++O controller da API declara exatamente as seis tabelas sincronizadas em
++`C:\RN\api\api-tozzo.uk\modules\sync\sync.controller.ts:L36-L42`:
++
++`products`, `product_types`, `orders`, `order_items`, `sales` e `sale_items`.
++
++A comparação independente entre `rawProduct`, `rawProductType`, `rawOrder`,
++`rawOrderItem`, `rawSale` e `rawSaleItem` do controller
++(`sync.controller.ts:L208-L289`) e `database/watermelon/schema.ts` deu:
++
++| Tabela | Campos raw do controller | Schema local |
++|---|---|---|
++| `products` | `id`, `name`, `price`, `ingredients`, `product_type_id`, `source_product_id`, `establishment_id`, `created_at`, `updated_at` | `schema.ts:L12-L20` + `id` implícito |
++| `product_types` | `id`, `description`, `is_active`, `color`, `created_at`, `updated_at` | `schema.ts:L24-L29` + `id` implícito |
++| `orders` | `id`, `is_open`, `customer_name`, `opened_at`, `created_at`, `updated_at`, `total`, `establishment_id`, `seller_id` | `schema.ts:L33-L41` + `id` implícito |
++| `order_items` | `id`, `quantity`, `status`, `order_id`, `product_id`, `unit_price_at_order`, `created_at`, `updated_at` | `schema.ts:L45-L52` + `id` implícito |
++| `sales` | `id`, `total`, `sold_at`, `customer_name`, `is_cancelled`, `created_at`, `updated_at`, `establishment_id`, `seller_id`, `order_id` | `schema.ts:L56-L65` + `id` implícito |
++| `sale_items` | `id`, `quantity`, `sale_id`, `product_id`, `unit_price_at_sale`, `created_at`, `updated_at` | `schema.ts:L69-L75` + `id` implícito |
++
++O controller usa `ChangeSet.deleted: string[]`
++(`sync.controller.ts:L18`) e envia tombstones como arrays de IDs
++(`sync.controller.ts:L879-L910`); não envia `deleted_at` nos registros raw.
++Portanto a ausência de `deleted_at` no schema Watermelon é correta para o
++protocolo da T3, e não uma divergência.
++
++Não há código de `category` no diretório novo (`git grep -ni category
++f5f5dbe -- database/watermelon` não retornou resultado). Isso está correto:
++`Establishment.category` fica na API e não foi duplicado numa tabela de
++estabelecimento local inexistente.
++
++### 2. Status e tipos de domínio
++
++- `Order.isOpen` está no model como `@field('is_open') isOpen!: boolean` em
++  `database/watermelon/models/Order.ts:L17-L24`, e a coluna é boolean em
++  `schema.ts:L38`.
++- `OrderItem.status` está no model como enum-like string
++  `REQUESTED | IN_PREPARATION | DELIVERED` em
++  `database/watermelon/models/OrderItem.ts:L8-L26`, e a coluna é string em
++  `schema.ts:L48`.
++- `SaleItem.ts:L8-L23` não declara `status`; a busca
++  `git grep -ni status f5f5dbe -- database/watermelon/models/SaleItem.ts ...`
++  só encontrou o status de `OrderItem` e a coluna de `order_items`.
++
++Não existe validação de transição nesta task, o que é adequado: a transição
++livre será comportamento do hook/UI da Task 6.
++
++### 3. ProductType.id numérico no servidor
++
++O Prisma da API confirma `ProductType.id Int @default(autoincrement())` em
++`C:\RN\api\api-tozzo.uk\prisma\schema.prisma:L63-L70`. O Watermelon model
++não declara um `id` próprio — usa o `Model.id` herdado, que é `string`
++(`node_modules/@nozbe/watermelondb/Model/index.d.ts:L12,L44`). Também não há
++`server_id` em `schema.ts:L23-L30` ou `ProductType.ts:L7-L18`.
++
++Isso não constitui bloqueio nesta task por dois motivos verificáveis:
++
++1. O controller da T3 já normaliza o ID do servidor no pull com
++   `id: String(row.id)` em `sync.controller.ts:L223-L231`; o Watermelon aceita
++   a representação string decimal (`'7'`) como ID local.
++2. A política de IDs e a conversão do wire foram explicitamente deixadas para
++   a Task 8 no relatório do worker. A ausência de `server_id` não impede
++   adicionar essa coluna numa migration futura caso a política escolhida
++   precise dela.
++
++### LOW-01 — Conversão de IDs numéricos não está codificada nem coberta no teste
++
++**Arquivos:** `database/watermelon/schema.ts:L16-L17`,
++`database/watermelon/models/Product.ts:L19-L25`,
++`database/watermelon/models/ProductType.ts:L7-L18`  
++**Impacto:** risco de perda silenciosa de vínculo de tipo/origem na primeira
++implementação do sync mobile.  
++**Bloqueia Task 4:** não.
++
++O controller envia `product_type_id` e `source_product_id` sem conversão em
++`sync.controller.ts:L215-L216`; esses valores são numéricos no Prisma
++(`schema.prisma:L84-L86`), enquanto as colunas locais são strings
++(`schema.ts:L16-L17`). A implementação instalada do Watermelon sanitiza um
++valor numérico recebido para uma coluna string opcional como `null`. A prova
++executada foi:
++
++```text
++node -e ...sanitizedRaw({id:'p1',product_type_id:7,source_product_id:42},schema)...
++{"id":"p1","_status":"created","_changed":"","product_type_id":null,"source_product_id":null}
++```
++
++O mesmo comportamento confirma que um ID raw numérico também não pode ser
++passado diretamente como `record.id`; a prova com `id:7` gerou um novo ID
++aleatório, enquanto `id:'7'` preservou `"7"`. A API já envia o
++`product_types.id` como string no pull, mas um `ProductType.create()` local
++sem ID explícito gera UUID (o teste faz isso em
++`watermelonDatabase.test.ts:L75-L81`). Se esse UUID for enviado como
++`product_types.id`, o parser numérico da T3 (`productTypeNumberId` em
++`sync.controller.ts:L174-L178`) não o aceitará.
++
++**Ação recomendada para Task 8:** definir e testar um único contrato: no
++pull, converter todos os IDs numéricos (`product_types.id`,
++`products.product_type_id` e `products.source_product_id`) para strings antes
++de aplicar no Watermelon; no push, garantir que ProductType local seja criado
++com o ID decimal string retornado pelo servidor ou manter um campo auxiliar
++`server_id` com migration e mapear as relações. O teste de sync deve incluir
++uma resposta raw realista, não apenas o teste de Model API da Task 4.
++
++## Hooks e blast radius
++
++`git diff --name-status f5f5dbe~1 f5f5dbe` listou somente os oito models, schema,
++database, migrations, teste, `package.json`, `package-lock.json` e
++`tsconfig.json`. Não listou:
++
++- `database/useProductDatabase.ts`;
++- `database/useOrderDatabase.ts`;
++- `database/useSaleDatabase.ts`;
++- `database/useUserDatabase.ts`;
++- `database/usePrinterDatabase.ts`;
++- `database/salesQuery.ts`; ou
++- `database/initializeDatabase.ts`.
++
++Adicionalmente, `git diff --quiet f5f5dbe~1 f5f5dbe --` sobre esses sete
++arquivos terminou com `exit_code=0`. O grep de `Watermelon` no commit mostra
++apenas o teste e a infraestrutura nova; nenhum hook existente importa a
++instância nova. Portanto o blast radius efetivo desta task é zero em runtime
++atual, com dependência futura concentrada nas Tasks 5–8.
++
++As tabelas `users` e `printers` são locais e não aparecem no `SYNC_TABLES` da
++T3. Isso é compatível com o escopo desta task; a Task 8 deve mantê-las fora
++do wire ou tratá-las explicitamente como local-only.
++
++## Cobertura de testes
++
++O teste novo em `database/__tests__/watermelonDatabase.test.ts:L60-L252`
++instancia SQLite em memória, cria e lê um registro de cada uma das oito
++tabelas e verifica as relações/children. Ele cobre schema, decorators,
++associações, datas, boolean e status string.
++
++Não cobre ainda:
++
++- aplicação de uma resposta `pullChanges` raw;
++- conversão de IDs numéricos;
++- `deleted`/tombstones; ou
++- build nativo Android/iOS com JSI real.
++
++Essas lacunas são coerentes com a divisão de escopo — sync fica na Task 8 e
++o build nativo está no QA integrado — mas a conversão deve ser uma condição
++de aceite da Task 8.
++
++## Evidência de comandos executados
++
++### Diff e estado
++
++```text
++git show f5f5dbe --stat --oneline
++f5f5dbe feat-mobile-watermelondb-schema-models
++15 files changed, 675 insertions(+)
++```
++
++`git show --no-ext-diff --no-color --format=fuller f5f5dbe --` foi executado
++e o diff completo foi lido. `git show --check --oneline f5f5dbe` não reportou
++erros de whitespace.
++
++O estado antes da criação deste relatório era:
++
++```text
++## feat/fase-7-sync-status-categoria
++?? docs/superpowers/sdd/2026-08-27-fase-7-t4-last-message.txt
++?? docs/superpowers/sdd/2026-08-27-fase-7-t4-mobile-worker.md
++```
++
++Os dois arquivos não rastreados já existiam e não foram alterados. Nenhum
++código foi modificado e nenhum commit foi criado nesta revisão.
++
++### Dependências
++
++```text
++npm ls @nozbe/watermelondb better-sqlite3 --depth=0
++@nozbe/watermelondb@0.28.0
++better-sqlite3@13.0.3
++exit code: 0
++```
++
++### Suíte completa
++
++Comando solicitado, executado independentemente:
++
++```text
++npx jest --watchAll=false --runInBand
++Test Suites: 28 passed, 28 total
++Tests:       117 passed, 117 total
++Snapshots:   1 passed, 1 total
++exit code: 0
++```
++
++Houve apenas logs esperados dos testes existentes e o warning do adapter
++JSI no ambiente Node: `JSI SQLiteAdapter not available ... falling back to
++asynchronous operation`. O teste Watermelon passou; isso não é validação de
++JSI nativo.
++
++### TypeScript
++
++```text
++npx tsc --noEmit
++sem saída de erro (apenas warning do Node sobre NO_COLOR/FORCE_COLOR)
++exit code: 0
++```
++
++## Histórico e metodologia
++
++- Estratégia: revisão diferencial DEEP do commit pequeno, com leitura do
++  diff completo e dos arquivos de contexto da spec/plano/worker.
++- Histórico: `git log --all --oneline -S"@nozbe/watermelondb"` aponta a
++  introdução no próprio `f5f5dbe`; não há código de segurança removido ou
++  regressão histórica detectável neste commit.
++- Contexto externo comparado: schema Prisma e
++  `modules/sync/sync.controller.ts` da API presentes em
++  `C:\RN\api\api-tozzo.uk`.
++- Confiança: **ALTA** para o escopo da Task 4; **CONDICIONADA** para o futuro
++  wire sync até LOW-01 ser coberto pela Task 8.
++
++## Recomendação
++
++### Antes de aceitar a Task 8
++
++- [ ] Adicionar teste de pull com payload numérico do API e verificar que
++  `product_type_id`, `source_product_id` e `product_types.id` não são
++  perdidos.
++- [ ] Definir a política para `ProductType` criado localmente: ID decimal
++  string retornado pelo servidor ou `server_id` auxiliar com migration.
++- [ ] Manter `users`/`printers` explicitamente local-only no sync novo.
++
++### Decisão desta revisão
++
++**APROVADO para a Task 4.** Não há alteração de código ou commit exigida
++nesta revisão.
+diff --git a/docs/superpowers/sdd/2026-08-27-fase-7-t5-mobile-worker-fix.md b/docs/superpowers/sdd/2026-08-27-fase-7-t5-mobile-worker-fix.md
+new file mode 100644
+index 0000000..980f170
+--- /dev/null
++++ b/docs/superpowers/sdd/2026-08-27-fase-7-t5-mobile-worker-fix.md
+@@ -0,0 +1,90 @@
++# Correção dos achados da Task 5 — hooks Watermelon
++
++- Data: 2026-08-27
++- Repositório: TozzoBurger
++- Branch: `feat/fase-7-sync-status-categoria`
++- Base: `49611d6` (`feat-mobile-migrate-simple-hooks-to-watermelon`)
++- Review tratado: `2026-08-27-fase-7-t5-review.md`
++
++## Important-01 — isolamento por estabelecimento e limpeza na troca
++
++### Escopo das queries de produto
++
++`useProductDatabase()` agora lê o estabelecimento atual por `useAuth().user.establishmentId`, normalizando IDs numéricos e textuais para string. O ID atual é aplicado nas queries de:
++
++- `searchByName`;
++- `filterByProductType` e o alias `filterByTipo`;
++- `show` e `showAdd`;
++- `searchBySourceProductId`.
++
++As buscas internas usadas por `update` e `remove` também foram escopadas para impedir alteração de um produto de outro estabelecimento quando apenas o ID é conhecido. A criação de produto usa o estabelecimento autenticado; sem estabelecimento autenticado, a operação falha explicitamente em vez de gravar uma linha sem escopo.
++
++A coluna `products.establishment_id` já existia no schema Watermelon v1 e no model `Product.ts`. Portanto, não foi necessária alteração de schema ou migration.
++
++### Limpeza na troca
++
++Foi adicionada `resetWatermelonLocalData()` em `database/watermelon/database.ts`. Ela executa uma escrita Watermelon e remove via batch todos os registros de `products`, `product_types` e `printers`, preservando as tabelas de pedidos, vendas e usuários que ainda pertencem às etapas posteriores da migração.
++
++`AuthContext.login()` chama essa função depois do commit da limpeza/recriação SQLite legada quando detecta mudança de `establishmentId`.
++
++### Decisão para impressora
++
++A impressora não ganhou uma coluna nova. O ID do registro, antes fixo em `"1"`, passou a ser `String(establishmentId)` do usuário autenticado. Assim, a tabela suporta uma impressora por estabelecimento e `getPrinter`, `setPrinter` e `removePrinter` não cruzam tenants mesmo antes da limpeza. O reset na troca continua sendo a limpeza de estado local exigida para os registros antigos e para as demais tabelas dos hooks da Task 5.
++
++### Sync fora do escopo
++
++`useSyncDatabase.ts` continua apontando para o SQLite legado. Produtos criados pelos hooks Watermelon ainda não entram no sync atual; isso é uma limitação temporária consciente desta migração incremental e permanece reservado para a Task 8, não um bug pendente desta correção. O objetivo desta alteração foi impedir vazamento entre estabelecimentos no mesmo dispositivo.
++
++## Medium-01 — default de role
++
++`useUserDatabase.create()` voltou a gravar `role: 'EMPLOYEE'` quando `input.role` não é informado, mantendo o comportamento do schema/fluxo legado.
++
++## TDD e testes adicionados
++
++Os testes RED foram executados antes da implementação. As falhas observadas foram as esperadas: produto de A retornava nas consultas de B, impressora de A retornava no contexto B, `role` era `null` e a função de reset ainda não existia.
++
++Os testes cobrem a troca de contexto A → B para todas as queries públicas de produto, o escopo da impressora, o reset seletivo e o default de role.
++
++## Verificações executadas
++
++### Focada — GREEN
++
++```text
++npx jest database/__tests__/useProductDatabase.test.tsx database/__tests__/useUserDatabase.test.ts database/__tests__/usePrinterDatabase.test.ts database/__tests__/watermelonReset.test.ts --watchAll=false --runInBand --silent
++
++Test Suites: 4 passed, 4 total
++Tests:       16 passed, 16 total
++Snapshots:   0 total
++Process exit: 0
++```
++
++### Suíte completa
++
++```text
++npx jest --watchAll=false --runInBand
++
++Test Suites: 31 passed, 31 total
++Tests:       125 passed, 125 total
++Snapshots:   1 passed, 1 total
++Process exit: 0
++```
++
++Os logs de i18n, BLE e fallback de JSI Watermelon são casos negativos/ambiente já esperados pela suíte; não houve falha.
++
++### TypeScript
++
++```text
++npx tsc --noEmit
++
++Process exit: 0
++```
++
++### Whitespace
++
++```text
++git diff --check
++
++Process exit: 0
++```
++
++Este relatório é um artefato de trabalho e não deve ser incluído no commit da correção.
+diff --git a/docs/superpowers/sdd/2026-08-27-fase-7-t5-mobile-worker.md b/docs/superpowers/sdd/2026-08-27-fase-7-t5-mobile-worker.md
+new file mode 100644
+index 0000000..59e9732
+--- /dev/null
++++ b/docs/superpowers/sdd/2026-08-27-fase-7-t5-mobile-worker.md
+@@ -0,0 +1,131 @@
++# Fase 7 — Task 5: migração dos hooks simples para WatermelonDB
++
++Data: 2026-08-27  
++Repositório: `C:\RN\TozzoBurger`  
++Branch: `feat/fase-7-sync-status-categoria`  
++Commit-base: `f5f5dbe` (`feat-mobile-watermelondb-schema-models`)
++
++## Implementação
++
++### `database/useProductDatabase.ts`
++
++- Removeu `expo-sqlite`, `prepareAsync`, `runAsync`, `getAllAsync` e
++  `getFirstAsync`.
++- `create()` usa `database.get('products').create()` dentro de
++  `database.write()` e mantém o retorno `{ id }`.
++- `createFromSync()` usa `prepareCreateFromDirtyRaw()` + `database.batch()`
++  para preservar o ID/timestamp recebido e marcar o registro como `synced`.
++- `searchByName()`, `getProductTypes()`, `filterByProductType()` e
++  `searchBySourceProductId()` usam Watermelon Query API, incluindo filtro de
++  tipo de produto ativo, ordenação e paginação existentes.
++- `show()`/`showAdd()` consultam a coleção Watermelon e convertem o model
++  para o shape legado (`productTypeId` numérico, `updated_at` em epoch ms,
++  `deleted_at`/`sync_status`).
++- `update()` usa `Model.update()`; `remove()` usa `markAsDeleted()`, que é o
++  tombstone equivalente no protocolo Watermelon. As escritas continuam
++  chamando `markChanged('products')` para manter o comportamento das telas
++  durante a transição para o sync nativo.
++
++### `database/useUserDatabase.ts`
++
++- Usa a coleção Watermelon `users` e `Q.where`/`Q.sortBy` para leitura e
++  listagem.
++- `create()` cria o registro pela Model API dentro de um writer serializado.
++  Como o contrato antigo devolve um `insertedRowId` numérico, gera o próximo
++  ID numérico como string no Watermelon e devolve o mesmo formato numérico.
++- `show()` e `list()` convertem IDs/establishment IDs string do model para o
++  shape numérico legado; o campo `email` continua preservado em runtime.
++- `update()` usa `Model.update()` e mantém exatamente os campos que o hook
++  antigo atualizava.
++
++### `database/usePrinterDatabase.ts`
++
++- Usa a coleção Watermelon `printers` sem SQL cru.
++- Mantém a impressora padrão no ID lógico `"1"`; a criação usa a Model API
++  preparada para preservar esse ID e atualizações usam `Model.update()`.
++- `getPrinter()` mantém o retorno `{ uuid: null, name: null }` quando não há
++  registro.
++- `removePrinter()` usa `destroyPermanently()`, equivalente à remoção local
++  definitiva que existia antes.
++
++## Assinaturas públicas
++
++Não foram alterados nomes exportados, parâmetros ou formatos de retorno:
++
++- `useProductDatabase()`: `create`, `createFromSync`, `searchByName`,
++  `update`, `remove`, `show`, `showAdd`, `getProductTypes`,
++  `filterByProductType`, `searchBySourceProductId` e os três aliases legados.
++- `useUserDatabase()`: `create`, `show`, `update`, `list`, incluindo o retorno
++  `{ insertedRowId }`.
++- `usePrinterDatabase()`: `setPrinter`, `getPrinter`, `removePrinter`,
++  incluindo o retorno `{ uuid, name }`.
++
++Nenhuma tela ou componente precisou ser alterado.
++
++## Consumidores validados
++
++- `app/(tabs)/produtos.tsx` continua usando `remove`; `useProductList` usa
++  busca, filtro e paginação do mesmo hook.
++- `app/(tabs)/index.tsx`, `historico.tsx` e os modais de produto, pedido,
++  conta, histórico e relatório continuam usando os métodos de produto sem
++  alteração de chamada.
++- `app/(tabs)/configs.tsx` continua usando `setPrinter`, `getPrinter` e
++  `removePrinter`.
++- O fluxo de impressão em `historico.tsx` e
++  `modais/contaHistoricoModal.tsx` continua usando `getPrinter`.
++- `app/login.tsx` não usa `useUserDatabase`; autenticação permanece em
++  `AuthContext` (que ainda está fora do escopo desta task). O hook de usuário
++  foi coberto independentemente e preserva sua assinatura.
++
++O typecheck compila todos esses consumidores e a suíte completa passou sem
++  quebra causada pelos hooks.
++
++## TDD e testes
++
++- RED: após adaptar o teste existente de produtos e criar os testes de
++  usuário/impressora, a execução contra os hooks antigos falhou em 3 suites
++  antes dos testes rodarem, porque ainda importava `expo-sqlite` no ambiente
++  Jest (`Cannot find native module 'ExponentConstants'`).
++- GREEN: testes focados passaram com banco SQLite Watermelon em memória,
++  populado exclusivamente por Model API (sem SQL cru): 3 suites, 12 testes.
++- `database/__tests__/useProductDatabase.test.tsx` foi adaptado para cobrir
++  criação, sync com ID/timestamp, atualização, tombstone, busca/filtros,
++  paginação, tipos ativos e aliases de leitura.
++- Foram criados `database/__tests__/useUserDatabase.test.ts` e
++  `database/__tests__/usePrinterDatabase.test.ts` com os comportamentos
++  legados equivalentes.
++
++## Comandos finais
++
++### Suíte completa
++
++Comando executado exatamente:
++
++```text
++npx jest --watchAll=false --runInBand
++```
++
++Resultado real:
++
++```text
++Test Suites: 30 passed, 30 total
++Tests:       121 passed, 121 total
++Snapshots:   1 passed, 1 total
++exit code: 0
++```
++
++O Jest exibiu apenas warnings esperados: fallback do adapter JSI para o
++adapter assíncrono no ambiente Node e logs de testes existentes de i18n/BLE.
++
++### TypeScript
++
++Comando executado exatamente:
++
++```text
++npx tsc --noEmit
++```
++
++Resultado real: nenhum erro TypeScript, `exit code: 0`. Houve somente o
++warning do Node sobre `NO_COLOR`/`FORCE_COLOR`.
++
++Este relatório fica fora do commit conforme solicitado.
+diff --git a/docs/superpowers/sdd/2026-08-27-fase-7-t5-review.md b/docs/superpowers/sdd/2026-08-27-fase-7-t5-review.md
+new file mode 100644
+index 0000000..8e96842
+--- /dev/null
++++ b/docs/superpowers/sdd/2026-08-27-fase-7-t5-review.md
+@@ -0,0 +1,201 @@
++# Revisão independente — Fase 7, Task 5
++
++- Data: 2026-08-27
++- Repositório: TozzoBurger
++- Branch: feat/fase-7-sync-status-categoria
++- Commit revisado: 49611d6197fc19aeeac9047080db61b7fea4ba8c
++- Base declarada: f5f5dbec100726052ca6cbf747491aa01719196b (Task 4)
++- Revisor: subagente independente
++
++## Veredito
++
++**REPROVADO**.
++
++Os critérios mecânicos da Task 5 passam: as assinaturas públicas permaneceram compatíveis, não há SQL cru nos três hooks, a suíte completa e o TypeScript passam, e nenhuma tela/componente foi alterado. Porém, há um achado **Important** bloqueante: os hooks agora gravam e leem um banco WatermelonDB persistente enquanto o fluxo de autenticação, sincronização e limpeza de dados da aplicação continua usando o SQLite legado. O commit deixa produtos e impressoras fora do sync/limpeza existentes e permite vazamento de dados entre estabelecimentos no mesmo dispositivo.
++
++## Classificação
++
++| Severidade | Quantidade | Bloqueia? |
++|---|---:|---|
++| Critical | 0 | — |
++| Important | 1 | Sim |
++| Medium | 1 | Não isoladamente |
++| Low | 0 | — |
++| Informativo | 1 | Não |
++
++## Escopo e diff revisado
++
++Comandos executados:
++
++~~~text
++git show 49611d6 --stat
++git rev-parse 49611d6~1
++git diff --name-only 49611d6~1 49611d6
++git diff --check 49611d6~1 49611d6
++~~~
++
++git show 49611d6 --stat confirmou 6 arquivos alterados, 710 inserções e 376 remoções:
++
++~~~text
++database/__tests__/usePrinterDatabase.test.ts
++database/__tests__/useProductDatabase.test.tsx
++database/__tests__/useUserDatabase.test.ts
++database/usePrinterDatabase.ts
++database/useProductDatabase.ts
++database/useUserDatabase.ts
++~~~
++
++Li o diff completo dos três hooks e dos três arquivos de teste. git diff --check não encontrou erro de whitespace.
++
++## Checklist específico da Task 5
++
++### 1. Assinaturas públicas
++
++**Passou.** Os três nomes exportados continuam sendo hooks sem parâmetros:
++
++~~~text
++useProductDatabase()
++useUserDatabase()
++usePrinterDatabase()
++~~~
++
++Os métodos retornados mantêm os nomes, parâmetros e formatos de retorno observados na implementação anterior. Em particular, foram preservados os retornos { id } de produto, { insertedRowId } de usuário e { uuid, name }/null do printer, além dos aliases existentes no produto (getTipoProdutos, filterByTipo, searchOrigemProdutoId e showAdd).
++
++Também procurei consumidores de produção. Os chamadores existentes em app/, hooks/ e modais não foram modificados pelo commit, portanto não há quebra de assinatura escondida nas telas.
++
++### 2. Ausência de SQL cru nos três hooks
++
++**Passou.** Para cada arquivo, executei git grep no commit revisado para:
++
++~~~text
++execAsync
++runAsync
++getAllAsync
++prepareAsync
++getFirstAsync
++expo-sqlite
++~~~
++
++Todas as buscas retornaram “sem ocorrências” em:
++
++~~~text
++database/useProductDatabase.ts
++database/useUserDatabase.ts
++database/usePrinterDatabase.ts
++~~~
++
++Os hooks usam database.get(...).query(...), modelos Watermelon e database.write(...)/batch(...).
++
++### 3. Conversão de ID de usuário e concorrência
++
++**Não encontrei race condition óbvia na implementação atual.** useUserDatabase calcula o próximo ID dentro de database.write(...). A implementação de Database.write do Watermelon enfileira o trabalho na WorkQueue, e a fila aguarda a conclusão da operação anterior antes de iniciar a seguinte. Assim, dois create concorrentes não executam simultaneamente o trecho fetch -> max + 1 -> insert.
++
++Além da leitura do código da fila (node_modules/@nozbe/watermelondb/Database/index.js e WorkQueue.js), executei uma prova independente com 20 chamadas concorrentes ao hook contra um banco Watermelon em memória. Saída relevante:
++
++~~~json
++{"ids":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],"count":20,"stored":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]}
++~~~
++
++Também li database/__tests__/syncGuard.test.ts; o teste existente de serialização de chamadas concorrentes continua passando. Portanto, não há achado de concorrência bloqueante nesta revisão.
++
++## Achado Important-01 — bancos divergentes deixam dados fora do sync e permitem vazamento entre estabelecimentos
++
++**Severidade: Important — bloqueante.**
++
++### Evidência
++
++O commit troca os três hooks para o singleton Watermelon em database/watermelon/database.ts, com banco persistente (dbName: tozzoburger). Ao mesmo tempo:
++
++- app/_layout.tsx continua montando somente o SQLiteProvider legado;
++- context/AuthContext.tsx continua lendo e escrevendo TB_USERS e executando a limpeza de troca de estabelecimento somente no SQLite legado;
++- context/AutoSyncContext.tsx continua lendo tabelas legadas;
++- database/useSyncDatabase.ts continua sendo a implementação de sincronização baseada em expo-sqlite;
++- não há filtro por establishment_id nas queries de produto do novo hook;
++- create de produto converte a ausência de establishmentId para '', e não obtém automaticamente o estabelecimento autenticado;
++- a limpeza legada de TB_PRODUCTS, TB_PRINTERS e TB_USERS não remove registros equivalentes do banco Watermelon.
++
++### Cenário concreto
++
++1. O usuário do estabelecimento A cria ou consulta produtos usando useProductDatabase; os registros vão para WatermelonDB.
++2. O usuário troca para o estabelecimento B. O AuthContext limpa/recria as tabelas TB_* do SQLite legado, mas não limpa o singleton Watermelon.
++3. searchByName, filterByTipo, show e showAdd do novo hook consultam Watermelon sem restringir pelo estabelecimento atual. Produtos de A continuam retornando para B.
++4. O mesmo problema existe para usePrinterDatabase: a impressora fica armazenada no registro fixo id = '1' do Watermelon, enquanto a remoção de TB_PRINTERS no fluxo de troca de conta atua em outro banco.
++
++Há ainda uma divergência funcional imediata: o produto criado pela UI nova não é observado pelo useSyncDatabase legado, porque o sync consulta SQLite; portanto ele não entra no fluxo de sincronização atual. O inverso também ocorre: produtos/types seed carregados apenas no SQLite legado não aparecem nas queries Watermelon.
++
++### Impacto
++
++Isso pode causar:
++
++- exposição de catálogo e impressora do estabelecimento anterior para o estabelecimento atual;
++- operações e relatórios usando dados de tenant incorreto;
++- produtos criados localmente que não são enviados pelo sync existente;
++- estado aparentemente vazio ou inconsistente após login/troca de estabelecimento.
++
++Os testes novos cobrem CRUD e filtragem de produto ativo, CRUD de usuário e CRUD de impressora, mas não cobrem troca de estabelecimento, persistência entre sessões, integração com AuthContext/sync nem isolamento por establishment_id. O fato de o sync completo estar planejado para uma task posterior explica a ordem da migração, mas não elimina o estado quebrado introduzido por este commit se ele for aceito/entregue isoladamente.
++
++### Correção recomendada
++
++Antes de aprovar, alinhar a fronteira de migração: ou migrar/rotear também sync, autenticação e limpeza para o mesmo banco Watermelon nesta etapa, ou manter uma camada de compatibilidade que replique/consuma os dados no SQLite até a conclusão do sync. Em qualquer caso, o acesso a produtos deve ser particionado pelo estabelecimento atual e a troca de estabelecimento deve limpar ou isolar os registros Watermelon; a impressora também precisa participar dessa política.
++
++## Achado Medium-01 — default de role mudou de EMPLOYEE para null
++
++**Severidade: Medium — não bloqueia isoladamente.**
++
++No fluxo anterior, o INSERT de usuário não informava role, e o schema legado tinha role TEXT NULL DEFAULT 'EMPLOYEE'. O novo useUserDatabase.create prepara explicitamente role: input.role ?? null. Assim, chamadas que não informam role — inclusive o teste novo — passam a armazenar null, não EMPLOYEE.
++
++Não encontrei consumidor de produção de useUserDatabase no commit/contexto atual, então o impacto imediato parece limitado. Ainda assim, é uma alteração de comportamento incompatível com o default legado e deve ser decidida/documentada ou coberta por teste antes da migração completa.
++
++## Informativo — cobertura adicional ausente
++
++Os testes alterados passam, mas não testam a paginação/tie-breaker completa do produto, a conversão de estabelecimento entre string/number, a persistência cruzada entre autenticação e hooks, nem a troca de estabelecimento. A prova concorrente independente desta revisão passou, mas deveria ser incorporada como teste do hook se a conversão de ID for mantida.
++
++## Verificações executadas
++
++### Suites focadas
++
++~~~text
++npx jest database/__tests__/useProductDatabase.test.tsx database/__tests__/useUserDatabase.test.ts database/__tests__/usePrinterDatabase.test.ts --watchAll=false --runInBand --silent
++
++Test Suites: 3 passed, 3 total
++Tests:       12 passed, 12 total
++Snapshots:   0 total
++~~~
++
++### Suíte completa
++
++~~~text
++npx jest --watchAll=false --runInBand
++
++Test Suites: 30 passed, 30 total
++Tests:       121 passed, 121 total
++Snapshots:   1 passed, 1 total
++Time:        5.42 s
++Process exit: 0
++~~~
++
++Houve apenas logs esperados de casos negativos/i18n, erro simulado de BLE e fallback quando JSI do Watermelon não está disponível; não houve falha de teste.
++
++### TypeScript
++
++~~~text
++npx tsc --noEmit
++
++Process exit: 0
++~~~
++
++### Telas e componentes
++
++~~~text
++git diff --name-only 49611d6~1 49611d6
++git diff --name-only 49611d6~1 49611d6 -- app components
++~~~
++
++A segunda busca não retornou arquivos. A primeira retornou somente os seis arquivos em database/ listados acima; nenhuma tela ou componente consumidor foi alterado.
++
++## Conclusão
++
++A implementação atende ao checklist local de API e substituição de SQL, e as verificações automatizadas reproduzem o relatório do worker (30 suites, 121 testes e TypeScript limpo). Mesmo assim, o comportamento integrado não é seguro: a migração para um banco persistente separado não foi acompanhada por isolamento de estabelecimento nem pela migração/ponte do fluxo existente de sync e limpeza. Por esse motivo, o veredito final é **REPROVADO** até o achado Important-01 ser resolvido ou explicitamente tratado por uma alteração de arquitetura que torne o estado intermediário seguro.
++
++Não foram alterados arquivos de código nem criado commit durante a revisão; este arquivo é o único artefato produzido pela revisão.
++
+diff --git a/docs/superpowers/sdd/2026-08-27-fase-7-t5-review2.md b/docs/superpowers/sdd/2026-08-27-fase-7-t5-review2.md
+new file mode 100644
+index 0000000..f8615ba
+--- /dev/null
++++ b/docs/superpowers/sdd/2026-08-27-fase-7-t5-review2.md
+@@ -0,0 +1,233 @@
++# Revisão independente — Fase 7, Task 5 — segunda rodada
++
++- Data: 2026-08-27
++- Repositório: TozzoBurger
++- Branch: feat/fase-7-sync-status-categoria
++- Commit revisado: 66d9457bea0c78af2314384a753cd9763757b9a0
++- Commit anterior/revisado na rodada 1: 49611d6
++- Base da Task 4: f5f5dbe
++- Revisor: subagente independente
++
++## Veredito final
++
++**APROVADO.**
++
++Não encontrei achado Critical ou Important. O Important-01 da rodada 1 foi
++resolvido nos caminhos de leitura e mutação de produto, na chave da
++impressora e no fluxo de troca de estabelecimento. O Medium-01 também foi
++corrigido. As limitações restantes são de cobertura/compatibilidade
++condicionais e não permitem acesso de B aos produtos de A no código atual.
++
++| Severidade | Quantidade | Bloqueia? |
++|---|---:|---|
++| Critical | 0 | — |
++| Important | 0 | — |
++| Medium | 0 | — |
++| Low | 2 | Não |
++| Informativo | 2 | Não |
++
++## O que foi revisado
++
++git show 66d9457 --stat reportou 9 arquivos alterados, 288 inserções e 24
++remoções. O diff completo de git show 66d9457 --format=fuller --no-ext-diff
++--no-color foi lido. Os arquivos de produção alterados são:
++
++- context/AuthContext.tsx;
++- database/useProductDatabase.ts;
++- database/usePrinterDatabase.ts;
++- database/useUserDatabase.ts; e
++- database/watermelon/database.ts.
++
++Os quatro arquivos restantes são testes novos ou ajustados. git diff
++--check 66d9457^ 66d9457 terminou com exit code 0.
++
++## Isolamento de produtos
++
++O escopo não é decorativo e é aplicado por uma única função compartilhada:
++
++| Caminho | Evidência no commit 66d9457 |
++|---|---|
++| searchByName | database/useProductDatabase.ts:L112-L125, com Q.where('establishment_id', currentEstablishmentId) em L116 |
++| filterByProductType | L175-L190, com o mesmo predicado em L180 |
++| filterByTipo | L220 aponta diretamente para filterByProductType, portanto herda o predicado |
++| show | L154-L156 chama findProduct |
++| showAdd | L159-L161 chama show, portanto herda o predicado |
++| searchBySourceProductId | L193-L204, com o predicado em L198 |
++| update | L129-L138 chama findProduct(data.id, currentEstablishmentId) |
++| remove | L144-L151 chama findProduct(id, currentEstablishmentId) |
++| searchOrigemProdutoId | L222 aponta diretamente para searchBySourceProductId |
++
++findProduct exige simultaneamente o ID e o estabelecimento em
++database/useProductDatabase.ts:L53-L58. Sem usuário/estabelecimento, as
++listas retornam vazio, show/showAdd retornam null e create falha
++explicitamente (L63-L70). A criação normal grava sempre o estabelecimento
++autenticado (L79), ignorando qualquer valor fornecido pelo objeto de entrada.
++
++createFromSync (L88-L109) é um caminho interno, não uma query pública de tela;
++preserva o estabelecimento recebido pelo payload e usa o autenticado como
++fallback. Não há consumidor de produção desse método nesta revisão.
++getProductTypes não foi escopado porque product_types não possui
++establishment_id no schema da Task 4 e é a tabela de tipos global prevista no
++contrato atual.
++
++## Impressora e representação do ID
++
++usePrinterDatabase.ts:L18-L22 normaliza number e string para
++String(user.establishmentId), tratando null, undefined e string vazia como
++ausência de contexto. O valor normalizado é usado em todos os caminhos:
++
++- leitura em findPrinter (L11-L15);
++- criação/atualização em setPrinter (L25-L50), com id: establishmentId em L42;
++- leitura em getPrinter (L55); e
++- remoção em removePrinter (L66).
++
++Isso é coerente com o schema da Task 4: printers tem apenas uuid e name
++(database/watermelon/schema.ts:L88-L93), então o ID primário é a chave lógica
++de uma impressora por estabelecimento. Dois usuários do mesmo estabelecimento
++veem a mesma impressora; estabelecimentos distintos não compartilham a linha.
++Para os formatos previstos, 7 e '7' viram o mesmo ID '7'; o valor numérico 0
++também é preservado como '0' e não é tratado como ausente. Formatos textuais
++semanticamente diferentes, como '007' e '7', continuam distintos — isso é uma
++limitação de canonicalização, não um bypass de isolamento.
++
++### LOW-01 — compatibilidade condicional com o registro fixo anterior
++
++O commit 49611d6 criava a impressora Watermelon com ID fixo '1'; o commit
++revisado não adiciona migração desse registro para o ID do estabelecimento.
++Se uma versão baseada em 49611d6 tivesse sido executada e depois atualizada
++para 66d9457, uma impressora já configurada em um estabelecimento diferente
++de 1 seria invisível até ser reconfigurada. O plano da fase declara que não
++há dispositivo legado em produção a preservar, portanto isso não bloqueia
++esta branch; deve ser tratado se a sequência de commits for distribuída
++incrementalmente.
++
++## Troca de estabelecimento e reset
++
++O caminho de login só chega ao bloco de troca depois de api.getMe(t) obter um
++perfil (context/AuthContext.tsx:L121-L128). A comparação ocorre em L153. No
++ramo de mudança:
++
++1. começa a transação SQLite legada em L155;
++2. apaga os dados legados e grava a nova conta;
++3. faz COMMIT em L174; e
++4. só então chama resetWatermelonLocalData() em L176.
++
++Logo, não há limpeza Watermelon antes da confirmação da nova autenticação,
++nem antes do commit da troca legada. Se login/token/perfil falha antes desse
++ponto, o reset não é chamado.
++
++resetWatermelonLocalData usa o singleton Watermelon por default e executa uma
++única escrita/batch (database/watermelon/database.ts:L39-L51). Limpa products,
++product_types e printers; o comentário em L35-L37 documenta que orders, sales
++e users ficam para tasks posteriores. O teste real em
++database/__tests__/watermelonReset.test.ts:L75-L122 confirma que as três
++tabelas são zeradas e que users permanece.
++
++### LOW-02 — falta de teste de integração e erro do reset não interrompe login
++
++O call site captura qualquer falha do reset e apenas registra warning
++(AuthContext.tsx:L176). Assim, uma falha de infraestrutura pode deixar
++registros Watermelon ativos. No estado atual isso não reabre o vazamento:
++produtos continuam filtrados pelo estabelecimento e impressoras usam IDs
++distintos. Ainda assim, falta um teste do AuthProvider que comprove a ordem e
++defina se falha de limpeza deve ser fatal ou apenas degradar. A cobertura
++existente prova a função de reset isoladamente, não o fluxo de autenticação.
++
++## Teste de troca: verificação contra tautologia
++
++O teste adicionado em database/__tests__/useProductDatabase.test.tsx:L267-L292
++não mocka as queries nem o Database: makeDatabase() cria um Database
++Watermelon com adapter SQLite em :memory:. O teste:
++
++1. cria Produto do A através do create real, com sourceProductId;
++2. troca o retorno do useAuth para B e instancia um novo hook;
++3. verifica vazio em searchByName, filterByProductType,
++   searchBySourceProductId, show e showAdd; e
++4. volta para A e verifica o mesmo ID/nome, provando que o registro existia e
++   que a asserção de B não é um vazio incondicional.
++
++Executei os testes específicos. Resultados reais:
++
++    npx jest database/__tests__/useProductDatabase.test.tsx --watchAll=false --runInBand -t isolates
++    1 passed, 6 skipped, 7 total
++
++    npx jest database/__tests__/usePrinterDatabase.test.ts --watchAll=false --runInBand -t does
++    1 passed, 3 skipped, 4 total
++
++Também executei as quatro suites afetadas:
++
++    npx jest database/__tests__/useProductDatabase.test.tsx database/__tests__/useUserDatabase.test.ts database/__tests__/usePrinterDatabase.test.ts database/__tests__/watermelonReset.test.ts --watchAll=false --runInBand --silent
++    Test Suites: 4 passed, 4 total
++    Tests:       16 passed, 16 total
++
++## Medium-01: default de role
++
++Corrigido em database/useUserDatabase.ts:L70:
++
++    role: input.role ?? 'EMPLOYEE'
++
++O teste useUserDatabase.test.ts cobre chamada sem role; ele passou na execução
++focada e na suíte completa.
++
++## Regressões da Task 4 e critérios já aprovados
++
++- git diff --exit-code f5f5dbe 66d9457 -- database/watermelon/schema.ts
++  database/watermelon/models database/watermelon/migrations.ts terminou sem
++  diferenças.
++- Dentro de database/watermelon, apenas database.ts mudou, adicionando o
++  reset; schema, models, relações, tipos e migrations da Task 4 não foram
++  alterados.
++- watermelonDatabase.test.ts passou na suíte completa.
++- git diff --name-only 49611d6 66d9457 não lista telas, componentes ou
++  hooks/; os consumidores continuam compilando.
++- A busca por execAsync, runAsync, getAllAsync, getFirstAsync, prepareAsync e
++  expo-sqlite nos três hooks retornou zero ocorrências (exit code 1, sem
++  saída).
++- filterByTipo, searchOrigemProdutoId, paginação, ordenação, tipo ativo,
++  tombstone remove e markChanged('products') permanecem cobertos pela
++  implementação/testes existentes.
++- A alteração não removeu validação de segurança; o histórico de PRINTER_ID e
++  findProduct mostra apenas a introdução do hook em 49611d6 e a correção em
++  66d9457, sem regressão de um fix de segurança anterior.
++
++O blast radius de produção é limitado aos consumidores já existentes: o grep
++encontrou 10 arquivos consumidores de useProductDatabase e 3 de
++usePrinterDatabase; nenhum deles foi alterado pelo fix. useUserDatabase
++continua sem consumidor de produção no commit, apenas testes.
++
++## Limitações conhecidas fora do bloqueio desta rodada
++
++useSyncDatabase.ts ainda opera sobre SQLite legado, enquanto os hooks
++Watermelon operam sobre tozzoburger. A migração do sync está explicitamente
++reservada para a Task 8 no plano. Portanto, esta aprovação é da correção de
++isolamento/limpeza da Task 5; não é uma aprovação de entrega isolada em
++produção antes do sync Watermelon.
++
++Também observei que useUserDatabase.list/show/update não são escopados pelo
++usuário e resetWatermelonLocalData preserva users, por desenho documentado
++para tasks posteriores. Como não há caller de produção no commit, não há
++exposição atual através da aplicação; a Task que ativar esse hook deve fechar
++essa fronteira.
++
++## Verificações completas executadas
++
++    npx jest --watchAll=false --runInBand
++    Test Suites: 31 passed, 31 total
++    Tests:       125 passed, 125 total
++    Snapshots:   1 passed, 1 total
++    exit code: 0
++
++    npx tsc --noEmit
++    exit code: 0
++
++Os logs não fatais observados foram os casos negativos já cobertos (i18n e
++BLE) e o fallback esperado do adapter JSI para operação assíncrona no ambiente
++Node/Jest.
++
++## Estado do repositório
++
++Antes da criação deste relatório, git status --short --branch mostrou a
++branch correta e somente os relatórios .md/.txt já não rastreados da sequência
++de tasks; nenhum arquivo de código foi modificado e nenhum commit foi criado.
++Este arquivo é o único artefato produzido por esta revisão.
++
+diff --git a/i18n/locales/en/status.json b/i18n/locales/en/status.json
+index 5d84944..904c918 100644
+--- a/i18n/locales/en/status.json
++++ b/i18n/locales/en/status.json
+@@ -1,10 +1,12 @@
+ {
+   "open": "Open",
++  "requested": "Requested",
+   "inPreparation": "In preparation",
++  "delivered": "Delivered",
+   "delivering": "Delivering",
+   "closed": "Closed",
+   "cancelled": "Cancelled",
+   "pending": "Pending",
+   "active": "Active",
+   "inactive": "Inactive"
+ }
+diff --git a/i18n/locales/es/status.json b/i18n/locales/es/status.json
+index 6c9bf80..8cfcf9d 100644
+--- a/i18n/locales/es/status.json
++++ b/i18n/locales/es/status.json
+@@ -1,10 +1,12 @@
+ {
+   "open": "Abierto",
++  "requested": "Solicitado",
+   "inPreparation": "En preparación",
++  "delivered": "Entregado",
+   "delivering": "En reparto",
+   "closed": "Cerrado",
+   "cancelled": "Cancelado",
+   "pending": "Pendiente",
+   "active": "Activo",
+   "inactive": "Inactivo"
+ }
+diff --git a/i18n/locales/fr/status.json b/i18n/locales/fr/status.json
+index 7f9caf8..f024731 100644
+--- a/i18n/locales/fr/status.json
++++ b/i18n/locales/fr/status.json
+@@ -1,10 +1,12 @@
+ {
+   "open": "Ouvert",
++  "requested": "Demandé",
+   "inPreparation": "En préparation",
++  "delivered": "Livré",
+   "delivering": "En livraison",
+   "closed": "Fermé",
+   "cancelled": "Annulé",
+   "pending": "En attente",
+   "active": "Actif",
+   "inactive": "Inactif"
+ }
+diff --git a/i18n/locales/hi/status.json b/i18n/locales/hi/status.json
+index 562c2c8..1724dec 100644
+--- a/i18n/locales/hi/status.json
++++ b/i18n/locales/hi/status.json
+@@ -1,10 +1,12 @@
+ {
+   "open": "खुला",
++  "requested": "अनुरोधित",
+   "inPreparation": "तैयारी में",
++  "delivered": "डिलीवर किया गया",
+   "delivering": "डिलीवरी हो रही है",
+   "closed": "बंद",
+   "cancelled": "रद्द",
+   "pending": "लंबित",
+   "active": "सक्रिय",
+   "inactive": "निष्क्रिय"
+ }
+diff --git a/i18n/locales/pt-BR/status.json b/i18n/locales/pt-BR/status.json
+index 94d4274..52821eb 100644
+--- a/i18n/locales/pt-BR/status.json
++++ b/i18n/locales/pt-BR/status.json
+@@ -1,10 +1,12 @@
+ {
+   "open": "Aberto",
++  "requested": "Solicitado",
+   "inPreparation": "Em preparo",
++  "delivered": "Entregue",
+   "delivering": "Entregando",
+   "closed": "Fechado",
+   "cancelled": "Cancelado",
+   "pending": "Pendente",
+   "active": "Ativo",
+   "inactive": "Inativo"
+ }
+diff --git a/i18n/locales/zh/status.json b/i18n/locales/zh/status.json
+index 037da6e..146fd9a 100644
+--- a/i18n/locales/zh/status.json
++++ b/i18n/locales/zh/status.json
+@@ -1,10 +1,12 @@
+ {
+   "open": "已开启",
++  "requested": "已请求",
+   "inPreparation": "准备中",
++  "delivered": "已送达",
+   "delivering": "配送中",
+   "closed": "已关闭",
+   "cancelled": "已取消",
+   "pending": "待处理",
+   "active": "活跃",
+   "inactive": "不活跃"
+ }

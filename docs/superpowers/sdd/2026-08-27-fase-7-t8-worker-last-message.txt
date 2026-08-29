@@ -1,0 +1,4 @@
+DONE_WITH_CONCERNS
+Commit: `a6623bb`.
+Testes: 33 suites, 139 testes e 1 snapshot passaram; `npx tsc --noEmit` OK.
+Relatório: [arquivo completo](C:/RN/TozzoBurger/docs/superpowers/sdd/2026-08-27-fase-7-t8-mobile-worker.md). Observação: retry automático 409 da versão WatermelonDB instalada precisa ser confirmado.

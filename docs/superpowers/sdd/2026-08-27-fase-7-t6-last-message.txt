@@ -1,0 +1,19 @@
+Task 6 concluída e commitada:
+
+- Hook de pedidos migrado para Watermelon com `isOpen` e status por item.
+- Isolamento por `establishmentId` aplicado em todas as operações.
+- Modal permite visualizar e alterar status dos itens.
+- `pedidos.tsx` lista apenas pedidos abertos.
+- `tableWatermark`/`useShouldReload` preservados.
+- Testes reais em banco em memória adicionados.
+
+Verificações:
+
+- Jest: 31 suítes, 127 testes e 1 snapshot aprovados.
+- TypeScript: `npx tsc --noEmit` aprovado.
+
+Commit: `4f04a5f feat-mobile-orders-watermelon-item-status`
+
+Relatório: [2026-08-27-fase-7-t6-mobile-worker.md](<C:\RN\TozzoBurger\docs\superpowers\sdd\2026-08-27-fase-7-t6-mobile-worker.md>)
+
+O relatório permanece não commitado, conforme solicitado. Nenhum push ou PR foi feito.

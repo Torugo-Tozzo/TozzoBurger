@@ -1,0 +1,3 @@
+BLOCKED — correções implementadas, mas `git add` e atualização do relatório foram bloqueados por ACL.
+Hash: indisponível. Testes: 2 suítes/11 testes passaram; `npx.cmd tsc --noEmit` sem erros.
+Relatório: [docs/.../2026-08-27-fase-7-t7-mobile-worker.md](C:/RN/TozzoBurger/docs/superpowers/sdd/2026-08-27-fase-7-t7-mobile-worker.md)

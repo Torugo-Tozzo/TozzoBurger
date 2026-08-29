@@ -1,0 +1,1022 @@
+164f617 fix-mobile-sale-edits-and-pagination
+
+ app/modais/__tests__/pedidoModal.test.tsx     | 138 ++++++++++++++++++++++++++
+ app/modais/pedidoModal.tsx                    |  13 +--
+ database/__tests__/useVendaDatabse.test.tsx   |  93 ++++++++++++++++-
+ database/__tests__/watermelonDatabase.test.ts |   2 +
+ database/salesQuery.ts                        |   9 +-
+ database/useSaleDatabase.ts                   |  94 ++++++++++++++----
+ database/watermelon/migrations.ts             |  16 ++-
+ database/watermelon/models/Sale.ts            |   1 +
+ database/watermelon/schema.ts                 |   3 +-
+ 9 files changed, 338 insertions(+), 31 deletions(-)
+
+diff --git a/app/modais/__tests__/pedidoModal.test.tsx b/app/modais/__tests__/pedidoModal.test.tsx
+new file mode 100644
+index 0000000..3b85c4d
+--- /dev/null
++++ b/app/modais/__tests__/pedidoModal.test.tsx
+@@ -0,0 +1,138 @@
++import React from 'react';
++import { act, create } from 'react-test-renderer';
++
++import PedidoModal from '@/app/modais/pedidoModal';
++
++const mockGetOrderById = jest.fn();
++const mockUpdateOrder = jest.fn();
++const mockRemoveOrder = jest.fn();
++const mockShowAdd = jest.fn();
++const mockSearchByName = jest.fn();
++const mockCreateSaleFromOrder = jest.fn();
++const mockTriggerSync = jest.fn();
++
++jest.mock('expo-router', () => ({
++  useLocalSearchParams: () => ({ orderId: 'order-1' }),
++  router: { back: jest.fn() },
++}));
++
++jest.mock('@/database/useOrderDatabase', () => ({
++  useOrderDatabase: () => ({
++    getOrderById: mockGetOrderById,
++    updateOrder: mockUpdateOrder,
++    removeOrder: mockRemoveOrder,
++  }),
++}));
++
++jest.mock('@/database/useProductDatabase', () => ({
++  useProductDatabase: () => ({
++    showAdd: mockShowAdd,
++    show: jest.fn(),
++    searchByName: mockSearchByName,
++  }),
++}));
++
++jest.mock('@/database/useSaleDatabase', () => ({
++  useSaleDatabase: () => ({ createSaleFromOrder: mockCreateSaleFromOrder }),
++}));
++
++jest.mock('@/context/AuthContext', () => ({
++  useAuth: () => ({ user: { id: 'seller-1', name: 'Caixa', role: 'EMPLOYEE' } }),
++}));
++
++jest.mock('@/context/AutoSyncContext', () => ({
++  useAutoSync: () => ({ triggerSync: mockTriggerSync }),
++}));
++
++jest.mock('react-i18next', () => ({
++  useTranslation: () => ({
++    t: (key: string) => key,
++    i18n: { language: 'en' },
++  }),
++}));
++
++jest.mock('@/components/Themed', () => ({ View: 'View', Text: 'Text' }));
++jest.mock('@/components/ui/Badge', () => ({
++  Badge: (props: Record<string, unknown>) => require('react').createElement('Badge', props),
++}));
++jest.mock('@/components/ui/Button', () => ({
++  Button: (props: Record<string, unknown>) => require('react').createElement('Button', props),
++}));
++jest.mock('@/components/ui/ListItem', () => ({
++  ListItem: (props: Record<string, unknown>) => {
++    const { trailing, ...rest } = props;
++    return require('react').createElement('ListItem', rest, trailing);
++  },
++}));
++jest.mock('@expo/vector-icons/FontAwesome', () => 'FontAwesome');
++
++function flushPromises() {
++  return new Promise<void>((resolve) => setImmediate(resolve));
++}
++
++describe('PedidoModal', () => {
++  beforeEach(() => {
++    mockGetOrderById.mockReset();
++    mockUpdateOrder.mockReset();
++    mockRemoveOrder.mockReset();
++    mockShowAdd.mockReset();
++    mockSearchByName.mockReset();
++    mockCreateSaleFromOrder.mockReset();
++    mockTriggerSync.mockReset();
++
++    mockGetOrderById.mockResolvedValue({
++      id: 'order-1',
++      total: 10,
++      customerName: 'Cliente',
++      isOpen: true,
++      items: [{
++        id: 'order-item-1',
++        productId: 'product-1',
++        quantity: 1,
++        status: 'REQUESTED',
++      }],
++    });
++    mockShowAdd.mockResolvedValue({ id: 'product-1', name: 'X-Burger', price: 10 });
++    mockSearchByName.mockResolvedValue([]);
++    mockCreateSaleFromOrder.mockResolvedValue({ saleId: 'sale-1' });
++    mockTriggerSync.mockResolvedValue(undefined);
++  });
++
++  it('persists the edited order before generating its sale', async () => {
++    let renderer: ReturnType<typeof create>;
++    await act(async () => {
++      renderer = create(<PedidoModal />);
++      await flushPromises();
++      await flushPromises();
++      await flushPromises();
++    });
++
++    const increaseQuantity = renderer!.root.find(
++      (node) => node.props.accessibilityLabel === 'common.increaseQuantity',
++    );
++    await act(async () => {
++      increaseQuantity.props.onPress();
++    });
++
++    const generateSaleButton = renderer!.root.find(
++      (node) => String(node.type) === 'Button' && node.props.title === 'orders.generateSale',
++    );
++    await act(async () => {
++      await generateSaleButton.props.onPress();
++    });
++
++    expect(mockUpdateOrder).toHaveBeenCalledWith(
++      'order-1',
++      [{ productId: 'product-1', quantity: 2, status: 'REQUESTED' }],
++      'Cliente',
++    );
++    expect(mockCreateSaleFromOrder).toHaveBeenCalledWith(
++      'order-1',
++      'Cliente',
++      'seller-1',
++      'Caixa',
++    );
++    expect(mockUpdateOrder.mock.invocationCallOrder[0])
++      .toBeLessThan(mockCreateSaleFromOrder.mock.invocationCallOrder[0]);
++  });
++});
+diff --git a/app/modais/pedidoModal.tsx b/app/modais/pedidoModal.tsx
+index 9b3556f..9f8a2d2 100644
+--- a/app/modais/pedidoModal.tsx
++++ b/app/modais/pedidoModal.tsx
+@@ -55,20 +55,25 @@ export default function PedidoModal() {
+   const [searchText, setSearchText] = useState('');
+   const [searchResults, setSearchResults] = useState<any[]>([]);
+   const { user } = useAuth();
+   const isCliente = user?.role === 'CUSTOMER';
+   const { triggerSync } = useAutoSync();
+   const colorScheme = useColorScheme() ?? 'light';
+   const isDarkMode = colorScheme === 'dark';
+   const colors = Colors[colorScheme];
+   const { t, i18n } = useTranslation();
+   const formatCurrency = (value: number) => new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(value);
++  const currentItemsPayload = () => (pedido?.items || []).map((item: any) => ({
++    productId: item.productId,
++    quantity: item.quantity,
++    status: isOrderItemStatus(item.status) ? item.status : ORDER_ITEM_STATUS.REQUESTED,
++  }));
+ 
+   const isReadOnly = isCliente || pedido?.isOpen === false;
+ 
+   const surface = colors.surface;
+   const textColor = colors.text;
+   const subText = colors.textMuted;
+   const inputBorder = colors.border;
+ 
+   useEffect(() => {
+     async function load() {
+@@ -101,26 +106,21 @@ export default function PedidoModal() {
+       const res = await searchByName(q);
+       setSearchResults(Array.isArray(res) ? res : []);
+     } catch (e) {
+       setSearchResults([]);
+     }
+   }
+ 
+   const handleSave = async () => {
+     if (!pedido || isReadOnly) return;
+     try {
+-      const itemsPayload = (pedido.items || []).map((item: any) => ({
+-        productId: item.productId,
+-        quantity: item.quantity,
+-        status: isOrderItemStatus(item.status) ? item.status : ORDER_ITEM_STATUS.REQUESTED,
+-      }));
+-      await updateOrder(pedido.id, itemsPayload, customerName);
++      await updateOrder(pedido.id, currentItemsPayload(), customerName);
+       triggerSync().catch((e) => console.warn('[sync] trigger failed', e));
+       Alert.alert(t('common.success'), t('orders.updated'));
+       router.back();
+     } catch (err) {
+       console.error(err);
+       Alert.alert(t('common.error'), t('errors.saveFailed'));
+     }
+   };
+ 
+   const handleDelete = async () => {
+@@ -135,20 +135,21 @@ export default function PedidoModal() {
+     // open product picker to add items
+     if (!pedido) return;
+     setSearchText('');
+     searchProducts('');
+     setPickerVisible(true);
+   };
+ 
+   const handleGerarVenda = async () => {
+     if (!pedido || isReadOnly) return;
+     try {
++      await updateOrder(pedido.id, currentItemsPayload(), customerName);
+       const { saleId } = await createSaleFromOrder(
+         pedido.id,
+         customerName ?? '',
+         user?.id,
+         user?.name ?? null,
+       );
+       Alert.alert(t('orders.generatedSaleTitle'), t('orders.generatedSaleMessage', { id: saleId }));
+       router.back();
+     } catch (err) {
+       console.error(err);
+diff --git a/database/__tests__/useVendaDatabse.test.tsx b/database/__tests__/useVendaDatabse.test.tsx
+index 99c7165..0e71f5a 100644
+--- a/database/__tests__/useVendaDatabse.test.tsx
++++ b/database/__tests__/useVendaDatabse.test.tsx
+@@ -260,26 +260,32 @@ describe('useSaleDatabase', () => {
+ 
+   it('creates a direct sale with product prices and returns its items through the Model API', async () => {
+     await seedProduct(mockDatabase, {
+       id: 'product-1',
+       name: 'X-Bacon',
+       price: 30,
+       establishmentId: 'establishment-1',
+     });
+ 
+     const { createSale, getSaleById } = useSaleDatabase();
+-    const result = await createSale([{ productId: 'product-1', quantity: 2 }], 'Cliente Y', 'seller-1');
++    const result = await createSale(
++      [{ productId: 'product-1', quantity: 2 }],
++      'Cliente Y',
++      'seller-1',
++      'Caixa Ana',
++    );
+ 
+     await expect(getSaleById(result.saleId)).resolves.toMatchObject({
+       id: result.saleId,
+       total: 60,
+       customerName: 'Cliente Y',
++      createdByName: 'Caixa Ana',
+       establishmentId: 'establishment-1',
+       items: [{
+         productId: 'product-1',
+         quantity: 2,
+         unitPriceAtSale: 30,
+       }],
+     });
+   });
+ 
+   it('imports a synced sale with its incoming id and timestamps without adding item status', async () => {
+@@ -289,29 +295,31 @@ describe('useSaleDatabase', () => {
+       price: 25,
+       establishmentId: 'establishment-1',
+     });
+ 
+     const { createFromSync } = useSaleDatabase();
+     await expect(createFromSync({
+       id: 'synced-sale-1',
+       total: 25,
+       soldAt: '2026-08-20T12:00:00.000Z',
+       customerName: 'Sync',
++      createdByName: 'Sync Caixa',
+       isCancelled: false,
+       establishmentId: 'establishment-1',
+       updated_at: 1234,
+       products: [{ id: 'synced-item-1', saleId: 'synced-sale-1', productId: 'product-1', quantity: 1 }],
+     })).resolves.toEqual({ saleId: 'synced-sale-1' });
+ 
+     await expect(mockDatabase.get<Sale>('sales').find('synced-sale-1')).resolves.toMatchObject({
+       soldAt: new Date('2026-08-20T12:00:00.000Z'),
+       updatedAt: new Date(1234),
++      createdByName: 'Sync Caixa',
+       syncStatus: 'synced',
+     });
+     const [item] = await mockDatabase.get<SaleItem>('sale_items').query(Q.where('sale_id', 'synced-sale-1')).fetch();
+     expect(item.id).toBe('synced-item-1');
+     expect((item as unknown as { status?: unknown }).status).toBeUndefined();
+     expect(mockMarkChanged).toHaveBeenCalledWith('sales');
+   });
+ 
+   it('does not read or mutate an order from another establishment', async () => {
+     await seedOrder(mockDatabase, {
+@@ -391,27 +399,83 @@ describe('useSaleDatabase', () => {
+       dataFinal: '2026-08-21',
+       customerName: 'Ana',
+       totalMin: '10,50',
+       totalMax: 99.9,
+       page: 2,
+       limit: 25,
+     }, 'establishment-1');
+ 
+     expect(query.page).toBe(2);
+     expect(query.limit).toBe(25);
+-    expect(query.clauses).toHaveLength(7);
++    expect(query.clauses).toHaveLength(9);
++    expect(query.clauses).toEqual(expect.arrayContaining([
++      { type: 'take', count: 25 },
++      { type: 'skip', count: 25 },
++    ]));
+     expect(JSON.stringify(query.clauses)).toEqual(expect.stringContaining('establishment_id'));
+     expect(JSON.stringify(query.clauses)).toEqual(expect.stringContaining('sold_at'));
+     expect(JSON.stringify(query.clauses)).toEqual(expect.stringContaining('customer_name'));
+     expect(JSON.stringify(query.clauses)).toEqual(expect.stringContaining('is_cancelled'));
+   });
+ 
++  it('passes the requested page bounds to the Watermelon sales query', async () => {
++    await seedProduct(mockDatabase, {
++      id: 'product-1',
++      name: 'X-Salada',
++      price: 25,
++      establishmentId: 'establishment-1',
++    });
++    await seedSale(mockDatabase, {
++      id: 'sale-1',
++      establishmentId: 'establishment-1',
++      soldAt: new Date('2026-08-20T12:00:00.000Z'),
++      total: 25,
++      productId: 'product-1',
++      quantity: 1,
++      unitPriceAtSale: 25,
++    });
++    await seedSale(mockDatabase, {
++      id: 'sale-2',
++      establishmentId: 'establishment-1',
++      soldAt: new Date('2026-08-20T11:00:00.000Z'),
++      total: 25,
++      productId: 'product-1',
++      quantity: 1,
++      unitPriceAtSale: 25,
++    });
++    await seedSale(mockDatabase, {
++      id: 'sale-3',
++      establishmentId: 'establishment-1',
++      soldAt: new Date('2026-08-20T10:00:00.000Z'),
++      total: 25,
++      productId: 'product-1',
++      quantity: 1,
++      unitPriceAtSale: 25,
++    });
++
++    const salesCollection = mockDatabase.get<Sale>('sales');
++    const querySpy = jest.spyOn(salesCollection, 'query');
++    const { listRecentSales } = useSaleDatabase();
++
++    await expect(listRecentSales({ page: 2, limit: 1 })).resolves.toMatchObject({
++      sales: [expect.objectContaining({ id: 'sale-2' })],
++      closing: 75,
++      pagination: expect.objectContaining({ total: 3, totalPages: 3 }),
++    });
++    const queryCalls = querySpy.mock.calls as unknown as Array<Array<{ type?: string; count?: number }>>;
++    expect(queryCalls.some((clauses) => clauses.some(
++      (clause) => clause.type === 'take' && clause.count === 1,
++    ) && clauses.some(
++      (clause) => clause.type === 'skip' && clause.count === 1,
++    ))).toBe(true);
++  });
++
+   it('matches local sale hours with the requested timezone offset', () => {
+     const query = buildLocalSalesQuery({
+       horaInicial: '20:00',
+       horaFinal: '22:00',
+       timezoneOffsetMinutes: 180,
+     }, 'establishment-1');
+ 
+     expect(query.matchesTime(new Date('2026-08-20T23:00:00.000Z'))).toBe(true);
+     expect(query.matchesTime(new Date('2026-08-20T22:59:00.000Z'))).toBe(false);
+     expect(query.matchesTime(new Date('2026-08-21T01:01:00.000Z'))).toBe(false);
+@@ -446,20 +510,45 @@ describe('useSaleDatabase', () => {
+ 
+     const saleDatabase = useSaleDatabase();
+     await expect(saleDatabase.listSalesByDay('2026-08-20')).resolves.toEqual([
+       expect.objectContaining({ id: 'sale-on-day', products: ['( 2x ) X-Salada'] }),
+     ]);
+     await expect(saleDatabase.getSalesReportByPeriod('2026-08-20', '2026-08-20', '7')).resolves.toEqual([
+       { id: 'product-1', name: 'X-Salada', price: 25, totalVendido: 2 },
+     ]);
+   });
+ 
++  it('returns all local sales for a day instead of applying the recent-sales page limit', async () => {
++    await seedProduct(mockDatabase, {
++      id: 'product-1',
++      name: 'X-Salada',
++      price: 25,
++      establishmentId: 'establishment-1',
++    });
++
++    for (let index = 0; index < 51; index += 1) {
++      await seedSale(mockDatabase, {
++        id: `sale-${index}`,
++        establishmentId: 'establishment-1',
++        soldAt: new Date(`2026-08-20T12:00:${String(index).padStart(2, '0')}.000Z`),
++        total: 25,
++        productId: 'product-1',
++        quantity: 1,
++        unitPriceAtSale: 25,
++      });
++    }
++
++    const { listSalesByDay } = useSaleDatabase();
++
++    await expect(listSalesByDay('2026-08-20')).resolves.toHaveLength(51);
++  });
++
+   it('cancels only a sale in the authenticated establishment and hides it from local lists', async () => {
+     await seedProduct(mockDatabase, {
+       id: 'product-1',
+       name: 'X-Salada',
+       price: 25,
+       establishmentId: 'establishment-1',
+     });
+     const sale = await seedSale(mockDatabase, {
+       id: 'sale-1',
+       establishmentId: 'establishment-1',
+diff --git a/database/__tests__/watermelonDatabase.test.ts b/database/__tests__/watermelonDatabase.test.ts
+index 7b6f9cf..0c2fb92 100644
+--- a/database/__tests__/watermelonDatabase.test.ts
++++ b/database/__tests__/watermelonDatabase.test.ts
+@@ -122,20 +122,21 @@ describe('WatermelonDB schema and models', () => {
+         record.product.id = product.id;
+         record.unitPriceAtOrder = 25.5;
+         record.createdAt = openedAt;
+         record.updatedAt = openedAt;
+       });
+ 
+       const sale = await sales.create((record) => {
+         record.total = 51;
+         record.soldAt = soldAt;
+         record.customerName = 'Ana';
++        record.createdByName = 'Caixa';
+         record.isCancelled = false;
+         record.establishmentId = 'establishment-1';
+         record.sellerId = user.id;
+         record.seller.set(user);
+         record.orderId = order.id;
+         record.order.set(order);
+         record.createdAt = soldAt;
+         record.updatedAt = soldAt;
+       });
+ 
+@@ -202,20 +203,21 @@ describe('WatermelonDB schema and models', () => {
+       orderId: order.id,
+       productId: product.id,
+       unitPriceAtOrder: 25.5,
+       createdAt: openedAt,
+       updatedAt: openedAt,
+     });
+     expect(readSale).toMatchObject({
+       total: 51,
+       soldAt,
+       customerName: 'Ana',
++      createdByName: 'Caixa',
+       isCancelled: false,
+       establishmentId: 'establishment-1',
+       sellerId: user.id,
+       orderId: order.id,
+       createdAt: soldAt,
+       updatedAt: soldAt,
+     });
+     expect(readSaleItem).toMatchObject({
+       quantity: 2,
+       saleId: sale.id,
+diff --git a/database/salesQuery.ts b/database/salesQuery.ts
+index 9b94bf4..05cf596 100644
+--- a/database/salesQuery.ts
++++ b/database/salesQuery.ts
+@@ -4,20 +4,21 @@ import type { Clause } from '@nozbe/watermelondb/QueryDescription';
+ import {
+   DEFAULT_SALES_LIMIT,
+   DEFAULT_SALES_PAGE,
+   MAX_SALES_LIMIT,
+   parseTimezoneOffsetMinutes,
+   type SalesFilters,
+ } from '../services/sales';
+ 
+ export type LocalSalesQuery = {
+   clauses: Clause[];
++  baseClauses: Clause[];
+   page: number;
+   limit: number;
+   matchesTime: (soldAt: Date) => boolean;
+ };
+ 
+ type ParsedDate = {
+   year: number;
+   month: number;
+   day: number;
+ };
+@@ -179,22 +180,28 @@ export function buildLocalSalesQuery(
+     clauses.push(Q.where('customer_name', Q.like(`%${Q.sanitizeLikeString(customerName)}%`)));
+   }
+   if (totalMin != null) clauses.push(Q.where('total', Q.gte(totalMin)));
+   if (totalMax != null) clauses.push(Q.where('total', Q.lte(totalMax)));
+ 
+   const hasTimeFilter = horaInicial != null || horaFinal != null;
+   const timezoneOffsetMinutes = hasTimeFilter
+     ? parseTimezoneOffsetMinutes(filters.timezoneOffsetMinutes)
+     : 0;
+ 
++  const baseClauses = [...clauses];
+   return {
+-    clauses,
++    clauses: [
++      ...baseClauses,
++      Q.take(limit),
++      Q.skip((page - 1) * limit),
++    ],
++    baseClauses,
+     page,
+     limit,
+     matchesTime: makeTimeMatcher(horaInicial, horaFinal, timezoneOffsetMinutes),
+   };
+ }
+ 
+ export function localPeriodBoundary(value: string | number | Date, endOfDay: boolean): number {
+   const normalized = typeof value === 'string' ? value.trim() : value;
+   const date = typeof normalized === 'string' && /^(\d{4})-(\d{2})-(\d{2})$/.test(normalized)
+     ? (() => {
+diff --git a/database/useSaleDatabase.ts b/database/useSaleDatabase.ts
+index ea89345..a5cec20 100644
+--- a/database/useSaleDatabase.ts
++++ b/database/useSaleDatabase.ts
+@@ -41,27 +41,30 @@ type SaleItemInput = {
+ type SaleSyncInput = SaleData & {
+   items?: SaleItemData[];
+   products?: SaleItemData[];
+   created_at?: number | string | Date;
+   sold_at?: number | string | Date;
+   updatedAt?: number | string | Date;
+   establishment_id?: string | number | null;
+   seller_id?: string | number | null;
+   order_id?: string | null;
+   is_cancelled?: boolean | null;
++  created_by_name?: string | null;
+ };
+ 
+ type SaleProductRow = {
+   name: string;
+   quantity: number;
+ };
+ 
++const SALES_SUMMARY_PAGE_SIZE = 100;
++
+ function normalizeEstablishmentId(value: string | number | null | undefined): string | null {
+   if (value == null) return null;
+   const normalized = String(value).trim();
+   return normalized.length > 0 ? normalized : null;
+ }
+ 
+ function finiteNumber(value: unknown, fallback = 0): number {
+   const parsed = typeof value === 'string'
+     ? Number(value.trim().replace(',', '.'))
+     : Number(value);
+@@ -161,35 +164,40 @@ async function fetchOrderItems(orderId: string, establishmentId: string): Promis
+ 
+ async function sellerName(sellerId: string, establishmentId: string): Promise<string | null> {
+   if (!sellerId) return null;
+ 
+   const [seller] = await userCollection()
+     .query(Q.where('id', sellerId), Q.where('establishment_id', establishmentId))
+     .fetch();
+   return seller?.name ?? null;
+ }
+ 
++async function createdByNameForSale(sale: SaleModel, establishmentId: string): Promise<string | null> {
++  if (sale.createdByName != null) return sale.createdByName;
++  return sellerName(sale.sellerId, establishmentId);
++}
++
+ function toSaleData(sale: SaleModel, createdByName: string | null): SaleData {
+   return {
+     id: sale.id,
+     total: sale.total,
+     soldAt: sale.soldAt.toISOString(),
+     customerName: sale.customerName,
+     isCancelled: sale.isCancelled,
+     establishmentId: sale.establishmentId,
+     sellerId: sale.sellerId || null,
+     orderId: sale.orderId,
+     updated_at: sale.updatedAt.getTime(),
+     deleted_at: null,
+     sync_status: sale.syncStatus === 'synced' ? 'synced' : 'pending',
+     createdBy: sale.sellerId || null,
+-    createdByName,
++    createdByName: sale.createdByName ?? createdByName,
+   };
+ }
+ 
+ function toSaleItemData(item: SaleItemModel): SaleItemData {
+   return {
+     id: item.id,
+     saleId: item.saleId,
+     productId: item.productId,
+     quantity: item.quantity,
+     unitPriceAtSale: item.unitPriceAtSale,
+@@ -216,21 +224,21 @@ function displayedProducts(products: SaleProductRow[]): string[] {
+     ? [...productNames.slice(0, 3), '...']
+     : productNames;
+ }
+ 
+ async function toSaleWithProducts(
+   sale: SaleModel,
+   establishmentId: string,
+ ): Promise<SaleWithProducts> {
+   const [items, createdByName] = await Promise.all([
+     fetchSaleItems(sale.id, establishmentId),
+-    sellerName(sale.sellerId, establishmentId),
++    createdByNameForSale(sale, establishmentId),
+   ]);
+   const products = await productNamesForItems(items, establishmentId);
+ 
+   return {
+     ...toSaleData(sale, createdByName),
+     products: displayedProducts(products),
+   };
+ }
+ 
+ function emptyPaginatedSales(page: number, limit: number): RecentSalesPaginated {
+@@ -250,54 +258,101 @@ function emptyPaginatedSales(page: number, limit: number): RecentSalesPaginated
+ async function fetchSales(query: LocalSalesQuery): Promise<SaleModel[]> {
+   return saleCollection()
+     .query(
+       ...query.clauses,
+       Q.sortBy('sold_at', Q.desc),
+       Q.sortBy('id', Q.desc),
+     )
+     .fetch();
+ }
+ 
++async function fetchSalesPage(
++  query: LocalSalesQuery,
++  page: number,
++  limit: number,
++): Promise<SaleModel[]> {
++  return saleCollection()
++    .query(
++      ...query.baseClauses,
++      Q.sortBy('sold_at', Q.desc),
++      Q.sortBy('id', Q.desc),
++      Q.take(limit),
++      Q.skip((page - 1) * limit),
++    )
++    .fetch();
++}
++
++async function summarizeSales(query: LocalSalesQuery): Promise<{ total: number; closing: number }> {
++  let page = 1;
++  let total = 0;
++  let closing = 0;
++
++  while (true) {
++    const salesPage = await fetchSalesPage(query, page, SALES_SUMMARY_PAGE_SIZE);
++    const matchingSales = salesPage.filter((sale) => query.matchesTime(sale.soldAt));
++    total += matchingSales.length;
++    closing += matchingSales.reduce((sum, sale) => sum + sale.total, 0);
++
++    if (salesPage.length < SALES_SUMMARY_PAGE_SIZE) break;
++    page += 1;
++  }
++
++  return { total, closing };
++}
++
++async function fetchAllSales(query: LocalSalesQuery): Promise<SaleModel[]> {
++  const allSales: SaleModel[] = [];
++  let page = 1;
++
++  while (true) {
++    const salesPage = await fetchSalesPage(query, page, SALES_SUMMARY_PAGE_SIZE);
++    allSales.push(...salesPage.filter((sale) => query.matchesTime(sale.soldAt)));
++
++    if (salesPage.length < SALES_SUMMARY_PAGE_SIZE) break;
++    page += 1;
++  }
++
++  return allSales;
++}
++
+ export function useSaleDatabase() {
+   const { user } = useAuth();
+   const currentEstablishmentId = normalizeEstablishmentId(user?.establishmentId);
+ 
+   async function createSale(
+     items: SaleItemInput[],
+     customerName?: string,
+     createdBy?: string | number | null,
+     createdByName?: string | null,
+   ) {
+     if (!currentEstablishmentId) {
+       throw new Error('Cannot create a sale without an authenticated establishment');
+     }
+ 
+-    // The Watermelon schema keeps the seller relation, not a denormalized name.
+-    void createdByName;
+-
+     const products = await Promise.all(items.map(async (item) => {
+       const product = await findProduct(String(item.productId), currentEstablishmentId);
+       if (!product) throw new Error(`Produto ${item.productId} não encontrado`);
+       return { item, product };
+     }));
+     const total = products.reduce(
+       (sum, { item, product }) => sum + product.price * Number(item.quantity),
+       0,
+     );
+     const now = new Date();
+     const sellerId = createdBy == null ? '' : String(createdBy);
+ 
+     const sale = await database.write(async () => {
+       const createdSale = await saleCollection().create((record) => {
+         record.total = total;
+         record.soldAt = now;
+         record.customerName = customerName ?? null;
++        record.createdByName = createdByName ?? null;
+         record.isCancelled = false;
+         record.establishmentId = currentEstablishmentId;
+         record.sellerId = sellerId;
+         record.orderId = null;
+         record.createdAt = now;
+         record.updatedAt = now;
+       });
+ 
+       for (const { item, product } of products) {
+         await saleItemCollection().create((record) => {
+@@ -322,40 +377,39 @@ export function useSaleDatabase() {
+   async function createSaleFromOrder(
+     orderId: string,
+     customerName?: string | null,
+     createdBy?: string | number | null,
+     createdByName?: string | null,
+   ) {
+     if (!currentEstablishmentId) {
+       throw new Error('Cannot create a sale without an authenticated establishment');
+     }
+ 
+-    void createdByName;
+-
+     const sale = await database.write(async () => {
+       const order = await findOrder(String(orderId), currentEstablishmentId);
+       if (!order) throw new Error(`Pedido com ID ${orderId} não encontrado.`);
+       if (!order.isOpen) throw new Error(`Pedido com ID ${orderId} já está fechado.`);
+ 
+       const items = await fetchOrderItems(order.id, currentEstablishmentId);
+       const products = await Promise.all(items.map(async (item) => {
+         const product = await findProduct(item.productId, currentEstablishmentId);
+         if (!product) throw new Error(`Produto ${item.productId} não encontrado`);
+         return { item, product };
+       }));
+       const now = new Date();
+       const sellerId = order.sellerId || (createdBy == null ? '' : String(createdBy));
+ 
+       const createdSale = await saleCollection().create((record) => {
+         record.total = order.total;
+         record.soldAt = now;
+         record.customerName = customerName === undefined ? order.customerName : customerName;
++        record.createdByName = createdByName ?? null;
+         record.isCancelled = false;
+         record.establishmentId = currentEstablishmentId;
+         record.sellerId = sellerId;
+         record.orderId = order.id;
+         record.createdAt = now;
+         record.updatedAt = now;
+       });
+ 
+       for (const { item, product } of products) {
+         const unitPriceAtSale = Number.isFinite(item.unitPriceAtOrder)
+@@ -379,21 +433,21 @@ export function useSaleDatabase() {
+       });
+ 
+       return createdSale;
+     });
+ 
+     markChanged('sales');
+     markChanged('orders');
+     return { saleId: sale.id };
+   }
+ 
+-  async function createFromSync(data: SaleData & { items?: SaleItemData[]; products?: SaleItemData[] }) {
++  async function createFromSync(data: SaleSyncInput) {
+     if (!currentEstablishmentId) {
+       throw new Error('Cannot sync a sale without an authenticated establishment');
+     }
+ 
+     const raw = data as SaleSyncInput;
+     const incomingEstablishmentId = normalizeEstablishmentId(
+       raw.establishmentId ?? raw.establishment_id,
+     );
+     if (incomingEstablishmentId && incomingEstablishmentId !== currentEstablishmentId) {
+       throw new Error('Cannot sync a sale from another establishment');
+@@ -415,20 +469,21 @@ export function useSaleDatabase() {
+         ? raw.products
+         : [];
+ 
+     const preparedSale = saleCollection().prepareCreateFromDirtyRaw({
+       id,
+       _status: 'synced',
+       _changed: '',
+       total: finiteNumber(raw.total),
+       sold_at: soldAt,
+       customer_name: raw.customerName ?? null,
++      created_by_name: raw.createdByName ?? raw.created_by_name ?? null,
+       is_cancelled: isCancelled,
+       establishment_id: currentEstablishmentId,
+       seller_id: seller == null ? '' : String(seller),
+       order_id: orderId == null ? null : String(orderId),
+       created_at: createdAt,
+       updated_at: updatedAt,
+     });
+ 
+     const preparedItems = await Promise.all(items.map(async (item) => {
+       const rawItem = item as SaleItemData & {
+@@ -466,21 +521,21 @@ export function useSaleDatabase() {
+   async function getSaleById(saleId: string) {
+     if (!currentEstablishmentId) {
+       throw new Error(`Venda com ID ${saleId} não encontrada.`);
+     }
+ 
+     const sale = await findSale(String(saleId), currentEstablishmentId);
+     if (!sale) throw new Error(`Venda com ID ${saleId} não encontrada.`);
+ 
+     const [items, createdByName] = await Promise.all([
+       fetchSaleItems(sale.id, currentEstablishmentId),
+-      sellerName(sale.sellerId, currentEstablishmentId),
++      createdByNameForSale(sale, currentEstablishmentId),
+     ]);
+ 
+     return {
+       ...toSaleData(sale, createdByName),
+       items: items.map(toSaleItemData),
+     };
+   }
+ 
+   async function removeSale(saleId: string) {
+     if (!currentEstablishmentId) return;
+@@ -498,58 +553,59 @@ export function useSaleDatabase() {
+   }
+ 
+   async function listRecentSales(): Promise<RecentSalesGrouped>;
+   async function listRecentSales(filters: SalesFilters): Promise<RecentSalesPaginated>;
+   async function listRecentSales(filters?: SalesFilters): Promise<RecentSalesGrouped | RecentSalesPaginated> {
+     if (!currentEstablishmentId) {
+       return filters === undefined ? {} : emptyPaginatedSales(1, DEFAULT_SALES_LIMIT);
+     }
+ 
+     const query = buildLocalSalesQuery(filters ?? {}, currentEstablishmentId);
+-    const allMatchingSales = (await fetchSales(query)).filter((sale) => query.matchesTime(sale.soldAt));
+-    const total = allMatchingSales.length;
+-    const closing = allMatchingSales.reduce((sum, sale) => sum + sale.total, 0);
+-    const start = (query.page - 1) * query.limit;
+-    const pageSales = allMatchingSales.slice(start, start + query.limit);
+-    const salesWithProducts = await Promise.all(
+-      pageSales.map((sale) => toSaleWithProducts(sale, currentEstablishmentId)),
+-    );
+-
+     if (filters === undefined) {
++      const groupedSales = await fetchAllSales(query);
++      const salesWithProducts = await Promise.all(
++        groupedSales.map((sale) => toSaleWithProducts(sale, currentEstablishmentId)),
++      );
+       const salesByDate: RecentSalesGrouped = {};
+       for (const sale of salesWithProducts) {
+         const date = new Date(sale.soldAt).toLocaleDateString();
+         if (!salesByDate[date]) salesByDate[date] = [];
+         salesByDate[date].push(sale);
+       }
+       return salesByDate;
+     }
+ 
++    const pageSales = (await fetchSales(query)).filter((sale) => query.matchesTime(sale.soldAt));
++    const { total, closing } = await summarizeSales(query);
++    const salesWithProducts = await Promise.all(
++      pageSales.map((sale) => toSaleWithProducts(sale, currentEstablishmentId)),
++    );
++
+     const totalPages = total === 0 ? 0 : Math.ceil(total / query.limit);
+     return {
+       sales: salesWithProducts,
+       closing,
+       pagination: {
+         page: query.page,
+         limit: query.limit,
+         total,
+         totalPages,
+         hasNextPage: query.page < totalPages,
+       },
+     };
+   }
+ 
+   async function listSalesByDay(data: string) {
+     if (!currentEstablishmentId) return [];
+ 
+     const query = buildLocalSalesQuery({ dataInicial: data, dataFinal: data }, currentEstablishmentId);
+-    const sales = (await fetchSales(query)).filter((sale) => query.matchesTime(sale.soldAt));
++    const sales = await fetchAllSales(query);
+     return Promise.all(sales.map((sale) => toSaleWithProducts(sale, currentEstablishmentId)));
+   }
+ 
+   async function getSalesReportByPeriod(
+     startDate: string,
+     endDate: string,
+     productTypeId?: string | number,
+   ) {
+     if (!currentEstablishmentId) return [];
+ 
+diff --git a/database/watermelon/migrations.ts b/database/watermelon/migrations.ts
+index 6f19442..271625e 100644
+--- a/database/watermelon/migrations.ts
++++ b/database/watermelon/migrations.ts
+@@ -1,3 +1,15 @@
+-import { schemaMigrations } from '@nozbe/watermelondb/Schema/migrations';
++import { addColumns, schemaMigrations } from '@nozbe/watermelondb/Schema/migrations';
+ 
+-export default schemaMigrations({ migrations: [] });
++export default schemaMigrations({
++  migrations: [
++    {
++      toVersion: 2,
++      steps: [
++        addColumns({
++          table: 'sales',
++          columns: [{ name: 'created_by_name', type: 'string', isOptional: true }],
++        }),
++      ],
++    },
++  ],
++});
+diff --git a/database/watermelon/models/Sale.ts b/database/watermelon/models/Sale.ts
+index f132cc7..7b9671c 100644
+--- a/database/watermelon/models/Sale.ts
++++ b/database/watermelon/models/Sale.ts
+@@ -12,20 +12,21 @@ export default class Sale extends Model {
+ 
+   static associations = {
+     sale_items: { type: 'has_many' as const, foreignKey: 'sale_id' },
+     users: { type: 'belongs_to' as const, key: 'seller_id' },
+     orders: { type: 'belongs_to' as const, key: 'order_id' },
+   };
+ 
+   @field('total') total!: number;
+   @date('sold_at') soldAt!: Date;
+   @field('customer_name') customerName!: string | null;
++  @field('created_by_name') createdByName!: string | null;
+   @field('is_cancelled') isCancelled!: boolean;
+   @field('establishment_id') establishmentId!: string;
+   @field('seller_id') sellerId!: string;
+   @relation('users', 'seller_id') seller!: Relation<User>;
+   @field('order_id') orderId!: string | null;
+   @relation('orders', 'order_id') order!: Relation<Order>;
+   @date('created_at') createdAt!: Date;
+   @date('updated_at') updatedAt!: Date;
+ 
+   @children('sale_items') items!: Query<SaleItem>;
+diff --git a/database/watermelon/schema.ts b/database/watermelon/schema.ts
+index fae5b8d..3b1da84 100644
+--- a/database/watermelon/schema.ts
++++ b/database/watermelon/schema.ts
+@@ -1,19 +1,19 @@
+ import { appSchema, tableSchema } from '@nozbe/watermelondb';
+ 
+ const syncTimestamps = [
+   { name: 'created_at', type: 'number' as const },
+   { name: 'updated_at', type: 'number' as const },
+ ];
+ 
+ export default appSchema({
+-  version: 1,
++  version: 2,
+   tables: [
+     tableSchema({
+       name: 'products',
+       columns: [
+         { name: 'name', type: 'string' },
+         { name: 'price', type: 'number' },
+         { name: 'product_type_id', type: 'string', isOptional: true, isIndexed: true },
+         { name: 'source_product_id', type: 'string', isOptional: true },
+         { name: 'ingredients', type: 'string', isOptional: true },
+         { name: 'establishment_id', type: 'string', isIndexed: true },
+@@ -51,20 +51,21 @@ export default appSchema({
+         { name: 'unit_price_at_order', type: 'number' },
+         ...syncTimestamps,
+       ],
+     }),
+     tableSchema({
+       name: 'sales',
+       columns: [
+         { name: 'total', type: 'number' },
+         { name: 'sold_at', type: 'number' },
+         { name: 'customer_name', type: 'string', isOptional: true },
++        { name: 'created_by_name', type: 'string', isOptional: true },
+         { name: 'is_cancelled', type: 'boolean' },
+         { name: 'establishment_id', type: 'string', isIndexed: true },
+         { name: 'seller_id', type: 'string', isIndexed: true },
+         { name: 'order_id', type: 'string', isOptional: true, isIndexed: true },
+         ...syncTimestamps,
+       ],
+     }),
+     tableSchema({
+       name: 'sale_items',
+       columns: [

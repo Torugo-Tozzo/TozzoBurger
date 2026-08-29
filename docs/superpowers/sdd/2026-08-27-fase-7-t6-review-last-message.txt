@@ -1,0 +1,33 @@
+# Task 6 — Review
+
+## Spec compliance
+
+✅ Objetivo — WatermelonDB, `isOpen` e status por item implementados ([useOrderDatabase.ts:198](/C:/RN/TozzoBurger/database/useOrderDatabase.ts:198), [Order.ts:25](/C:/RN/TozzoBurger/database/types/Order.ts:25)).
+
+✅ Arquivos — hooks, tela de pedidos, modal, componente e traduções atualizados.
+
+❌ Passo 1 — o teste chamado “direct requested-to-delivered” passa antes por `IN_PREPARATION` ([usePedidoDatabase.test.tsx:174](/C:/RN/TozzoBurger/database/__tests__/usePedidoDatabase.test.tsx:174), [usePedidoDatabase.test.tsx:185](/C:/RN/TozzoBurger/database/__tests__/usePedidoDatabase.test.tsx:185)).
+
+✅ Passo 2 — implementação usa Query/Model API, sem SQL ou `expo-sqlite` ([useOrderDatabase.ts:1](/C:/RN/TozzoBurger/database/useOrderDatabase.ts:1)).
+
+✅ Passo 3 — modal exibe os três status e permite alteração ([pedidoModal.tsx:156](/C:/RN/TozzoBurger/app/modais/pedidoModal.tsx:156), [pedidoModal.tsx:164](/C:/RN/TozzoBurger/app/modais/pedidoModal.tsx:164)).
+
+✅ Passo 4 — lista usa somente `isOpen`, sem `pedido.status` ([pedidos.tsx:61](/C:/RN/TozzoBurger/app/(tabs)/pedidos.tsx:61)).
+
+✅ Passo 5 — suíte focada: 6/6; suíte completa: 31/31 suites, 127/127 testes; `tsc --noEmit` sem erros.
+
+✅ Critérios específicos — transições não são bloqueadas ([useOrderDatabase.ts:385](/C:/RN/TozzoBurger/database/useOrderDatabase.ts:385)); pedidos fechados são filtrados por `is_open = true` ([useOrderDatabase.ts:439](/C:/RN/TozzoBurger/database/useOrderDatabase.ts:439)).
+
+✅ Isolamento — queries e mutações usam o estabelecimento autenticado, incluindo pedidos, itens e produtos ([useOrderDatabase.ts:115](/C:/RN/TozzoBurger/database/useOrderDatabase.ts:115), [useOrderDatabase.ts:147](/C:/RN/TozzoBurger/database/useOrderDatabase.ts:147), [useOrderDatabase.ts:348](/C:/RN/TozzoBurger/database/useOrderDatabase.ts:348)).
+
+## Achados
+
+- [Minor] O teste não cobre a transição direta `REQUESTED → DELIVERED` — [usePedidoDatabase.test.tsx:174](/C:/RN/TozzoBurger/database/__tests__/usePedidoDatabase.test.tsx:174) — deixa escapar regressão futura justamente no comportamento exigido pelo brief.
+
+- [Minor] `createdByName` é descartado — [useOrderDatabase.ts:214](/C:/RN/TozzoBurger/database/useOrderDatabase.ts:214) e sempre retornado como `null` em [useOrderDatabase.ts:100](/C:/RN/TozzoBurger/database/useOrderDatabase.ts:100) — embora a tela de criação ainda o envie e `PedidoItem` o exiba ([contaModal.tsx:115](/C:/RN/TozzoBurger/app/modais/contaModal.tsx:115), [PedidoItem.tsx:21](/C:/RN/TozzoBurger/components/PedidoItem.tsx:21)).
+
+## Veredito
+
+Aprovado com ressalvas (minor).
+
+O working tree permaneceu inalterado. Não gravei o arquivo `2026-08-27-fase-7-t6-review.md` porque isso contradiz a instrução explícita de não editar nenhum arquivo.

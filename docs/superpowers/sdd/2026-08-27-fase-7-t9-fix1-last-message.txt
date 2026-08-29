@@ -1,0 +1,8 @@
+Correção concluída no commit `6fd6bf6` (sem push):
+
+- Rota `/onboarding` agora exige `OWNER` e `category === null`; caso contrário, redireciona para `/(tabs)` sem mutações.
+- Gate e rota reutilizam `useCategoryOnboardingAccess`.
+- Testes regressivos adicionados em `app/__tests__/onboarding.test.tsx`.
+- Relatório atualizado com `Fix round 1`.
+
+DONE — `6fd6bf6` — foco 7/7, suíte completa 37/37 suítes (157 testes, 1 snapshot) e `npx tsc --noEmit` sem erros.

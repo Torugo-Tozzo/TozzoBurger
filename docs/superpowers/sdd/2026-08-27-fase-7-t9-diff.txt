@@ -1,0 +1,1418 @@
+db6fd1e docs(sdd): report Task 9 mobile worker
+04f2172 feat: add category onboarding
+
+ app/__tests__/onboarding.test.tsx                  | 209 +++++++++++++++++
+ app/_layout.tsx                                    |  23 +-
+ app/onboarding.tsx                                 | 258 +++++++++++++++++++++
+ components/CategoryOnboardingGate.tsx              |  72 ++++++
+ .../watermelon/__tests__/categorySeeds.test.ts     |  37 +++
+ database/watermelon/categorySeeds.ts               |  23 ++
+ .../sdd/2026-08-27-fase-7-t9-mobile-worker.md      | 110 +++++++++
+ i18n/__tests__/index.test.ts                       |  22 ++
+ i18n/locales/en/common.json                        |  11 +-
+ i18n/locales/es/common.json                        |  11 +-
+ i18n/locales/fr/common.json                        |  11 +-
+ i18n/locales/hi/common.json                        |  11 +-
+ i18n/locales/pt-BR/common.json                     |  11 +-
+ i18n/locales/zh/common.json                        |  11 +-
+ services/__tests__/api.test.ts                     |  73 +++++-
+ services/__tests__/categoryOnboarding.test.ts      |  72 ++++++
+ services/api.ts                                    | 100 ++++++++
+ services/categoryOnboarding.ts                     |  36 +++
+ 18 files changed, 1084 insertions(+), 17 deletions(-)
+
+diff --git a/app/__tests__/onboarding.test.tsx b/app/__tests__/onboarding.test.tsx
+new file mode 100644
+index 0000000..2229f86
+--- /dev/null
++++ b/app/__tests__/onboarding.test.tsx
+@@ -0,0 +1,209 @@
++import React from 'react';
++import { act, create } from 'react-test-renderer';
++import { View } from 'react-native';
++
++import OnboardingScreen from '@/app/onboarding';
++import CategoryOnboardingGate from '@/components/CategoryOnboardingGate';
++import {
++  createProductType,
++  getEstablishment,
++  updateEstablishmentCategory,
++} from '@/services/api';
++import { runWithLock } from '@/database/syncGuard';
++import { synchronizeWithServer } from '@/database/watermelon/sync';
++
++const mockUseAuth = jest.fn();
++
++jest.mock('@/context/AuthContext', () => ({
++  useAuth: () => mockUseAuth(),
++}));
++
++jest.mock('@/services/api', () => ({
++  createProductType: jest.fn(),
++  getEstablishment: jest.fn(),
++  updateEstablishmentCategory: jest.fn(),
++}));
++
++jest.mock('@/database/syncGuard', () => ({
++  runWithLock: jest.fn(),
++}));
++
++jest.mock('@/database/watermelon/sync', () => ({
++  synchronizeWithServer: jest.fn(),
++}));
++
++jest.mock('react-i18next', () => ({
++  useTranslation: () => ({
++    t: (_key: string, fallback?: string) => fallback ?? _key,
++  }),
++}));
++
++const mockCreateProductType = createProductType as jest.MockedFunction<typeof createProductType>;
++const mockGetEstablishment = getEstablishment as jest.MockedFunction<typeof getEstablishment>;
++const mockUpdateEstablishmentCategory = updateEstablishmentCategory as jest.MockedFunction<typeof updateEstablishmentCategory>;
++const mockRunWithLock = runWithLock as jest.MockedFunction<typeof runWithLock>;
++const mockSynchronizeWithServer = synchronizeWithServer as jest.MockedFunction<typeof synchronizeWithServer>;
++
++function findByAccessibilityLabel(renderer: ReturnType<typeof create>, label: string) {
++  return renderer.root.find((node) => node.props.accessibilityLabel === label);
++}
++
++function flushPromises() {
++  return new Promise<void>((resolve) => setImmediate(resolve));
++}
++
++describe('category onboarding screen', () => {
++  beforeEach(() => {
++    jest.clearAllMocks();
++    mockUseAuth.mockReturnValue({
++      token: 'token-123',
++      user: { role: 'OWNER', establishmentId: 'establishment-1' },
++    });
++    mockUpdateEstablishmentCategory.mockResolvedValue({ id: 'establishment-1', category: 'HAMBURGUERIA' });
++    mockCreateProductType.mockResolvedValue({ id: 'type-1' });
++    mockSynchronizeWithServer.mockResolvedValue(undefined);
++    mockRunWithLock.mockImplementation(async (callback) => callback());
++  });
++
++  it('uses the edited list when confirming a category', async () => {
++    let renderer: ReturnType<typeof create>;
++    await act(async () => {
++      renderer = create(
++        <OnboardingScreen token="token-123" establishmentId="establishment-1" />,
++      );
++    });
++
++    await act(async () => {
++      findByAccessibilityLabel(renderer!, 'HAMBURGUERIA').props.onPress();
++    });
++
++    const input = findByAccessibilityLabel(renderer!, 'onboarding.typeInput');
++    await act(async () => {
++      input.props.onChangeText('Combos');
++    });
++    await act(async () => {
++      findByAccessibilityLabel(renderer!, 'onboarding.addType').props.onPress();
++    });
++    await act(async () => {
++      findByAccessibilityLabel(renderer!, 'onboarding.removeType:Lanches').props.onPress();
++    });
++
++    await act(async () => {
++      findByAccessibilityLabel(renderer!, 'onboarding.confirm').props.onPress();
++      await flushPromises();
++    });
++
++    expect(mockUpdateEstablishmentCategory).toHaveBeenCalledWith(
++      'token-123',
++      'establishment-1',
++      'HAMBURGUERIA',
++    );
++    expect(mockCreateProductType.mock.calls).toEqual([
++      ['token-123', { description: 'Bebidas', color: '#9E9E9E' }],
++      ['token-123', { description: 'Porções', color: '#9E9E9E' }],
++      ['token-123', { description: 'Sobremesas', color: '#9E9E9E' }],
++      ['token-123', { description: 'Combos', color: '#9E9E9E' }],
++    ]);
++    expect(mockCreateProductType).not.toHaveBeenCalledWith(
++      'token-123',
++      { description: 'Lanches', color: '#9E9E9E' },
++    );
++    expect(mockRunWithLock).toHaveBeenCalledTimes(1);
++    expect(mockSynchronizeWithServer).toHaveBeenCalledWith('token-123', 'establishment-1');
++  });
++});
++
++describe('category onboarding gate', () => {
++  beforeEach(() => {
++    jest.clearAllMocks();
++    mockUseAuth.mockReturnValue({
++      token: 'token-123',
++      user: { role: 'OWNER', establishmentId: 'establishment-1' },
++    });
++  });
++
++  it('shows onboarding for an OWNER only when the server category is null', async () => {
++    mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: null });
++    let renderer: ReturnType<typeof create>;
++
++    await act(async () => {
++      renderer = create(
++        <CategoryOnboardingGate>
++          <View accessibilityLabel="app-content" />
++        </CategoryOnboardingGate>,
++      );
++      await flushPromises();
++    });
++
++    expect(mockGetEstablishment).toHaveBeenCalledWith('token-123');
++    expect(findByAccessibilityLabel(renderer!, 'HAMBURGUERIA')).toBeDefined();
++    expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'app-content')).toHaveLength(0);
++  });
++
++  it('removes onboarding after a successful confirmation without refetching the gate', async () => {
++    mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: null });
++    mockUpdateEstablishmentCategory.mockResolvedValue({ id: 'establishment-1', category: 'HAMBURGUERIA' });
++    mockCreateProductType.mockResolvedValue({ id: 'type-1' });
++    mockSynchronizeWithServer.mockResolvedValue(undefined);
++    mockRunWithLock.mockImplementation(async (callback) => callback());
++
++    let renderer: ReturnType<typeof create>;
++    await act(async () => {
++      renderer = create(
++        <CategoryOnboardingGate>
++          <View accessibilityLabel="app-content" />
++        </CategoryOnboardingGate>,
++      );
++      await flushPromises();
++    });
++
++    await act(async () => {
++      findByAccessibilityLabel(renderer!, 'HAMBURGUERIA').props.onPress();
++    });
++    await act(async () => {
++      findByAccessibilityLabel(renderer!, 'onboarding.confirm').props.onPress();
++      await flushPromises();
++    });
++
++    expect(mockGetEstablishment).toHaveBeenCalledTimes(1);
++    expect(renderer!.root.find((node) => node.props.accessibilityLabel === 'app-content')).toBeDefined();
++    expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
++  });
++
++  it('keeps the app available and skips the request for non-OWNER users', async () => {
++    mockUseAuth.mockReturnValue({
++      token: 'token-123',
++      user: { role: 'MANAGER', establishmentId: 'establishment-1' },
++    });
++
++    const renderer = create(
++      <CategoryOnboardingGate>
++        <View accessibilityLabel="app-content" />
++      </CategoryOnboardingGate>,
++    );
++    await act(async () => {
++      await flushPromises();
++    });
++
++    expect(mockGetEstablishment).not.toHaveBeenCalled();
++    expect(renderer.root.find((node) => node.props.accessibilityLabel === 'app-content')).toBeDefined();
++    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
++  });
++
++  it('does not show onboarding again when the category is already configured', async () => {
++    mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: 'PIZZARIA' });
++    let renderer: ReturnType<typeof create>;
++
++    await act(async () => {
++      renderer = create(
++        <CategoryOnboardingGate>
++          <View accessibilityLabel="app-content" />
++        </CategoryOnboardingGate>,
++      );
++      await flushPromises();
++    });
++
++    expect(renderer!.root.find((node) => node.props.accessibilityLabel === 'app-content')).toBeDefined();
++    expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
++  });
++});
+diff --git a/app/_layout.tsx b/app/_layout.tsx
+index fcb4cd7..6dd905c 100644
+--- a/app/_layout.tsx
++++ b/app/_layout.tsx
+@@ -12,20 +12,21 @@ import { CartProvider } from '@/context/CartContext';
+ import { AuthProvider } from '@/context/AuthContext';
+ import { useAuth } from '@/context/AuthContext';
+ import { AutoSyncProvider } from '@/context/AutoSyncContext';
+ import { useRouter, usePathname } from 'expo-router';
+ 
+ import { useColorScheme } from '@/components/useColorScheme';
+ import AppLoadingScreen from '@/components/AppLoadingScreen';
+ import { StatusBar } from 'expo-status-bar';
+ import { I18nextProvider, useTranslation } from 'react-i18next';
+ import { i18n, initializeI18n } from '@/i18n';
++import CategoryOnboardingGate from '@/components/CategoryOnboardingGate';
+ 
+ export {
+   // Catch any errors thrown by the Layout component.
+   ErrorBoundary,
+ } from 'expo-router';
+ 
+ export const unstable_settings = {
+   // Ensure that reloading on `/modal` keeps a back button present.
+   initialRouteName: '(tabs)',
+ };
+@@ -110,23 +111,25 @@ function RootLayoutNav() {
+ 
+   if (loading) return <AppLoadingScreen stage={user ? 'preparing' : 'authenticating'} />;
+ 
+   return (
+     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+       <StatusBar 
+         style={colorScheme === 'dark' ? 'light' : 'dark'} 
+         backgroundColor={colorScheme === 'dark' ? '#000' : '#fff'} 
+         translucent={true}
+       />
+-      <Stack>
+-        <Stack.Screen name="login" options={{ headerShown: false }} />
+-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+-        <Stack.Screen name="modais/contaModal" options={{ presentation: 'modal', title: t('navigation.account') }} />
+-        <Stack.Screen name="modais/produtoModal" options={{ presentation: 'modal', title: t('navigation.product') }} />
+-        <Stack.Screen name="modais/pedidoModal" options={{ presentation: 'modal', title: t('navigation.orders') }} />
+-        <Stack.Screen name="modais/contaHistoricoModal" options={{ presentation: 'modal', title: t('navigation.closedAccount') }} />
+-        <Stack.Screen name="modais/adicionalModal" options={{ presentation: 'modal', title: t('navigation.addOn') }} />
+-        <Stack.Screen name="modais/relatorioModal" options={{ presentation: 'modal', title: t('navigation.report') }} />
+-      </Stack>
++      <CategoryOnboardingGate>
++        <Stack>
++          <Stack.Screen name="login" options={{ headerShown: false }} />
++          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
++          <Stack.Screen name="modais/contaModal" options={{ presentation: 'modal', title: t('navigation.account') }} />
++          <Stack.Screen name="modais/produtoModal" options={{ presentation: 'modal', title: t('navigation.product') }} />
++          <Stack.Screen name="modais/pedidoModal" options={{ presentation: 'modal', title: t('navigation.orders') }} />
++          <Stack.Screen name="modais/contaHistoricoModal" options={{ presentation: 'modal', title: t('navigation.closedAccount') }} />
++          <Stack.Screen name="modais/adicionalModal" options={{ presentation: 'modal', title: t('navigation.addOn') }} />
++          <Stack.Screen name="modais/relatorioModal" options={{ presentation: 'modal', title: t('navigation.report') }} />
++        </Stack>
++      </CategoryOnboardingGate>
+     </ThemeProvider>
+   );
+ }
+diff --git a/app/onboarding.tsx b/app/onboarding.tsx
+new file mode 100644
+index 0000000..c4457f8
+--- /dev/null
++++ b/app/onboarding.tsx
+@@ -0,0 +1,258 @@
++import React, { useState } from 'react';
++import {
++  Pressable,
++  ScrollView,
++  StyleSheet,
++  Text,
++  TextInput,
++  View,
++} from 'react-native';
++import { useTranslation } from 'react-i18next';
++
++import { useAuth } from '@/context/AuthContext';
++import {
++  CATEGORY_OPTIONS,
++  type EstablishmentCategory,
++  getCategorySeed,
++} from '@/database/watermelon/categorySeeds';
++import {
++  completeCategoryOnboarding,
++} from '@/services/categoryOnboarding';
++import { Button } from '@/components/ui/Button';
++
++type EstablishmentId = string | number;
++
++export type OnboardingScreenProps = {
++  token?: string | null;
++  establishmentId?: EstablishmentId | null;
++  onCompleted?: (category: EstablishmentCategory) => void;
++};
++
++export default function OnboardingScreen({
++  token: tokenOverride,
++  establishmentId: establishmentIdOverride,
++  onCompleted,
++}: OnboardingScreenProps = {}) {
++  const { token: authToken, user } = useAuth();
++  const { t } = useTranslation();
++  const token = tokenOverride ?? authToken;
++  const establishmentId = establishmentIdOverride ?? user?.establishmentId;
++  const [category, setCategory] = useState<EstablishmentCategory | null>(null);
++  const [productTypeDescriptions, setProductTypeDescriptions] = useState<string[]>([]);
++  const [newDescription, setNewDescription] = useState('');
++  const [saving, setSaving] = useState(false);
++  const [error, setError] = useState<string | null>(null);
++
++  const chooseCategory = (nextCategory: EstablishmentCategory) => {
++    setCategory(nextCategory);
++    setProductTypeDescriptions(getCategorySeed(nextCategory));
++    setNewDescription('');
++    setError(null);
++  };
++
++  const addDescription = () => {
++    const description = newDescription.trim();
++    if (description.length === 0) return;
++
++    setProductTypeDescriptions((current) => (
++      current.includes(description) ? current : [...current, description]
++    ));
++    setNewDescription('');
++  };
++
++  const removeDescription = (index: number) => {
++    setProductTypeDescriptions((current) => current.filter((_, itemIndex) => itemIndex !== index));
++  };
++
++  const confirm = async () => {
++    if (!category || !token || establishmentId === null || establishmentId === undefined) {
++      setError(t('common.onboardingSaveError'));
++      return;
++    }
++
++    setSaving(true);
++    setError(null);
++    try {
++      await completeCategoryOnboarding({
++        token,
++        establishmentId,
++        category,
++        productTypeDescriptions,
++      });
++      onCompleted?.(category);
++    } catch (confirmationError) {
++      console.warn('Category onboarding failed', confirmationError);
++      setError(t('common.onboardingSaveError'));
++    } finally {
++      setSaving(false);
++    }
++  };
++
++  return (
++    <ScrollView contentContainerStyle={styles.container}>
++      <Text style={styles.title}>{t('common.onboardingTitle')}</Text>
++      <Text style={styles.subtitle}>{t('common.onboardingChooseCategory')}</Text>
++
++      <View style={styles.categories}>
++        {CATEGORY_OPTIONS.map((option) => {
++          const selected = category === option;
++          return (
++            <Pressable
++              key={option}
++              accessibilityRole="button"
++              accessibilityLabel={option}
++              onPress={() => chooseCategory(option)}
++              style={[styles.category, selected && styles.categorySelected]}
++            >
++              <Text style={styles.categoryText}>{option}</Text>
++            </Pressable>
++          );
++        })}
++      </View>
++
++      {category && (
++        <View style={styles.editor}>
++          <Text style={styles.sectionTitle}>{t('common.onboardingSuggestedTypes')}</Text>
++          {productTypeDescriptions.map((description, index) => (
++            <View key={`${description}-${index}`} style={styles.typeRow}>
++              <Text style={styles.typeText}>{description}</Text>
++              <Pressable
++                accessibilityRole="button"
++                accessibilityLabel={`onboarding.removeType:${description}`}
++                onPress={() => removeDescription(index)}
++                style={styles.removeButton}
++              >
++                <Text style={styles.removeText}>×</Text>
++              </Pressable>
++            </View>
++          ))}
++
++          <View style={styles.addRow}>
++            <TextInput
++              accessibilityLabel="onboarding.typeInput"
++              placeholder={t('common.onboardingTypePlaceholder')}
++              value={newDescription}
++              onChangeText={setNewDescription}
++              style={styles.input}
++            />
++            <Button
++              accessibilityLabel="onboarding.addType"
++              title={t('common.onboardingAddType')}
++              onPress={addDescription}
++              variant="outline"
++              style={styles.addButton}
++            />
++          </View>
++
++          {error && <Text style={styles.error}>{error}</Text>}
++          <Button
++            accessibilityLabel="onboarding.confirm"
++            title={saving ? t('common.onboardingSaving') : t('common.onboardingConfirm')}
++            onPress={confirm}
++            loading={saving}
++            disabled={saving}
++            style={styles.confirmButton}
++          />
++          <Button
++            accessibilityLabel="onboarding.changeCategory"
++            title={t('common.onboardingChangeCategory')}
++            onPress={() => setCategory(null)}
++            variant="outline"
++            disabled={saving}
++          />
++        </View>
++      )}
++    </ScrollView>
++  );
++}
++
++const styles = StyleSheet.create({
++  container: {
++    flexGrow: 1,
++    padding: 24,
++    justifyContent: 'center',
++    backgroundColor: '#fff',
++  },
++  title: {
++    fontSize: 26,
++    fontWeight: '700',
++    marginBottom: 8,
++    color: '#000',
++  },
++  subtitle: {
++    fontSize: 16,
++    marginBottom: 20,
++    color: '#333',
++  },
++  categories: {
++    gap: 10,
++  },
++  category: {
++    borderWidth: 1,
++    borderColor: '#000',
++    borderRadius: 8,
++    padding: 14,
++  },
++  categorySelected: {
++    backgroundColor: '#e8e8e8',
++  },
++  categoryText: {
++    color: '#000',
++    fontWeight: '600',
++  },
++  editor: {
++    marginTop: 24,
++  },
++  sectionTitle: {
++    fontSize: 18,
++    fontWeight: '700',
++    marginBottom: 12,
++    color: '#000',
++  },
++  typeRow: {
++    minHeight: 44,
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    borderBottomWidth: StyleSheet.hairlineWidth,
++    borderBottomColor: '#999',
++  },
++  typeText: {
++    color: '#000',
++    fontSize: 16,
++  },
++  removeButton: {
++    paddingHorizontal: 12,
++    paddingVertical: 8,
++  },
++  removeText: {
++    color: '#ef4444',
++    fontSize: 24,
++  },
++  addRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 8,
++    marginTop: 16,
++  },
++  input: {
++    flex: 1,
++    height: 48,
++    borderWidth: 1,
++    borderColor: '#000',
++    borderRadius: 8,
++    paddingHorizontal: 12,
++    color: '#000',
++  },
++  addButton: {
++    minHeight: 48,
++  },
++  confirmButton: {
++    marginTop: 20,
++    marginBottom: 10,
++  },
++  error: {
++    color: '#b91c1c',
++    marginTop: 12,
++  },
++});
+diff --git a/components/CategoryOnboardingGate.tsx b/components/CategoryOnboardingGate.tsx
+new file mode 100644
+index 0000000..cc46ec3
+--- /dev/null
++++ b/components/CategoryOnboardingGate.tsx
+@@ -0,0 +1,72 @@
++import React, { useEffect, useState } from 'react';
++
++import OnboardingScreen from '@/app/onboarding';
++import { useAuth } from '@/context/AuthContext';
++import { getEstablishment, type Establishment } from '@/services/api';
++import type { EstablishmentCategory } from '@/database/watermelon/categorySeeds';
++
++type Props = {
++  children: React.ReactNode;
++};
++
++export default function CategoryOnboardingGate({ children }: Props) {
++  const { token, user } = useAuth();
++  const role = user?.role;
++  const establishmentId = user?.establishmentId;
++  const isOwner = role === 'OWNER';
++  const eligible = Boolean(token && isOwner && establishmentId !== null && establishmentId !== undefined);
++  const [establishment, setEstablishment] = useState<Establishment | null>(null);
++  const [checking, setChecking] = useState(false);
++
++  useEffect(() => {
++    let mounted = true;
++
++    if (!eligible || !token) {
++      setEstablishment(null);
++      setChecking(false);
++      return () => {
++        mounted = false;
++      };
++    }
++
++    setChecking(true);
++    setEstablishment(null);
++    getEstablishment(token)
++      .then((nextEstablishment) => {
++        if (mounted) setEstablishment(nextEstablishment);
++      })
++      .catch((error) => {
++        if (mounted) {
++          console.warn('Could not load establishment category', error);
++          setEstablishment(null);
++        }
++      })
++      .finally(() => {
++        if (mounted) setChecking(false);
++      });
++
++    return () => {
++      mounted = false;
++    };
++  }, [eligible, establishmentId, token]);
++
++  if (
++    eligible
++    && !checking
++    && establishment?.category === null
++    && establishment.id !== null
++    && establishment.id !== undefined
++  ) {
++    return (
++      <OnboardingScreen
++        token={token}
++        establishmentId={establishment.id}
++        onCompleted={(category: EstablishmentCategory) => {
++          setEstablishment((current) => current ? { ...current, category } : current);
++        }}
++      />
++    );
++  }
++
++  return <>{children}</>;
++}
+diff --git a/database/watermelon/__tests__/categorySeeds.test.ts b/database/watermelon/__tests__/categorySeeds.test.ts
+new file mode 100644
+index 0000000..4ac36a3
+--- /dev/null
++++ b/database/watermelon/__tests__/categorySeeds.test.ts
+@@ -0,0 +1,37 @@
++import {
++  CATEGORY_OPTIONS,
++  CATEGORY_SEEDS,
++  getCategorySeed,
++} from '@/database/watermelon/categorySeeds';
++
++describe('category seed configuration', () => {
++  it('defines the six API categories with non-empty, business-relevant suggestions', () => {
++    expect(CATEGORY_OPTIONS).toEqual([
++      'HAMBURGUERIA',
++      'PIZZARIA',
++      'SORVETERIA',
++      'CAFETERIA',
++      'LANCHONETE',
++      'OUTRO',
++    ]);
++
++    for (const category of CATEGORY_OPTIONS) {
++      expect(CATEGORY_SEEDS[category].length).toBeGreaterThan(0);
++      expect(new Set(CATEGORY_SEEDS[category]).size).toBe(CATEGORY_SEEDS[category].length);
++      expect(CATEGORY_SEEDS[category].every((name) => name.trim().length > 0)).toBe(true);
++    }
++  });
++
++  it('returns the hamburger suggestion as a fresh editable list', () => {
++    const suggestions = getCategorySeed('HAMBURGUERIA');
++
++    expect(suggestions).toEqual(['Lanches', 'Bebidas', 'Porções', 'Sobremesas']);
++    suggestions.pop();
++    expect(getCategorySeed('HAMBURGUERIA')).toEqual([
++      'Lanches',
++      'Bebidas',
++      'Porções',
++      'Sobremesas',
++    ]);
++  });
++});
+diff --git a/database/watermelon/categorySeeds.ts b/database/watermelon/categorySeeds.ts
+new file mode 100644
+index 0000000..f65e39a
+--- /dev/null
++++ b/database/watermelon/categorySeeds.ts
+@@ -0,0 +1,23 @@
++export const CATEGORY_OPTIONS = [
++  'HAMBURGUERIA',
++  'PIZZARIA',
++  'SORVETERIA',
++  'CAFETERIA',
++  'LANCHONETE',
++  'OUTRO',
++] as const;
++
++export type EstablishmentCategory = (typeof CATEGORY_OPTIONS)[number];
++
++export const CATEGORY_SEEDS: Readonly<Record<EstablishmentCategory, readonly string[]>> = {
++  HAMBURGUERIA: ['Lanches', 'Bebidas', 'Porções', 'Sobremesas'],
++  PIZZARIA: ['Pizzas', 'Bebidas', 'Entradas', 'Sobremesas'],
++  SORVETERIA: ['Sorvetes', 'Açaí', 'Coberturas', 'Bebidas'],
++  CAFETERIA: ['Cafés', 'Bebidas', 'Salgados', 'Doces'],
++  LANCHONETE: ['Lanches', 'Bebidas', 'Porções', 'Doces'],
++  OUTRO: ['Produtos', 'Bebidas', 'Serviços', 'Outros'],
++};
++
++export function getCategorySeed(category: EstablishmentCategory): string[] {
++  return [...CATEGORY_SEEDS[category]];
++}
+diff --git a/docs/superpowers/sdd/2026-08-27-fase-7-t9-mobile-worker.md b/docs/superpowers/sdd/2026-08-27-fase-7-t9-mobile-worker.md
+new file mode 100644
+index 0000000..c5b91d6
+--- /dev/null
++++ b/docs/superpowers/sdd/2026-08-27-fase-7-t9-mobile-worker.md
+@@ -0,0 +1,110 @@
++# Task 9 — Onboarding de categoria (mobile)
++
++## Resultado
++
++Implementado o onboarding de primeiro acesso no mobile para usuários `OWNER`:
++
++1. O app busca o estabelecimento autenticado em `GET /estabelecimentos`.
++2. Quando a resposta contém `category === null`, exibe a tela de onboarding.
++3. A tela oferece exatamente as seis categorias do contrato, carrega seeds
++   estáticos de tipos de produto, permite adicionar/remover descrições e confirma
++   somente a lista editada.
++4. A confirmação faz `PATCH /establishments/:id`, um `POST /tipos` por item não
++   vazio e, somente depois, dispara
++   `runWithLock(() => synchronizeWithServer(token, establishmentId))`.
++5. Após a confirmação, o gate atualiza o estado em memória e desmonta o
++   onboarding; em uma nova avaliação, uma categoria não nula também não dispara
++   a tela.
++
++Arquivos principais:
++
++- `database/watermelon/categorySeeds.ts`: enum tipado, seis opções e quatro
++  sugestões coerentes por categoria.
++- `services/api.ts`: clientes dos três endpoints do contrato.
++- `services/categoryOnboarding.ts`: orquestração PATCH → POSTs → sync protegido.
++- `app/onboarding.tsx`: seleção e edição da lista de tipos.
++- `components/CategoryOnboardingGate.tsx`: gate do fluxo pós-login.
++- `app/_layout.tsx`: integração do gate no shell autenticado.
++- `i18n/locales/*/common.json`: textos do onboarding nos seis locales, com teste
++  de bundle.
++
++## Decisões tomadas
++
++- Segui o brief desta task como fonte de verdade. Portanto, o lookup usa
++  `GET /estabelecimentos` (sem `:id`), enquanto a mutação usa exatamente
++  `PATCH /establishments/:id` e a criação usa `POST /tipos`. Não consultei o
++  repositório da API.
++- O ruling de RBAC foi aplicado literalmente: somente `user.role === 'OWNER'`
++  é elegível. `MANAGER`, `EMPLOYEE` e `CUSTOMER` não fazem sequer o GET de
++  onboarding; em particular, um `MANAGER` com categoria nula não vê a tela nem
++  tenta criar tipos que retornariam 403.
++- O gate só interpreta `category === null` como pendência. Categoria ausente,
++  já configurada ou erro/offline no GET deixa o shell normal disponível, sem
++  transformar uma falha de rede em onboarding falso.
++- Os seeds são configuração local e não vêm da API. O seed de `HAMBURGUERIA`
++  é `Lanches`, `Bebidas`, `Porções`, `Sobremesas`; as outras cinco categorias
++  também possuem listas não vazias e sem duplicatas.
++- Os POSTs são sequenciais e recebem `{ description, color: '#9E9E9E' }`. A
++  lista é normalizada para remover espaços externos e entradas vazias; a UI
++  impede duplicatas adicionadas pelo usuário.
++- Não foi criado cache local de onboarding: o gate não lê nem grava Watermelon
++  para esse estado. O fluxo usa o estabelecimento autenticado e passa o mesmo
++  `establishmentId` ao sync, preservando o isolamento exigido pelo plano.
++- O módulo pesado de sync é carregado dentro do callback de `runWithLock`. Isso
++  mantém o comportamento de runtime e evita instanciar o adapter JSI durante a
++  importação do layout em ambientes de teste que mockam o provider de sync.
++
++## TDD e testes
++
++O ciclo TDD foi executado em etapas:
++
++- RED inicial: os testes novos falharam pela ausência de `categorySeeds`, da
++  orquestração/tela e das três funções de API; os quatro testes antigos de
++  `services/__tests__/api.test.ts` permaneceram passando.
++- GREEN incremental: seeds, API, orquestração, tela/gate e cópia i18n foram
++  implementados e testados após cada etapa.
++
++Comandos finais e resultados:
++
++- `npx jest app/__tests__/onboarding.test.tsx services/__tests__/api.test.ts services/__tests__/categoryOnboarding.test.ts database/watermelon/__tests__/categorySeeds.test.ts i18n/__tests__/index.test.ts app/__tests__/i18nSurfaces.test.tsx --runInBand --watchAll=false --silent`
++  — **6 suítes, 30 testes passando**.
++- `npx jest --runInBand --watchAll=false --silent` — **37 suítes, 155 testes
++  passando; 1 snapshot passando**. As mensagens `i18n check failed` exibidas
++  durante essa execução são os diagnósticos esperados pelas fixtures inválidas
++  cobertas em `scripts/__tests__/check-i18n.test.ts`; o processo terminou com
++  código 0.
++- `node scripts/check-i18n.mjs` — **passou** (`6 locales, 15 namespaces`).
++- `npx tsc --noEmit` — **passou**, sem erros.
++- `git diff --cached --check` — **passou**, sem erro de whitespace; os avisos
++  de permissão/configuração do Git não alteraram o conteúdo staged.
++
++Não foi executado `npx expo run:android` nem um fluxo contra API real: esta task
++exigia a suíte focada e o typecheck, e o contrato foi coberto por mocks nos
++testes de API/orquestração.
++
++## Self-review
++
++- O teste de fluxo escolhe `HAMBURGUERIA`, adiciona `Combos`, remove `Lanches` e
++  confirma que somente `Bebidas`, `Porções`, `Sobremesas` e `Combos` geram POST;
++  também verifica o sync após os POSTs.
++- O gate foi coberto para `OWNER` pendente, categoria já configurada, usuário
++  não-`OWNER` e remoção do onboarding após sucesso sem novo GET.
++- A importação do layout foi revisada após a regressão de JSI encontrada na
++  suíte completa; o carregamento lazy do sync corrigiu os dois testes de
++  navegação afetados.
++- O staging foi feito com caminhos explícitos. Artefatos `.md`, `.txt` e logs
++  preexistentes no worktree foram preservados e não entraram no commit de
++  implementação.
++- Observação de atomicidade: o contrato fornecido não oferece transação nem
++  endpoint de criação em lote para combinar o PATCH com os vários POSTs. Se o
++  PATCH tiver sucesso e um POST posterior falhar, a categoria pode ficar salva
++  sem todos os tipos; a tela mostra erro e permanece no fluxo atual, mas uma
++  nova sessão não repete o onboarding porque a categoria já não é nula. Resolver
++  atomicidade/idempotência exigiria uma mudança de contrato/API fora do escopo
++  desta task e deve ser considerado pelo controller antes de uma evolução desse
++  cenário.
++
++## Commits
++
++- `04f2172` — `feat: add category onboarding` (implementação e testes).
++- O commit separado deste relatório será informado no handoff final.
+diff --git a/i18n/__tests__/index.test.ts b/i18n/__tests__/index.test.ts
+index 2c2ea8a..92ee71b 100644
+--- a/i18n/__tests__/index.test.ts
++++ b/i18n/__tests__/index.test.ts
+@@ -86,20 +86,42 @@ describe('mobile i18n foundation', () => {
+     expect(setItem).toHaveBeenCalledWith(LOCALE_PREFERENCE_KEY, 'pt-BR');
+   });
+ 
+   it('configures local resources with a closed fallback language set', () => {
+     expect(i18n.options.fallbackLng).toEqual(['en']);
+     expect(i18n.options.load).toBe('currentOnly');
+     expect(i18n.options.supportedLngs).toEqual(SUPPORTED_LOCALES);
+     expect(i18n.t('common.appName')).toBe('TozzoBurger');
+   });
+ 
++  it('bundles non-empty onboarding copy for every supported locale', () => {
++    const onboardingKeys = [
++      'onboardingTitle',
++      'onboardingChooseCategory',
++      'onboardingSuggestedTypes',
++      'onboardingTypePlaceholder',
++      'onboardingAddType',
++      'onboardingConfirm',
++      'onboardingChangeCategory',
++      'onboardingSaving',
++      'onboardingSaveError',
++    ];
++
++    for (const locale of SUPPORTED_LOCALES) {
++      for (const key of onboardingKeys) {
++        const value = resources[locale].common[key as keyof typeof resources[typeof locale]['common']];
++        expect(typeof value).toBe('string');
++        expect(String(value).trim().length).toBeGreaterThan(0);
++      }
++    }
++  });
++
+   it('keeps the runtime supported-language check closed to app locales', () => {
+     expect(i18n.services.languageUtils.supportedLngs).toEqual(SUPPORTED_LOCALES);
+     expect(i18n.services.languageUtils.isSupportedCode('en')).toBe(true);
+     expect(i18n.services.languageUtils.isSupportedCode('cimode')).toBe(false);
+     expect(i18n.services.languageUtils.isSupportedCode('de')).toBe(false);
+   });
+ 
+   it('exposes every supported locale with every required namespace locally', () => {
+     expect(Object.keys(resources)).toEqual(SUPPORTED_LOCALES);
+     for (const locale of SUPPORTED_LOCALES) {
+diff --git a/i18n/locales/en/common.json b/i18n/locales/en/common.json
+index 6b89757..ac84666 100644
+--- a/i18n/locales/en/common.json
++++ b/i18n/locales/en/common.json
+@@ -32,12 +32,21 @@
+   "increaseQuantity": "Increase quantity",
+   "error": "Error",
+   "success": "Success",
+   "notProvided": "Not provided",
+   "unknownProduct": "Product not found",
+   "share": "Share",
+   "addItem": "Add item",
+   "clearCartConfirm": "Do you really want to clear the cart?",
+   "notFoundTitle": "Oops!",
+   "notFoundMessage": "This screen doesn't exist.",
+-  "goHome": "Go to home screen!"
++  "goHome": "Go to home screen!",
++  "onboardingTitle": "Set up your establishment",
++  "onboardingChooseCategory": "Choose your establishment category",
++  "onboardingSuggestedTypes": "Suggested product types",
++  "onboardingTypePlaceholder": "New product type",
++  "onboardingAddType": "Add",
++  "onboardingConfirm": "Confirm category",
++  "onboardingChangeCategory": "Choose another category",
++  "onboardingSaving": "Saving…",
++  "onboardingSaveError": "Could not save the category. Please try again."
+ }
+diff --git a/i18n/locales/es/common.json b/i18n/locales/es/common.json
+index 22c6efb..f19bf59 100644
+--- a/i18n/locales/es/common.json
++++ b/i18n/locales/es/common.json
+@@ -32,12 +32,21 @@
+   "increaseQuantity": "Aumentar cantidad",
+   "error": "Error",
+   "success": "Éxito",
+   "notProvided": "No informado",
+   "unknownProduct": "Producto no encontrado",
+   "share": "Compartir",
+   "addItem": "Añadir artículo",
+   "clearCartConfirm": "¿Quieres vaciar el carrito?",
+   "notFoundTitle": "¡Vaya!",
+   "notFoundMessage": "Esta pantalla no existe.",
+-  "goHome": "¡Ir a la pantalla de inicio!"
++  "goHome": "¡Ir a la pantalla de inicio!",
++  "onboardingTitle": "Configura tu establecimiento",
++  "onboardingChooseCategory": "Elige la categoría de tu establecimiento",
++  "onboardingSuggestedTypes": "Tipos de producto sugeridos",
++  "onboardingTypePlaceholder": "Nuevo tipo de producto",
++  "onboardingAddType": "Añadir",
++  "onboardingConfirm": "Confirmar categoría",
++  "onboardingChangeCategory": "Elegir otra categoría",
++  "onboardingSaving": "Guardando…",
++  "onboardingSaveError": "No se pudo guardar la categoría. Inténtalo de nuevo."
+ }
+diff --git a/i18n/locales/fr/common.json b/i18n/locales/fr/common.json
+index 81206db..cf5e0b2 100644
+--- a/i18n/locales/fr/common.json
++++ b/i18n/locales/fr/common.json
+@@ -32,12 +32,21 @@
+   "increaseQuantity": "Augmenter la quantité",
+   "error": "Erreur",
+   "success": "Réussite",
+   "notProvided": "Non renseigné",
+   "unknownProduct": "Produit introuvable",
+   "share": "Partager",
+   "addItem": "Ajouter un article",
+   "clearCartConfirm": "Voulez-vous vraiment vider le panier ?",
+   "notFoundTitle": "Oups !",
+   "notFoundMessage": "Cet écran n’existe pas.",
+-  "goHome": "Retour à l’accueil !"
++  "goHome": "Retour à l’accueil !",
++  "onboardingTitle": "Configurez votre établissement",
++  "onboardingChooseCategory": "Choisissez la catégorie de votre établissement",
++  "onboardingSuggestedTypes": "Types de produits suggérés",
++  "onboardingTypePlaceholder": "Nouveau type de produit",
++  "onboardingAddType": "Ajouter",
++  "onboardingConfirm": "Confirmer la catégorie",
++  "onboardingChangeCategory": "Choisir une autre catégorie",
++  "onboardingSaving": "Enregistrement…",
++  "onboardingSaveError": "Impossible d’enregistrer la catégorie. Réessayez."
+ }
+diff --git a/i18n/locales/hi/common.json b/i18n/locales/hi/common.json
+index 2b96b13..e8c1e32 100644
+--- a/i18n/locales/hi/common.json
++++ b/i18n/locales/hi/common.json
+@@ -32,12 +32,21 @@
+   "increaseQuantity": "मात्रा बढ़ाएँ",
+   "error": "त्रुटि",
+   "success": "सफलता",
+   "notProvided": "उपलब्ध नहीं",
+   "unknownProduct": "उत्पाद नहीं मिला",
+   "share": "साझा करें",
+   "addItem": "आइटम जोड़ें",
+   "clearCartConfirm": "क्या आप वाकई कार्ट खाली करना चाहते हैं?",
+   "notFoundTitle": "ओह!",
+   "notFoundMessage": "यह स्क्रीन मौजूद नहीं है।",
+-  "goHome": "होम स्क्रीन पर जाएँ!"
++  "goHome": "होम स्क्रीन पर जाएँ!",
++  "onboardingTitle": "अपने प्रतिष्ठान की जानकारी सेट करें",
++  "onboardingChooseCategory": "अपने प्रतिष्ठान की श्रेणी चुनें",
++  "onboardingSuggestedTypes": "सुझाए गए उत्पाद प्रकार",
++  "onboardingTypePlaceholder": "नया उत्पाद प्रकार",
++  "onboardingAddType": "जोड़ें",
++  "onboardingConfirm": "श्रेणी की पुष्टि करें",
++  "onboardingChangeCategory": "दूसरी श्रेणी चुनें",
++  "onboardingSaving": "सहेजा जा रहा है…",
++  "onboardingSaveError": "श्रेणी सहेजी नहीं जा सकी। फिर से प्रयास करें।"
+ }
+diff --git a/i18n/locales/pt-BR/common.json b/i18n/locales/pt-BR/common.json
+index 1a7d6d8..24790e9 100644
+--- a/i18n/locales/pt-BR/common.json
++++ b/i18n/locales/pt-BR/common.json
+@@ -32,12 +32,21 @@
+   "increaseQuantity": "Aumentar quantidade",
+   "error": "Erro",
+   "success": "Sucesso",
+   "notProvided": "Não informado",
+   "unknownProduct": "Produto não encontrado",
+   "share": "Compartilhar",
+   "addItem": "Adicionar item",
+   "clearCartConfirm": "Deseja realmente limpar o carrinho?",
+   "notFoundTitle": "Ops!",
+   "notFoundMessage": "Esta tela não existe.",
+-  "goHome": "Ir para a tela inicial!"
++  "goHome": "Ir para a tela inicial!",
++  "onboardingTitle": "Configure seu estabelecimento",
++  "onboardingChooseCategory": "Escolha a categoria do seu estabelecimento",
++  "onboardingSuggestedTypes": "Tipos de produto sugeridos",
++  "onboardingTypePlaceholder": "Novo tipo de produto",
++  "onboardingAddType": "Adicionar",
++  "onboardingConfirm": "Confirmar categoria",
++  "onboardingChangeCategory": "Escolher outra categoria",
++  "onboardingSaving": "Salvando…",
++  "onboardingSaveError": "Não foi possível salvar a categoria. Tente novamente."
+ }
+diff --git a/i18n/locales/zh/common.json b/i18n/locales/zh/common.json
+index 1642813..2a11bad 100644
+--- a/i18n/locales/zh/common.json
++++ b/i18n/locales/zh/common.json
+@@ -32,12 +32,21 @@
+   "increaseQuantity": "增加数量",
+   "error": "错误",
+   "success": "成功",
+   "notProvided": "未提供",
+   "unknownProduct": "未找到产品",
+   "share": "分享",
+   "addItem": "添加项目",
+   "clearCartConfirm": "确定要清空购物车吗？",
+   "notFoundTitle": "糟糕！",
+   "notFoundMessage": "此页面不存在。",
+-  "goHome": "返回主页！"
++  "goHome": "返回主页！",
++  "onboardingTitle": "设置您的店铺",
++  "onboardingChooseCategory": "选择您的店铺类别",
++  "onboardingSuggestedTypes": "建议的产品类型",
++  "onboardingTypePlaceholder": "新的产品类型",
++  "onboardingAddType": "添加",
++  "onboardingConfirm": "确认类别",
++  "onboardingChangeCategory": "选择其他类别",
++  "onboardingSaving": "保存中…",
++  "onboardingSaveError": "无法保存类别，请重试。"
+ }
+diff --git a/services/__tests__/api.test.ts b/services/__tests__/api.test.ts
+index e6b40c5..afc55ea 100644
+--- a/services/__tests__/api.test.ts
++++ b/services/__tests__/api.test.ts
+@@ -1,11 +1,16 @@
+-import { listVendas } from '../api';
++import {
++  createProductType,
++  getEstablishment,
++  listVendas,
++  updateEstablishmentCategory,
++} from '../api';
+ 
+ describe('listVendas', () => {
+   const fetchMock = jest.spyOn(global, 'fetch');
+   const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+ 
+   afterEach(() => { fetchMock.mockReset(); consoleError.mockClear(); });
+   afterAll(() => { fetchMock.mockRestore(); consoleError.mockRestore(); });
+ 
+   it('faz GET autenticado, monta query params e preserva a paginação da resposta', async () => {
+     const payload = {
+@@ -57,11 +62,77 @@ describe('listVendas', () => {
+     const result = await listVendas('token-123', { page: 1, limit: 50 });
+ 
+     expect(result.pagination).toEqual({ page: 1, limit: 50, total: 101, totalPages: 3, hasNextPage: true });
+   });
+ 
+   it('propaga erro HTTP sem engolir a falha', async () => {
+     fetchMock.mockResolvedValue({ ok: false, status: 500, text: jest.fn(async () => JSON.stringify({ message: 'Falha ao listar vendas' })) } as unknown as Response);
+     await expect(listVendas('token-123', {})).rejects.toThrow('Falha ao listar vendas');
+     expect(consoleError).toHaveBeenCalledWith('API listVendas error:', expect.stringContaining('/vendas'), 'Falha ao listar vendas');
+   });
++
++  it('busca o estabelecimento autenticado com a categoria atual', async () => {
++    const establishment = { id: 'establishment-1', name: 'Tozzo Burger', category: null };
++    fetchMock.mockResolvedValue({
++      ok: true,
++      text: jest.fn(async () => JSON.stringify(establishment)),
++    } as unknown as Response);
++
++    await expect(getEstablishment('token-123')).resolves.toEqual(establishment);
++
++    const [requestUrl, requestOptions] = fetchMock.mock.calls[0];
++    expect(new URL(String(requestUrl)).pathname).toBe('/estabelecimentos');
++    expect(requestOptions).toEqual({
++      method: 'GET',
++      headers: expect.objectContaining({
++        Authorization: 'Bearer token-123',
++        Accept: 'application/json',
++      }),
++    });
++  });
++
++  it('patches the authenticated establishment category with the English API field', async () => {
++    const updated = { id: 'establishment-1', category: 'HAMBURGUERIA' };
++    fetchMock.mockResolvedValue({
++      ok: true,
++      text: jest.fn(async () => JSON.stringify(updated)),
++    } as unknown as Response);
++
++    await expect(updateEstablishmentCategory('token-123', 'establishment-1', 'HAMBURGUERIA'))
++      .resolves.toEqual(updated);
++
++    const [requestUrl, requestOptions] = fetchMock.mock.calls[0];
++    expect(new URL(String(requestUrl)).pathname).toBe('/establishments/establishment-1');
++    expect(requestOptions).toEqual(expect.objectContaining({
++      method: 'PATCH',
++      headers: expect.objectContaining({
++        Authorization: 'Bearer token-123',
++        'Content-Type': 'application/json',
++      }),
++      body: JSON.stringify({ category: 'HAMBURGUERIA' }),
++    }));
++  });
++
++  it('creates one product type using the documented English payload', async () => {
++    const created = { id: 'type-1', description: 'Lanches', color: '#9E9E9E' };
++    fetchMock.mockResolvedValue({
++      ok: true,
++      text: jest.fn(async () => JSON.stringify(created)),
++    } as unknown as Response);
++
++    await expect(createProductType('token-123', {
++      description: 'Lanches',
++      color: '#9E9E9E',
++    })).resolves.toEqual(created);
++
++    const [requestUrl, requestOptions] = fetchMock.mock.calls[0];
++    expect(new URL(String(requestUrl)).pathname).toBe('/tipos');
++    expect(requestOptions).toEqual(expect.objectContaining({
++      method: 'POST',
++      headers: expect.objectContaining({
++        Authorization: 'Bearer token-123',
++        'Content-Type': 'application/json',
++      }),
++      body: JSON.stringify({ description: 'Lanches', color: '#9E9E9E' }),
++    }));
++  });
+ });
+diff --git a/services/__tests__/categoryOnboarding.test.ts b/services/__tests__/categoryOnboarding.test.ts
+new file mode 100644
+index 0000000..14f1c6c
+--- /dev/null
++++ b/services/__tests__/categoryOnboarding.test.ts
+@@ -0,0 +1,72 @@
++import { completeCategoryOnboarding } from '@/services/categoryOnboarding';
++import { createProductType, updateEstablishmentCategory } from '@/services/api';
++import { runWithLock } from '@/database/syncGuard';
++import { synchronizeWithServer } from '@/database/watermelon/sync';
++
++jest.mock('@/services/api', () => ({
++  createProductType: jest.fn(),
++  updateEstablishmentCategory: jest.fn(),
++}));
++
++jest.mock('@/database/syncGuard', () => ({
++  runWithLock: jest.fn(),
++}));
++
++jest.mock('@/database/watermelon/sync', () => ({
++  synchronizeWithServer: jest.fn(),
++}));
++
++const mockCreateProductType = createProductType as jest.MockedFunction<typeof createProductType>;
++const mockUpdateEstablishmentCategory = updateEstablishmentCategory as jest.MockedFunction<typeof updateEstablishmentCategory>;
++const mockRunWithLock = runWithLock as jest.MockedFunction<typeof runWithLock>;
++const mockSynchronizeWithServer = synchronizeWithServer as jest.MockedFunction<typeof synchronizeWithServer>;
++
++describe('completeCategoryOnboarding', () => {
++  beforeEach(() => {
++    jest.clearAllMocks();
++    mockUpdateEstablishmentCategory.mockResolvedValue({ id: 'establishment-1', category: 'HAMBURGUERIA' });
++    mockCreateProductType.mockResolvedValue({ id: 'type-1' });
++    mockSynchronizeWithServer.mockResolvedValue(undefined);
++    mockRunWithLock.mockImplementation(async (callback) => callback());
++  });
++
++  it('updates the category, creates only the confirmed types, then syncs under the lock', async () => {
++    await completeCategoryOnboarding({
++      token: 'token-123',
++      establishmentId: 'establishment-1',
++      category: 'HAMBURGUERIA',
++      productTypeDescriptions: ['Lanches', 'Bebidas'],
++    });
++
++    expect(mockUpdateEstablishmentCategory).toHaveBeenCalledWith(
++      'token-123',
++      'establishment-1',
++      'HAMBURGUERIA',
++    );
++    expect(mockCreateProductType.mock.calls).toEqual([
++      ['token-123', { description: 'Lanches', color: '#9E9E9E' }],
++      ['token-123', { description: 'Bebidas', color: '#9E9E9E' }],
++    ]);
++    expect(mockRunWithLock).toHaveBeenCalledTimes(1);
++    expect(mockSynchronizeWithServer).toHaveBeenCalledWith('token-123', 'establishment-1');
++    expect(mockUpdateEstablishmentCategory.mock.invocationCallOrder[0])
++      .toBeLessThan(mockCreateProductType.mock.invocationCallOrder[0]);
++    expect(mockCreateProductType.mock.invocationCallOrder.at(-1))
++      .toBeLessThan(mockRunWithLock.mock.invocationCallOrder[0]);
++  });
++
++  it('does not send blank descriptions from an edited list', async () => {
++    await completeCategoryOnboarding({
++      token: 'token-123',
++      establishmentId: 'establishment-1',
++      category: 'OUTRO',
++      productTypeDescriptions: [' Produtos ', '  '],
++    });
++
++    expect(mockCreateProductType).toHaveBeenCalledWith(
++      'token-123',
++      { description: 'Produtos', color: '#9E9E9E' },
++    );
++    expect(mockCreateProductType).toHaveBeenCalledTimes(1);
++  });
++});
+diff --git a/services/api.ts b/services/api.ts
+index 5ce9413..f540c6f 100644
+--- a/services/api.ts
++++ b/services/api.ts
+@@ -1,12 +1,13 @@
+ import { buildSalesQueryParams, DEFAULT_SALES_LIMIT, DEFAULT_SALES_PAGE, SalesFilters, SalesListResponse, SalesPagination } from './sales';
+ import { fromLegacySyncResponse, fromLegacyUser } from './legacyWire';
++import type { EstablishmentCategory } from '@/database/watermelon/categorySeeds';
+ 
+ // Fallback = produção. Para dev/homolog, defina EXPO_PUBLIC_API_URL no .env (ver .env.example).
+ export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.tozzo.uk';
+ 
+ // Túnel ngrok (dev local) mostra uma pagina de aviso HTML pro primeiro acesso de
+ // qualquer client sem esse header, mesmo pra requests que nao sao de browser —
+ // isso quebraria o parse de JSON das respostas. Sem efeito em tozzo.uk/dev-api.tozzo.uk.
+ const NGROK_HEADERS: Record<string, string> = BASE_URL.includes('ngrok')
+   ? { 'ngrok-skip-browser-warning': 'true' }
+   : {};
+@@ -42,20 +43,31 @@ export type SyncIgnoredItem = {
+   type: string;
+   entityId: string | null;
+   reason: string;
+ };
+ 
+ export type SyncPushResponse = {
+   ignored?: SyncIgnoredItem[];
+   ignored_order_deletes?: SyncIgnoredItem[];
+ };
+ 
++export type Establishment = {
++  id: string | number;
++  category: EstablishmentCategory | null;
++  [key: string]: unknown;
++};
++
++export type ProductTypePayload = {
++  description: string;
++  color: string;
++};
++
+ export class ApiHttpError extends Error {
+   readonly status: number;
+   readonly body: unknown;
+   readonly code?: string;
+   readonly details?: unknown;
+ 
+   constructor(status: number, body: unknown, fallbackMessage = `HTTP ${status}`) {
+     const record = body && typeof body === 'object' ? body as Record<string, unknown> : null;
+     const message = typeof record?.message === 'string'
+       ? record.message
+@@ -154,20 +166,108 @@ export async function getMe(token: string) {
+       throw new Error(message);
+     }
+ 
+     return fromLegacyUser(await handleJsonResponse(res));
+   } catch (err: any) {
+     console.error('Network/getMe request failed', url, err?.message ?? err);
+     throw err;
+   }
+ }
+ 
++export async function getEstablishment(token: string): Promise<Establishment> {
++  const url = new URL('/estabelecimentos', BASE_URL);
++  try {
++    const res = await fetch(url, {
++      method: 'GET',
++      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
++    });
++
++    if (!res.ok) {
++      const errBody = await handleJsonResponse(res).catch(() => null);
++      const error = new ApiHttpError(res.status, errBody);
++      console.error('API getEstablishment error:', url.toString(), error.message);
++      throw error;
++    }
++
++    return await handleJsonResponse(res) as Establishment;
++  } catch (err: any) {
++    if (err instanceof ApiHttpError) throw err;
++    console.error('Network/getEstablishment request failed', url.toString(), err?.message ?? err);
++    throw err;
++  }
++}
++
++export async function updateEstablishmentCategory(
++  token: string,
++  establishmentId: string | number,
++  category: EstablishmentCategory,
++): Promise<Establishment> {
++  const url = new URL(`/establishments/${encodeURIComponent(String(establishmentId))}`, BASE_URL);
++  try {
++    const res = await fetch(url, {
++      method: 'PATCH',
++      headers: {
++        'Content-Type': 'application/json',
++        Authorization: `Bearer ${token}`,
++        Accept: 'application/json',
++        ...NGROK_HEADERS,
++      },
++      body: JSON.stringify({ category }),
++    });
++
++    if (!res.ok) {
++      const errBody = await handleJsonResponse(res).catch(() => null);
++      const error = new ApiHttpError(res.status, errBody);
++      console.error('API updateEstablishmentCategory error:', url.toString(), error.message);
++      throw error;
++    }
++
++    return await handleJsonResponse(res) as Establishment;
++  } catch (err: any) {
++    if (err instanceof ApiHttpError) throw err;
++    console.error('Network/updateEstablishmentCategory request failed', url.toString(), err?.message ?? err);
++    throw err;
++  }
++}
++
++export async function createProductType(
++  token: string,
++  payload: ProductTypePayload,
++): Promise<Record<string, unknown>> {
++  const url = new URL('/tipos', BASE_URL);
++  try {
++    const res = await fetch(url, {
++      method: 'POST',
++      headers: {
++        'Content-Type': 'application/json',
++        Authorization: `Bearer ${token}`,
++        Accept: 'application/json',
++        ...NGROK_HEADERS,
++      },
++      body: JSON.stringify(payload),
++    });
++
++    if (!res.ok) {
++      const errBody = await handleJsonResponse(res).catch(() => null);
++      const error = new ApiHttpError(res.status, errBody);
++      console.error('API createProductType error:', url.toString(), error.message);
++      throw error;
++    }
++
++    return await handleJsonResponse(res) as Record<string, unknown>;
++  } catch (err: any) {
++    if (err instanceof ApiHttpError) throw err;
++    console.error('Network/createProductType request failed', url.toString(), err?.message ?? err);
++    throw err;
++  }
++}
++
+ export async function pullChanges(token: string, params: SyncPullRequest): Promise<SyncPullResponse> {
+   const url = new URL('/sync/pull', BASE_URL);
+   url.searchParams.set('schemaVersion', String(params.schemaVersion));
+   if (params.lastPulledAt !== undefined && params.lastPulledAt !== null) {
+     url.searchParams.set('lastPulledAt', String(params.lastPulledAt));
+   }
+ 
+   try {
+     const res = await fetch(url, {
+       method: 'GET',
+diff --git a/services/categoryOnboarding.ts b/services/categoryOnboarding.ts
+new file mode 100644
+index 0000000..3d6896f
+--- /dev/null
++++ b/services/categoryOnboarding.ts
+@@ -0,0 +1,36 @@
++import type { EstablishmentCategory } from '@/database/watermelon/categorySeeds';
++import { createProductType, updateEstablishmentCategory } from '@/services/api';
++import { runWithLock } from '@/database/syncGuard';
++
++export const DEFAULT_PRODUCT_TYPE_COLOR = '#9E9E9E';
++
++export type CompleteCategoryOnboardingInput = {
++  token: string;
++  establishmentId: string | number;
++  category: EstablishmentCategory;
++  productTypeDescriptions: readonly string[];
++};
++
++export async function completeCategoryOnboarding({
++  token,
++  establishmentId,
++  category,
++  productTypeDescriptions,
++}: CompleteCategoryOnboardingInput): Promise<void> {
++  await updateEstablishmentCategory(token, establishmentId, category);
++
++  for (const rawDescription of productTypeDescriptions) {
++    const description = rawDescription.trim();
++    if (description.length === 0) continue;
++
++    await createProductType(token, {
++      description,
++      color: DEFAULT_PRODUCT_TYPE_COLOR,
++    });
++  }
++
++  await runWithLock(async () => {
++    const { synchronizeWithServer } = require('@/database/watermelon/sync') as typeof import('@/database/watermelon/sync');
++    return synchronizeWithServer(token, establishmentId);
++  });
++}

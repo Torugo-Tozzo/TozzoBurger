@@ -1,0 +1,4911 @@
+OpenAI Codex v0.149.1
+--------
+workdir: C:\RN\TozzoBurger
+model: gpt-5.6-luna
+provider: openai
+approval: on-request
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: max
+reasoning summaries: none
+session id: 01a04a00-1c83-7541-b3c4-befc25520da0
+--------
+user
+Você é o reviewer da re-revisão escopada da Task 9 (Fase 7 — onboarding de
+categoria, mobile) no repo `TozzoBurger` (C:\RN\TozzoBurger). Read-only — não edite
+código, só pode gravar seu próprio relatório em
+`docs/superpowers/sdd/2026-08-27-fase-7-t9-rereview1.md`. Não dê commit/push. NÃO
+dispare subagentes.
+
+A revisão original (`docs/superpowers/sdd/2026-08-27-fase-7-t9-review.md`) reprovou
+a task com este achado:
+
+- [Important] Proteção `OWNER`-only existia só no gate
+  (`CategoryOnboardingGate.tsx`), não na rota `/onboarding` em si — um `MANAGER`
+  navegando direto pra `/onboarding` conseguia renderizar a tela e confirmar,
+  gerando PATCH bem-sucedido + POSTs 403 (estado parcial que o ruling deveria
+  evitar). Achado relacionado: a rota direta também não conferia
+  `category === null` antes de renderizar.
+
+(O achado Minor de não-atomicidade foi aceito como limitação — não faz parte desta
+re-revisão.)
+
+Um worker corrigiu isso (commit `6fd6bf6 fix: guard direct category onboarding
+route`). Leia:
+1. `docs/superpowers/sdd/2026-08-27-fase-7-t9-fix1-diff.txt` — log de commit + diff
+   completo (`git diff -U10`) entre `db6fd1e` (estado revisado originalmente) e
+   `6fd6bf6` (correção).
+2. Se precisar, leia `app/onboarding.tsx`, `components/CategoryOnboardingGate.tsx`
+   e `hooks/useCategoryOnboardingAccess.ts` completos no repo.
+
+Para o achado Important acima, dê veredito ADDRESSED ou NOT ADDRESSED, com
+justificativa e referência a arquivo:linha — confirme especificamente: (a) a rota
+`/onboarding` agora bloqueia usuário não-`OWNER` navegando direto; (b) a rota
+`/onboarding` agora bloqueia quando `category` já não é `null`; (c) existe teste
+regressivo cobrindo os dois cenários. Sinalize também qualquer quebra NOVA
+introduzida por este diff de correção (fora do escopo do achado, mas real) como
+achado novo Critical/Important — não vasculhe código não relacionado.
+
+Formato do relatório final (retorne como texto da resposta E grave em
+`docs/superpowers/sdd/2026-08-27-fase-7-t9-rereview1.md`):
+
+```
+# Task 9 — Re-review (fix round 1)
+
+## Finding da revisão original
+- [Important] Bypass de RBAC/categoria pela rota direta: ADDRESSED|NOT ADDRESSED — justificativa.
+
+## Quebras novas no diff de correção
+(lista, ou "Nenhuma")
+
+## Veredito
+Todos endereçados / Ainda há findings abertos (liste quais)
+```
+
+Seja direto, sem elogio performático.
+
+warning: skipping prompt hook in C:\Users\lipoi\.codex\plugins\cache\trailofbits\fp-check\1.0.3\hooks\hooks.json: prompt hooks are not supported yet
+warning: skipping prompt hook in C:\Users\lipoi\.codex\plugins\cache\trailofbits\fp-check\1.0.3\hooks\hooks.json: prompt hooks are not supported yet
+codex
+Vou usar as skills `audit-context-building` e `differential-review`: a primeira para reconstruir o fluxo da rota/gate, e a segunda para revisar exclusivamente o diff de correção e seu impacto. Permanecerei em modo read-only, sem subagentes, e gravarei apenas o relatório solicitado.
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command "rtk read C:\\Users\\lipoi\\.codex\\plugins\\cache\\trailofbits\\audit-context-building\\2.0.0\\skills\\audit-context-building\\SKILL.md" in C:\RN\TozzoBurger
+ succeeded in 162ms:
+---
+name: audit-context-building
+description: Understand a codebase before looking for bugs in it - what each function assumes, what it guarantees, and what it depends on elsewhere. Use when starting an audit, threat model, or architecture review on unfamiliar code, and before any vulnerability-hunting pass.
+allowed-tools: Workflow Task Read Grep Glob
+---
+
+# Audit Context Building
+
+Build understanding, not verdicts. This runs before anyone hunts for bugs, and feeds that work.
+
+## When to Use
+
+At the start of an audit, a threat model, or an architecture review, when the code is unfamiliar. Also when
+an earlier pass produced findings nobody could judge, because no one had mapped out how the system fits
+together.
+
+## When NOT to Use
+
+Do not name vulnerabilities, suggest fixes, write proofs-of-concept, or rate severity. Those belong to the
+hunting phase, which runs next and with the whole picture in hand. When the code counts on something and
+nothing checks it, record that plainly and move on — whether it matters is decided later.
+
+Not worth the tokens on code you already understand.
+
+## Do not analyze in this context
+
+The analysis is long, and this context needs to survive to use it. Dispatch it:
+
+- **A codebase, or more than one function** — run `/audit-context-building:audit-context <path>`. It orients,
+  analyzes each function in its own subagent, and writes `audit-context/DOSSIER.md` plus one file per
+  function under `audit-context/functions/`. Only compact records return here.
+- **A single function** — dispatch the `audit-context-building:function-analyzer` agent at it. It writes its
+  prose to disk and returns a record.
+
+Then work from what comes back: the index, the unenforced assumptions, the open questions. Read a function's
+file when you need its detail.
+
+The workflow is what enforces this, not this text: a subagent bound to a return schema cannot return prose.
+Treat this section as routing, and route.
+
+## What comes back, and how to read it
+
+Each record lists what must always be true (with the line that shows it), what the function takes on faith
+(with whatever establishes it), which functions it calls and what it needs from each, and anything still
+unclear. The dossier adds the rules that span several functions, who can reach what, and where the
+complicated parts cluster.
+
+Two things matter more than the rest:
+
+- **Assumptions marked `nothing found`.** The code counts on something being true and nothing anywhere makes
+  it true. This is the most useful thing to hand the hunting phase.
+- **The open questions.** An honest list of what is still unclear beats a confident answer that turns out to
+  be wrong. Carry them forward instead of closing them out.
+
+Where two records disagree, both are quoted rather than quietly reconciled. That is a fact about the code,
+not a flaw in the analysis.
+
+## The format
+
+[ANALYSIS_FORMAT.md](resources/ANALYSIS_FORMAT.md) defines it, and
+[FUNCTION_MICRO_ANALYSIS_EXAMPLE.md](resources/FUNCTION_MICRO_ANALYSIS_EXAMPLE.md) works through examples in
+C and Solidity. Read them when extending this plugin or deciding whether a record can be trusted.
+
+The format is the same whatever the target. What changes is what fills each slot, and what counts as a call
+you cannot see inside. [DOMAIN_NOTES.md](resources/DOMAIN_NOTES.md) maps that across smart contracts, C and
+C++, decompiled firmware, and web services — read it when the target is not plain source code.
+
+**The rule that matters most: follow the calls.** Whether a function is correct usually depends on something
+another function does, and you cannot see that from the caller alone. A limit looks enforced because the
+value came back from a function whose name suggests it was checked. So read the function being called, follow
+every path through it rather than only the one that succeeds, and say what makes each assumption true. When
+nothing does, use those words: `nothing found`. Every claim cites a line, or becomes an open question.
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command "rtk read C:\\Users\\lipoi\\.codex\\plugins\\cache\\trailofbits\\differential-review\\1.1.2\\skills\\differential-review\\SKILL.md" in C:\RN\TozzoBurger
+ succeeded in 162ms:
+---
+name: differential-review
+description: "Performs security-focused differential review of code changes. Adapts analysis depth to codebase size, uses git blame for context, calculates blast radius by counting callers, checks test coverage of modified code, and generates a markdown report. Use when reviewing a PR, commit, or diff for security vulnerabilities, checking whether a change re-introduces a previously fixed bug, asking what else a change could break, or finding which modified code has no test covering it."
+allowed-tools: Read Write Grep Glob Bash
+---
+
+# Differential Security Review
+
+Security-focused code review for PRs, commits, and diffs.
+
+## Core Principles
+
+1. **Risk-First**: Focus on auth, crypto, value transfer, external calls
+2. **Evidence-Based**: Every finding backed by git history, line numbers, attack scenarios
+3. **Adaptive**: Scale to codebase size (SMALL/MEDIUM/LARGE)
+4. **Honest**: Explicitly state coverage limits and confidence level
+5. **Output-Driven**: Always generate comprehensive markdown report file
+
+---
+
+## Rationalizations (Do Not Skip)
+
+| Rationalization | Why It's Wrong | Required Action |
+|-----------------|----------------|-----------------|
+| "Small PR, quick review" | Heartbleed was 2 lines | Classify by RISK, not size |
+| "I know this codebase" | Familiarity breeds blind spots | Build explicit baseline context |
+| "Git history takes too long" | History reveals regressions | Never skip Phase 1 |
+| "Blast radius is obvious" | You'll miss transitive callers | Calculate quantitatively |
+| "No tests = not my problem" | Missing tests = elevated risk rating | Flag in report, elevate severity |
+| "Just a refactor, no security impact" | Refactors break invariants | Analyze as HIGH until proven LOW |
+| "I'll explain verbally" | No artifact = findings lost | Always write report |
+
+---
+
+## Quick Reference
+
+### Codebase Size Strategy
+
+| Codebase Size | Strategy | Approach |
+|---------------|----------|----------|
+| SMALL (<20 files) | DEEP | Read all deps, full git blame |
+| MEDIUM (20-200) | FOCUSED | 1-hop deps, priority files |
+| LARGE (200+) | SURGICAL | Critical paths only |
+
+### Risk Level Triggers
+
+| Risk Level | Triggers |
+|------------|----------|
+| HIGH | Auth, crypto, external calls, value transfer, validation removal |
+| MEDIUM | Business logic, state changes, new public APIs |
+| LOW | Comments, tests, UI, logging |
+
+---
+
+## Workflow Overview
+
+```
+Pre-Analysis → Phase 0: Triage → Phase 1: Code Analysis → Phase 2: Test Coverage
+    ↓              ↓                    ↓                        ↓
+Phase 3: Blast Radius → Phase 4: Deep Context → Phase 5: Adversarial → Phase 6: Report
+```
+
+---
+
+## Decision Tree
+
+**Starting a review?**
+
+```
+├─ Need detailed phase-by-phase methodology?
+│  └─ Read: methodology.md
+│     (Pre-Analysis + Phases 0-4: triage, code analysis, test coverage, blast radius)
+│
+├─ Analyzing HIGH RISK change?
+│  ├─ Read: adversarial.md
+│  │  (Phase 5: Attacker modeling, exploit scenarios, exploitability rating)
+│  └─ Or delegate to: differential-review:adversarial-modeler agent
+│     (Autonomous attacker modeling with concrete exploit scenarios)
+│
+├─ Writing the final report?
+│  └─ Read: reporting.md
+│     (Phase 6: Report structure, templates, formatting guidelines)
+│
+├─ Looking for specific vulnerability patterns?
+│  └─ Read: patterns.md
+│     (Regressions, reentrancy, access control, overflow, etc.)
+│
+└─ Quick triage only?
+   └─ Use Quick Reference above, skip detailed docs
+```
+
+---
+
+## Agents
+
+**`differential-review:adversarial-modeler`** — Models attacker perspectives and
+builds exploit scenarios for HIGH RISK code changes. Follows the 5-step
+adversarial methodology (attacker model, attack vectors, exploitability rating,
+exploit scenario, baseline cross-reference) and produces structured vulnerability
+reports. Delegate to this agent when Phase 5 analysis is needed on high-risk
+changes, passing that full namespaced name as `subagent_type` — a bare
+`adversarial-modeler` is unregistered and the dispatch fails at runtime.
+
+---
+
+## Quality Checklist
+
+Before delivering:
+
+- [ ] All changed files analyzed
+- [ ] Git blame on removed security code
+- [ ] Blast radius calculated for HIGH risk
+- [ ] Attack scenarios are concrete (not generic)
+- [ ] Findings reference specific line numbers + commits
+- [ ] Report file generated
+- [ ] User notified with summary
+
+---
+
+## Integration
+
+**audit-context-building skill:**
+- Pre-Analysis: Build baseline context
+- Phase 4: Deep context on HIGH RISK changes
+
+**issue-writer skill:**
+- Transform findings into formal audit reports
+- Command: `issue-writer --input DIFFERENTIAL_REVIEW_REPORT.md --format audit-report`
+
+---
+
+## Example Usage
+
+### Quick Triage (Small PR)
+```
+Input: 5 file PR, 2 HIGH RISK files
+Strategy: Use Quick Reference
+1. Classify risk level per file (2 HIGH, 3 LOW)
+2. Focus on 2 HIGH files only
+3. Git blame removed code
+4. Generate minimal report
+Time: ~30 minutes
+```
+
+### Standard Review (Medium Codebase)
+```
+Input: 80 files, 12 HIGH RISK changes
+Strategy: FOCUSED (see methodology.md)
+1. Full workflow on HIGH RISK files
+2. Surface scan on MEDIUM
+3. Skip LOW risk files
+4. Complete report with all sections
+Time: ~3-4 hours
+```
+
+### Deep Audit (Large, Critical Change)
+```
+Input: 450 files, auth system rewrite
+Strategy: SURGICAL + audit-context-building
+1. Baseline context with audit-context-building
+2. Deep analysis on auth changes only
+3. Blast radius analysis
+4. Adversarial modeling
+5. Comprehensive report
+Time: ~6-8 hours
+```
+
+---
+
+## When NOT to Use This Skill
+
+- **Greenfield code** (no baseline to compare)
+- **Documentation-only changes** (no security impact)
+- **Formatting/linting** (cosmetic changes)
+- **User explicitly requests quick summary only** (they accept risk)
+
+For these cases, use standard code review instead.
+
+---
+
+## Red Flags (Stop and Investigate)
+
+**Immediate escalation triggers:**
+- Removed code from "security", "CVE", or "fix" commits
+- Access control modifiers removed (onlyOwner, internal → external)
+- Validation removed without replacement
+- External calls added without checks
+- High blast radius (50+ callers) + HIGH risk change
+
+These patterns require adversarial analysis even in quick triage.
+
+---
+
+## Tips for Best Results
+
+**Do:**
+- Start with git blame for removed code
+- Calculate blast radius early to prioritize
+- Generate concrete attack scenarios
+- Reference specific line numbers and commits
+- Be honest about coverage limitations
+- Always generate the output file
+
+**Don't:**
+- Skip git history analysis
+- Make generic findings without evidence
+- Claim full analysis when time-limited
+- Forget to check test coverage
+- Miss high blast radius changes
+- Output report only to chat (file required)
+
+---
+
+## Supporting Documentation
+
+- **[methodology.md](methodology.md)** - Detailed phase-by-phase workflow (Phases 0-4)
+- **[adversarial.md](adversarial.md)** - Attacker modeling and exploit scenarios (Phase 5)
+- **[reporting.md](reporting.md)** - Report structure and formatting (Phase 6)
+- **[patterns.md](patterns.md)** - Common vulnerability patterns reference
+
+---
+
+**For first-time users:** Start with [methodology.md](methodology.md) to understand the complete workflow.
+
+**For experienced users:** Use this page's Quick Reference and Decision Tree to navigate directly to needed content.
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk git status --short' in C:\RN\TozzoBurger
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read docs/superpowers/sdd/2026-08-27-fase-7-t9-fix1-diff.txt' in C:\RN\TozzoBurger
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read docs/superpowers/sdd/2026-08-27-fase-7-t9-review.md' in C:\RN\TozzoBurger
+ succeeded in 172ms:
+?? docs/superpowers/sdd/2026-08-27-fase-7-t6-brief.md
+?? docs/superpowers/sdd/2026-08-27-fase-7-t6-diff.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t6-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t6-review-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t6-review-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-brief.md
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-diff.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix1-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix1-diff.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix1-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix1b-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix1b-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix2-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix2-diff.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix2-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix2b-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix2b-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-rereview1-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-rereview1-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-rereview2-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-rereview2-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-review-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-review-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-worker-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-worker-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-brief.md
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-concern-fix-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-concern-fix-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-diff.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-review-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-review-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-worker-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-worker-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-brief.md
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-diff.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-fix1-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-fix1-diff.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-fix1-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-rereview1-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-review-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-review-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-worker-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-worker-last-message.txt
+ succeeded in 137ms:
+# Task 9 — Review
+
+Diff revisado: `efc1eb1..db6fd1e` (`04f2172` implementação e `db6fd1e` relatório do worker).
+
+## Spec compliance
+
+✅ Objetivo — `app/onboarding.tsx:91-165` implementa seleção de categoria, edição da lista e confirmação; `components/CategoryOnboardingGate.tsx:53-71` integra o primeiro acesso.
+
+✅ Arquivos — `database/watermelon/categorySeeds.ts:1-23`, `app/onboarding.tsx:31-167`, `components/CategoryOnboardingGate.tsx:12-72` e `app/_layout.tsx:121-132` cobrem os arquivos novos e a integração pós-login; `services/api.ts:176-262` adiciona os clientes necessários.
+
+✅ Passo 1 — `database/watermelon/categorySeeds.ts:1-18` define exatamente as seis categorias e listas não vazias, coerentes e sem duplicatas; `getCategorySeed` retorna cópia nova em `:21-23`.
+
+✅ Passo 2 — `app/onboarding.tsx:96-163` mostra as seis opções, carrega os seeds, permite adicionar texto não vazio e remover itens; `:76-81` passa a lista editada ao fluxo de confirmação.
+
+✅ Passo 3 — `services/api.ts:176-191` usa `GET /estabelecimentos`; `:199-224` usa `PATCH /establishments/:id` com `{ category }`; `:232-256` usa `POST /tipos` com `{ description, color }`; `services/categoryOnboarding.ts:20-29` faz um POST por item confirmado.
+
+✅ Passo 4 — `app/__tests__/onboarding.test.tsx:68-113` adiciona, remove e confirma verificando que o item removido não gera POST; `services/__tests__/categoryOnboarding.test.ts:33-70` verifica ordem, normalização e sync.
+
+✅ Passo 5 — verificado diretamente: suíte focada 6/6 suítes e 30/30 testes, suíte completa 37/37 e 155/155 testes com 1 snapshot, `node scripts/check-i18n.mjs` passou e `tsc --noEmit` não encontrou erros.
+
+❌ Critério `category === null` — o gate normal só retorna onboarding quando a condição estrita é verdadeira em `components/CategoryOnboardingGate.tsx:53-59` e atualiza a categoria em memória após sucesso em `:64-66`, mas a rota direta `app/onboarding.tsx:31-39,91-165` não consulta a categoria e pode exibir onboarding mesmo quando ela já está configurada.
+
+❌ Ruling RBAC `OWNER`-only — o caminho normal está protegido por `components/CategoryOnboardingGate.tsx:13-27`, que não faz sequer o GET para não-`OWNER`. Porém `app/onboarding.tsx` é também uma rota e, em `:36-39` e `:67-89`, não verifica `user.role` antes de renderizar ou confirmar. O fluxo de redirecionamento em `app/_layout.tsx:100-109` só trata autenticação e `/login`; não bloqueia um usuário autenticado que abra `/onboarding` diretamente. Isso viola o ruling para `MANAGER` e pode executar PATCH seguido de POSTs 403.
+
+✅ Sync pós-confirmação — `services/categoryOnboarding.ts:32-35` chama `runWithLock` e passa `token` e `establishmentId` para `synchronizeWithServer` somente depois dos POSTs.
+
+✅ Isolamento/local — T9 não faz query, criação ou atualização direta no WatermelonDB: `services/categoryOnboarding.ts:1-35` usa somente API, lock e sync. O `establishmentId` é usado no PATCH e no sync (`:20`, `:32-35`); não foi criado cache local de onboarding.
+
+✅ Textos — os nove textos estão presentes nos seis locales, por exemplo `i18n/locales/en/common.json:43-51`, e a cobertura fechada está em `i18n/__tests__/index.test.ts:96-115`.
+
+## Falha parcial não-atômica (avaliação)
+
+**Aceitar como limitação documentada — Minor/não-bloqueante, isoladamente.**
+
+Se o PATCH funcionar e algum POST posterior falhar, a exceção do loop sequencial em `services/categoryOnboarding.ts:20-29` chega ao `catch` de `app/onboarding.tsx:83-87`. O usuário vê a mensagem localizada genérica de erro; `saving` volta a `false`, então pode tentar novamente ou trocar a categoria. O gate continua substituindo o shell pela tela (`components/CategoryOnboardingGate.tsx:53-71`), sem botão de cancelar/voltar ao app; portanto não há saída normal durante essa sessão, apenas retry/troca de categoria ou fechamento e reabertura. Como o PATCH já salvou a categoria, uma sessão futura não mostra o onboarding.
+
+Há risco real de duplicação: um retry reenvia a lista inteira em `services/categoryOnboarding.ts:20-29`, inclusive os itens cujos POSTs já tiveram sucesso; uma falha do sync depois de todos os POSTs também deixa o mesmo risco. Não há checkpoint nem idempotência no contrato fornecido.
+
+Reordenar para POST antes do PATCH não resolve: uma falha tardia deixa os POSTs anteriores para serem duplicados no retry, e uma falha do PATCH depois de todos os POSTs deixaria tipos criados com a categoria ainda pendente. Dado que o contrato não oferece transação/lote/idempotência e considerando a premissa informada de que o `OWNER` pode completar manualmente tipos faltantes na gestão existente, isso é uma limitação recuperável e não bloqueia a task por si só.
+
+## Achados
+
+- [Important] O `OWNER`-only está protegido apenas pelo gate, não pela própria rota/tela — `app/onboarding.tsx:31-39,67-89`; `app/_layout.tsx:100-109,121-132` — um `MANAGER` autenticado que abrir `/onboarding` diretamente pode renderizar a tela e confirmar; o PATCH é permitido para `MANAGER`, mas os POSTs de tipos retornam 403, reproduzindo justamente o estado parcial que o ruling deveria impedir. O teste `app/__tests__/onboarding.test.tsx:173-190` cobre apenas o gate e não esse entrypoint.
+- [Minor] A confirmação não é retomável/idempotente em falha parcial — `services/categoryOnboarding.ts:20-35`; `app/onboarding.tsx:73-87` — erro é informado e a tentativa pode ser repetida, mas itens já criados são reenviados e podem duplicar. Limitação aceita conforme a seção acima; não há endpoint transacional/idempotente no escopo.
+
+## Veredito
+
+**Reprovado — exige correção do bypass de RBAC `OWNER`-only antes da aprovação.** A falha não-atômica foi aceita como Minor isoladamente; o achado Important da rota direta é independente e viola um ruling obrigatório.
+
+ succeeded in 176ms:
+6fd6bf6 fix: guard direct category onboarding route
+
+ app/__tests__/onboarding.test.tsx     | 42 +++++++++++++++++
+ app/onboarding.tsx                    | 24 +++++++++-
+ components/CategoryOnboardingGate.tsx | 60 +++++-------------------
+ hooks/useCategoryOnboardingAccess.ts  | 87 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 163 insertions(+), 50 deletions(-)
+
+diff --git a/app/__tests__/onboarding.test.tsx b/app/__tests__/onboarding.test.tsx
+index 2229f86..1ab1763 100644
+--- a/app/__tests__/onboarding.test.tsx
++++ b/app/__tests__/onboarding.test.tsx
+@@ -6,20 +6,25 @@ import OnboardingScreen from '@/app/onboarding';
+ import CategoryOnboardingGate from '@/components/CategoryOnboardingGate';
+ import {
+   createProductType,
+   getEstablishment,
+   updateEstablishmentCategory,
+ } from '@/services/api';
+ import { runWithLock } from '@/database/syncGuard';
+ import { synchronizeWithServer } from '@/database/watermelon/sync';
+ 
+ const mockUseAuth = jest.fn();
++const mockRouterReplace = jest.fn();
++
++jest.mock('expo-router', () => ({
++  useRouter: () => ({ replace: mockRouterReplace }),
++}));
+ 
+ jest.mock('@/context/AuthContext', () => ({
+   useAuth: () => mockUseAuth(),
+ }));
+ 
+ jest.mock('@/services/api', () => ({
+   createProductType: jest.fn(),
+   getEstablishment: jest.fn(),
+   updateEstablishmentCategory: jest.fn(),
+ }));
+@@ -54,30 +59,32 @@ function flushPromises() {
+ 
+ describe('category onboarding screen', () => {
+   beforeEach(() => {
+     jest.clearAllMocks();
+     mockUseAuth.mockReturnValue({
+       token: 'token-123',
+       user: { role: 'OWNER', establishmentId: 'establishment-1' },
+     });
+     mockUpdateEstablishmentCategory.mockResolvedValue({ id: 'establishment-1', category: 'HAMBURGUERIA' });
+     mockCreateProductType.mockResolvedValue({ id: 'type-1' });
++    mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: null });
+     mockSynchronizeWithServer.mockResolvedValue(undefined);
+     mockRunWithLock.mockImplementation(async (callback) => callback());
+   });
+ 
+   it('uses the edited list when confirming a category', async () => {
+     let renderer: ReturnType<typeof create>;
+     await act(async () => {
+       renderer = create(
+         <OnboardingScreen token="token-123" establishmentId="establishment-1" />,
+       );
++      await flushPromises();
+     });
+ 
+     await act(async () => {
+       findByAccessibilityLabel(renderer!, 'HAMBURGUERIA').props.onPress();
+     });
+ 
+     const input = findByAccessibilityLabel(renderer!, 'onboarding.typeInput');
+     await act(async () => {
+       input.props.onChangeText('Combos');
+     });
+@@ -104,20 +111,55 @@ describe('category onboarding screen', () => {
+       ['token-123', { description: 'Sobremesas', color: '#9E9E9E' }],
+       ['token-123', { description: 'Combos', color: '#9E9E9E' }],
+     ]);
+     expect(mockCreateProductType).not.toHaveBeenCalledWith(
+       'token-123',
+       { description: 'Lanches', color: '#9E9E9E' },
+     );
+     expect(mockRunWithLock).toHaveBeenCalledTimes(1);
+     expect(mockSynchronizeWithServer).toHaveBeenCalledWith('token-123', 'establishment-1');
+   });
++
++  it('redirects a MANAGER opening onboarding directly without rendering or mutating', async () => {
++    mockUseAuth.mockReturnValue({
++      token: 'token-123',
++      user: { role: 'MANAGER', establishmentId: 'establishment-1' },
++    });
++    let renderer: ReturnType<typeof create>;
++
++    await act(async () => {
++      renderer = create(<OnboardingScreen />);
++      await flushPromises();
++    });
++
++    expect(mockRouterReplace).toHaveBeenCalledWith('/(tabs)');
++    expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
++    expect(mockGetEstablishment).not.toHaveBeenCalled();
++    expect(mockUpdateEstablishmentCategory).not.toHaveBeenCalled();
++    expect(mockCreateProductType).not.toHaveBeenCalled();
++  });
++
++  it('redirects an OWNER opening onboarding directly when the category is already configured', async () => {
++    mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: 'PIZZARIA' });
++    let renderer: ReturnType<typeof create>;
++
++    await act(async () => {
++      renderer = create(<OnboardingScreen />);
++      await flushPromises();
++    });
++
++    expect(mockGetEstablishment).toHaveBeenCalledWith('token-123');
++    expect(mockRouterReplace).toHaveBeenCalledWith('/(tabs)');
++    expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
++    expect(mockUpdateEstablishmentCategory).not.toHaveBeenCalled();
++    expect(mockCreateProductType).not.toHaveBeenCalled();
++  });
+ });
+ 
+ describe('category onboarding gate', () => {
+   beforeEach(() => {
+     jest.clearAllMocks();
+     mockUseAuth.mockReturnValue({
+       token: 'token-123',
+       user: { role: 'OWNER', establishmentId: 'establishment-1' },
+     });
+   });
+diff --git a/app/onboarding.tsx b/app/onboarding.tsx
+index c4457f8..f4a3df0 100644
+--- a/app/onboarding.tsx
++++ b/app/onboarding.tsx
+@@ -1,55 +1,75 @@
+-import React, { useState } from 'react';
++import React, { useEffect, useRef, useState } from 'react';
+ import {
+   Pressable,
+   ScrollView,
+   StyleSheet,
+   Text,
+   TextInput,
+   View,
+ } from 'react-native';
+ import { useTranslation } from 'react-i18next';
++import { useRouter } from 'expo-router';
+ 
+ import { useAuth } from '@/context/AuthContext';
+ import {
+   CATEGORY_OPTIONS,
+   type EstablishmentCategory,
+   getCategorySeed,
+ } from '@/database/watermelon/categorySeeds';
+ import {
+   completeCategoryOnboarding,
+ } from '@/services/categoryOnboarding';
+ import { Button } from '@/components/ui/Button';
++import { useCategoryOnboardingAccess } from '@/hooks/useCategoryOnboardingAccess';
++import type { Establishment } from '@/services/api';
+ 
+ type EstablishmentId = string | number;
+ 
+ export type OnboardingScreenProps = {
+   token?: string | null;
+   establishmentId?: EstablishmentId | null;
++  knownEstablishment?: Establishment | null;
+   onCompleted?: (category: EstablishmentCategory) => void;
+ };
+ 
+ export default function OnboardingScreen({
+   token: tokenOverride,
+   establishmentId: establishmentIdOverride,
++  knownEstablishment,
+   onCompleted,
+ }: OnboardingScreenProps = {}) {
+   const { token: authToken, user } = useAuth();
+   const { t } = useTranslation();
++  const router = useRouter();
+   const token = tokenOverride ?? authToken;
+   const establishmentId = establishmentIdOverride ?? user?.establishmentId;
++  const access = useCategoryOnboardingAccess({
++    token,
++    role: user?.role,
++    establishmentId,
++    knownEstablishment,
++  });
++  const redirected = useRef(false);
+   const [category, setCategory] = useState<EstablishmentCategory | null>(null);
+   const [productTypeDescriptions, setProductTypeDescriptions] = useState<string[]>([]);
+   const [newDescription, setNewDescription] = useState('');
+   const [saving, setSaving] = useState(false);
+   const [error, setError] = useState<string | null>(null);
+ 
++  useEffect(() => {
++    if (!access.shouldRedirect || redirected.current) return;
++
++    redirected.current = true;
++    router.replace('/(tabs)');
++  }, [access.shouldRedirect, router]);
++
+   const chooseCategory = (nextCategory: EstablishmentCategory) => {
+     setCategory(nextCategory);
+     setProductTypeDescriptions(getCategorySeed(nextCategory));
+     setNewDescription('');
+     setError(null);
+   };
+ 
+   const addDescription = () => {
+     const description = newDescription.trim();
+     if (description.length === 0) return;
+@@ -81,20 +101,22 @@ export default function OnboardingScreen({
+       });
+       onCompleted?.(category);
+     } catch (confirmationError) {
+       console.warn('Category onboarding failed', confirmationError);
+       setError(t('common.onboardingSaveError'));
+     } finally {
+       setSaving(false);
+     }
+   };
+ 
++  if (!access.allowed) return null;
++
+   return (
+     <ScrollView contentContainerStyle={styles.container}>
+       <Text style={styles.title}>{t('common.onboardingTitle')}</Text>
+       <Text style={styles.subtitle}>{t('common.onboardingChooseCategory')}</Text>
+ 
+       <View style={styles.categories}>
+         {CATEGORY_OPTIONS.map((option) => {
+           const selected = category === option;
+           return (
+             <Pressable
+diff --git a/components/CategoryOnboardingGate.tsx b/components/CategoryOnboardingGate.tsx
+index cc46ec3..067198f 100644
+--- a/components/CategoryOnboardingGate.tsx
++++ b/components/CategoryOnboardingGate.tsx
+@@ -1,72 +1,34 @@
+-import React, { useEffect, useState } from 'react';
++import React from 'react';
+ 
+ import OnboardingScreen from '@/app/onboarding';
+ import { useAuth } from '@/context/AuthContext';
+-import { getEstablishment, type Establishment } from '@/services/api';
++import { useCategoryOnboardingAccess } from '@/hooks/useCategoryOnboardingAccess';
+ import type { EstablishmentCategory } from '@/database/watermelon/categorySeeds';
+ 
+ type Props = {
+   children: React.ReactNode;
+ };
+ 
+ export default function CategoryOnboardingGate({ children }: Props) {
+   const { token, user } = useAuth();
+-  const role = user?.role;
+-  const establishmentId = user?.establishmentId;
+-  const isOwner = role === 'OWNER';
+-  const eligible = Boolean(token && isOwner && establishmentId !== null && establishmentId !== undefined);
+-  const [establishment, setEstablishment] = useState<Establishment | null>(null);
+-  const [checking, setChecking] = useState(false);
++  const access = useCategoryOnboardingAccess({
++    token,
++    role: user?.role,
++    establishmentId: user?.establishmentId,
++  });
+ 
+-  useEffect(() => {
+-    let mounted = true;
+-
+-    if (!eligible || !token) {
+-      setEstablishment(null);
+-      setChecking(false);
+-      return () => {
+-        mounted = false;
+-      };
+-    }
+-
+-    setChecking(true);
+-    setEstablishment(null);
+-    getEstablishment(token)
+-      .then((nextEstablishment) => {
+-        if (mounted) setEstablishment(nextEstablishment);
+-      })
+-      .catch((error) => {
+-        if (mounted) {
+-          console.warn('Could not load establishment category', error);
+-          setEstablishment(null);
+-        }
+-      })
+-      .finally(() => {
+-        if (mounted) setChecking(false);
+-      });
+-
+-    return () => {
+-      mounted = false;
+-    };
+-  }, [eligible, establishmentId, token]);
+-
+-  if (
+-    eligible
+-    && !checking
+-    && establishment?.category === null
+-    && establishment.id !== null
+-    && establishment.id !== undefined
+-  ) {
++  if (access.allowed && access.establishment) {
+     return (
+       <OnboardingScreen
+         token={token}
+-        establishmentId={establishment.id}
++        establishmentId={access.establishment.id}
++        knownEstablishment={access.establishment}
+         onCompleted={(category: EstablishmentCategory) => {
+-          setEstablishment((current) => current ? { ...current, category } : current);
++          access.markCategoryConfigured(category);
+         }}
+       />
+     );
+   }
+ 
+   return <>{children}</>;
+ }
+diff --git a/hooks/useCategoryOnboardingAccess.ts b/hooks/useCategoryOnboardingAccess.ts
+new file mode 100644
+index 0000000..7e93bbe
+--- /dev/null
++++ b/hooks/useCategoryOnboardingAccess.ts
+@@ -0,0 +1,87 @@
++import { useEffect, useState } from 'react';
++
++import { getEstablishment, type Establishment } from '@/services/api';
++
++type EstablishmentId = string | number;
++
++type Options = {
++  token: string | null | undefined;
++  role: string | null | undefined;
++  establishmentId: EstablishmentId | null | undefined;
++  knownEstablishment?: Establishment | null;
++};
++
++export type CategoryOnboardingAccess = {
++  establishment: Establishment | null;
++  checking: boolean;
++  allowed: boolean;
++  shouldRedirect: boolean;
++  markCategoryConfigured: (category: Establishment['category']) => void;
++};
++
++export function useCategoryOnboardingAccess({
++  token,
++  role,
++  establishmentId,
++  knownEstablishment,
++}: Options): CategoryOnboardingAccess {
++  const isOwner = role === 'OWNER';
++  const eligible = Boolean(token && isOwner && establishmentId !== null && establishmentId !== undefined);
++  const hasKnownEstablishment = knownEstablishment !== undefined;
++  const [establishment, setEstablishment] = useState<Establishment | null>(knownEstablishment ?? null);
++  const [checking, setChecking] = useState(eligible && !hasKnownEstablishment);
++
++  useEffect(() => {
++    let mounted = true;
++
++    if (hasKnownEstablishment) {
++      setEstablishment(knownEstablishment ?? null);
++      setChecking(false);
++      return () => {
++        mounted = false;
++      };
++    }
++
++    if (!eligible || !token) {
++      setEstablishment(null);
++      setChecking(false);
++      return () => {
++        mounted = false;
++      };
++    }
++
++    setChecking(true);
++    setEstablishment(null);
++    getEstablishment(token)
++      .then((nextEstablishment) => {
++        if (mounted) setEstablishment(nextEstablishment);
++      })
++      .catch((error) => {
++        if (mounted) {
++          console.warn('Could not load establishment category', error);
++          setEstablishment(null);
++        }
++      })
++      .finally(() => {
++        if (mounted) setChecking(false);
++      });
++
++    return () => {
++      mounted = false;
++    };
++  }, [eligible, establishmentId, hasKnownEstablishment, knownEstablishment, token]);
++
++  const hasEstablishmentId = establishment?.id !== null && establishment?.id !== undefined;
++  const allowed = eligible && !checking && establishment?.category === null && hasEstablishmentId;
++  const markCategoryConfigured = (category: Establishment['category']) => {
++    setEstablishment((current) => current ? { ...current, category } : current);
++  };
++
++  return {
++    establishment,
++    checking,
++    allowed,
++    shouldRedirect: !checking && !allowed,
++    markCategoryConfigured,
++  };
++}
+
+codex
+O diff contém quatro arquivos: a nova hook compartilhada, a proteção da rota, a refatoração do gate e três testes focados. Agora vou conferir o estado final com números de linha e revisar se a extração alterou algum comportamento existente além dos dois cenários corrigidos.
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read app/onboarding.tsx' in C:\RN\TozzoBurger
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read hooks/useCategoryOnboardingAccess.ts' in C:\RN\TozzoBurger
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read app/__tests__/onboarding.test.tsx' in C:\RN\TozzoBurger
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read components/CategoryOnboardingGate.tsx' in C:\RN\TozzoBurger
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read package.json' in C:\RN\TozzoBurger
+ succeeded in 219ms:
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
+
+import { useAuth } from '@/context/AuthContext';
+import {
+  CATEGORY_OPTIONS,
+  type EstablishmentCategory,
+  getCategorySeed,
+} from '@/database/watermelon/categorySeeds';
+import {
+  completeCategoryOnboarding,
+} from '@/services/categoryOnboarding';
+import { Button } from '@/components/ui/Button';
+import { useCategoryOnboardingAccess } from '@/hooks/useCategoryOnboardingAccess';
+import type { Establishment } from '@/services/api';
+
+type EstablishmentId = string | number;
+
+export type OnboardingScreenProps = {
+  token?: string | null;
+  establishmentId?: EstablishmentId | null;
+  knownEstablishment?: Establishment | null;
+  onCompleted?: (category: EstablishmentCategory) => void;
+};
+
+export default function OnboardingScreen({
+  token: tokenOverride,
+  establishmentId: establishmentIdOverride,
+  knownEstablishment,
+  onCompleted,
+}: OnboardingScreenProps = {}) {
+  const { token: authToken, user } = useAuth();
+  const { t } = useTranslation();
+  const router = useRouter();
+  const token = tokenOverride ?? authToken;
+  const establishmentId = establishmentIdOverride ?? user?.establishmentId;
+  const access = useCategoryOnboardingAccess({
+    token,
+    role: user?.role,
+    establishmentId,
+    knownEstablishment,
+  });
+  const redirected = useRef(false);
+  const [category, setCategory] = useState<EstablishmentCategory | null>(null);
+  const [productTypeDescriptions, setProductTypeDescriptions] = useState<string[]>([]);
+  const [newDescription, setNewDescription] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!access.shouldRedirect || redirected.current) return;
+
+    redirected.current = true;
+    router.replace('/(tabs)');
+  }, [access.shouldRedirect, router]);
+
+  const chooseCategory = (nextCategory: EstablishmentCategory) => {
+    setCategory(nextCategory);
+    setProductTypeDescriptions(getCategorySeed(nextCategory));
+    setNewDescription('');
+    setError(null);
+  };
+
+  const addDescription = () => {
+    const description = newDescription.trim();
+    if (description.length === 0) return;
+
+    setProductTypeDescriptions((current) => (
+      current.includes(description) ? current : [...current, description]
+    ));
+    setNewDescription('');
+  };
+
+  const removeDescription = (index: number) => {
+    setProductTypeDescriptions((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const confirm = async () => {
+    if (!category || !token || establishmentId === null || establishmentId === undefined) {
+      setError(t('common.onboardingSaveError'));
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      await completeCategoryOnboarding({
+        token,
+        establishmentId,
+        category,
+        productTypeDescriptions,
+      });
+      onCompleted?.(category);
+    } catch (confirmationError) {
+      console.warn('Category onboarding failed', confirmationError);
+      setError(t('common.onboardingSaveError'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!access.allowed) return null;
+
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>{t('common.onboardingTitle')}</Text>
+      <Text style={styles.subtitle}>{t('common.onboardingChooseCategory')}</Text>
+
+      <View style={styles.categories}>
+        {CATEGORY_OPTIONS.map((option) => {
+          const selected = category === option;
+          return (
+            <Pressable
+              key={option}
+              accessibilityRole="button"
+              accessibilityLabel={option}
+              onPress={() => chooseCategory(option)}
+              style={[styles.category, selected && styles.categorySelected]}
+            >
+              <Text style={styles.categoryText}>{option}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {category && (
+        <View style={styles.editor}>
+          <Text style={styles.sectionTitle}>{t('common.onboardingSuggestedTypes')}</Text>
+          {productTypeDescriptions.map((description, index) => (
+            <View key={`${description}-${index}`} style={styles.typeRow}>
+              <Text style={styles.typeText}>{description}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`onboarding.removeType:${description}`}
+                onPress={() => removeDescription(index)}
+                style={styles.removeButton}
+              >
+                <Text style={styles.removeText}>×</Text>
+              </Pressable>
+            </View>
+          ))}
+
+          <View style={styles.addRow}>
+            <TextInput
+              accessibilityLabel="onboarding.typeInput"
+              placeholder={t('common.onboardingTypePlaceholder')}
+              value={newDescription}
+              onChangeText={setNewDescription}
+              style={styles.input}
+            />
+            <Button
+              accessibilityLabel="onboarding.addType"
+              title={t('common.onboardingAddType')}
+              onPress={addDescription}
+              variant="outline"
+              style={styles.addButton}
+            />
+          </View>
+
+          {error && <Text style={styles.error}>{error}</Text>}
+          <Button
+            accessibilityLabel="onboarding.confirm"
+            title={saving ? t('common.onboardingSaving') : t('common.onboardingConfirm')}
+            onPress={confirm}
+            loading={saving}
+            disabled={saving}
+            style={styles.confirmButton}
+          />
+          <Button
+            accessibilityLabel="onboarding.changeCategory"
+            title={t('common.onboardingChangeCategory')}
+            onPress={() => setCategory(null)}
+            variant="outline"
+            disabled={saving}
+          />
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flexGrow: 1,
+    padding: 24,
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '700',
+    marginBottom: 8,
+    color: '#000',
+  },
+  subtitle: {
+    fontSize: 16,
+    marginBottom: 20,
+    color: '#333',
+  },
+  categories: {
+    gap: 10,
+  },
+  category: {
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 8,
+    padding: 14,
+  },
+  categorySelected: {
+    backgroundColor: '#e8e8e8',
+  },
+  categoryText: {
+    color: '#000',
+    fontWeight: '600',
+  },
+  editor: {
+    marginTop: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
+    color: '#000',
+  },
+  typeRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#999',
+  },
+  typeText: {
+    color: '#000',
+    fontSize: 16,
+  },
+  removeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  removeText: {
+    color: '#ef4444',
+    fontSize: 24,
+  },
+  addRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+  },
+  input: {
+    flex: 1,
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    color: '#000',
+  },
+  addButton: {
+    minHeight: 48,
+  },
+  confirmButton: {
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  error: {
+    color: '#b91c1c',
+    marginTop: 12,
+  },
+});
+
+ succeeded in 211ms:
+import { useEffect, useState } from 'react';
+
+import { getEstablishment, type Establishment } from '@/services/api';
+
+type EstablishmentId = string | number;
+
+type Options = {
+  token: string | null | undefined;
+  role: string | null | undefined;
+  establishmentId: EstablishmentId | null | undefined;
+  knownEstablishment?: Establishment | null;
+};
+
+export type CategoryOnboardingAccess = {
+  establishment: Establishment | null;
+  checking: boolean;
+  allowed: boolean;
+  shouldRedirect: boolean;
+  markCategoryConfigured: (category: Establishment['category']) => void;
+};
+
+export function useCategoryOnboardingAccess({
+  token,
+  role,
+  establishmentId,
+  knownEstablishment,
+}: Options): CategoryOnboardingAccess {
+  const isOwner = role === 'OWNER';
+  const eligible = Boolean(token && isOwner && establishmentId !== null && establishmentId !== undefined);
+  const hasKnownEstablishment = knownEstablishment !== undefined;
+  const [establishment, setEstablishment] = useState<Establishment | null>(knownEstablishment ?? null);
+  const [checking, setChecking] = useState(eligible && !hasKnownEstablishment);
+
+  useEffect(() => {
+    let mounted = true;
+
+    if (hasKnownEstablishment) {
+      setEstablishment(knownEstablishment ?? null);
+      setChecking(false);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    if (!eligible || !token) {
+      setEstablishment(null);
+      setChecking(false);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    setChecking(true);
+    setEstablishment(null);
+    getEstablishment(token)
+      .then((nextEstablishment) => {
+        if (mounted) setEstablishment(nextEstablishment);
+      })
+      .catch((error) => {
+        if (mounted) {
+          console.warn('Could not load establishment category', error);
+          setEstablishment(null);
+        }
+      })
+      .finally(() => {
+        if (mounted) setChecking(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [eligible, establishmentId, hasKnownEstablishment, knownEstablishment, token]);
+
+  const hasEstablishmentId = establishment?.id !== null && establishment?.id !== undefined;
+  const allowed = eligible && !checking && establishment?.category === null && hasEstablishmentId;
+  const markCategoryConfigured = (category: Establishment['category']) => {
+    setEstablishment((current) => current ? { ...current, category } : current);
+  };
+
+  return {
+    establishment,
+    checking,
+    allowed,
+    shouldRedirect: !checking && !allowed,
+    markCategoryConfigured,
+  };
+}
+
+ succeeded in 212ms:
+import React from 'react';
+import { act, create } from 'react-test-renderer';
+import { View } from 'react-native';
+
+import OnboardingScreen from '@/app/onboarding';
+import CategoryOnboardingGate from '@/components/CategoryOnboardingGate';
+import {
+  createProductType,
+  getEstablishment,
+  updateEstablishmentCategory,
+} from '@/services/api';
+import { runWithLock } from '@/database/syncGuard';
+import { synchronizeWithServer } from '@/database/watermelon/sync';
+
+const mockUseAuth = jest.fn();
+const mockRouterReplace = jest.fn();
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ replace: mockRouterReplace }),
+}));
+
+jest.mock('@/context/AuthContext', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
+jest.mock('@/services/api', () => ({
+  createProductType: jest.fn(),
+  getEstablishment: jest.fn(),
+  updateEstablishmentCategory: jest.fn(),
+}));
+
+jest.mock('@/database/syncGuard', () => ({
+  runWithLock: jest.fn(),
+}));
+
+jest.mock('@/database/watermelon/sync', () => ({
+  synchronizeWithServer: jest.fn(),
+}));
+
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (_key: string, fallback?: string) => fallback ?? _key,
+  }),
+}));
+
+const mockCreateProductType = createProductType as jest.MockedFunction<typeof createProductType>;
+const mockGetEstablishment = getEstablishment as jest.MockedFunction<typeof getEstablishment>;
+const mockUpdateEstablishmentCategory = updateEstablishmentCategory as jest.MockedFunction<typeof updateEstablishmentCategory>;
+const mockRunWithLock = runWithLock as jest.MockedFunction<typeof runWithLock>;
+const mockSynchronizeWithServer = synchronizeWithServer as jest.MockedFunction<typeof synchronizeWithServer>;
+
+function findByAccessibilityLabel(renderer: ReturnType<typeof create>, label: string) {
+  return renderer.root.find((node) => node.props.accessibilityLabel === label);
+}
+
+function flushPromises() {
+  return new Promise<void>((resolve) => setImmediate(resolve));
+}
+
+describe('category onboarding screen', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      token: 'token-123',
+      user: { role: 'OWNER', establishmentId: 'establishment-1' },
+    });
+    mockUpdateEstablishmentCategory.mockResolvedValue({ id: 'establishment-1', category: 'HAMBURGUERIA' });
+    mockCreateProductType.mockResolvedValue({ id: 'type-1' });
+    mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: null });
+    mockSynchronizeWithServer.mockResolvedValue(undefined);
+    mockRunWithLock.mockImplementation(async (callback) => callback());
+  });
+
+  it('uses the edited list when confirming a category', async () => {
+    let renderer: ReturnType<typeof create>;
+    await act(async () => {
+      renderer = create(
+        <OnboardingScreen token="token-123" establishmentId="establishment-1" />,
+      );
+      await flushPromises();
+    });
+
+    await act(async () => {
+      findByAccessibilityLabel(renderer!, 'HAMBURGUERIA').props.onPress();
+    });
+
+    const input = findByAccessibilityLabel(renderer!, 'onboarding.typeInput');
+    await act(async () => {
+      input.props.onChangeText('Combos');
+    });
+    await act(async () => {
+      findByAccessibilityLabel(renderer!, 'onboarding.addType').props.onPress();
+    });
+    await act(async () => {
+      findByAccessibilityLabel(renderer!, 'onboarding.removeType:Lanches').props.onPress();
+    });
+
+    await act(async () => {
+      findByAccessibilityLabel(renderer!, 'onboarding.confirm').props.onPress();
+      await flushPromises();
+    });
+
+    expect(mockUpdateEstablishmentCategory).toHaveBeenCalledWith(
+      'token-123',
+      'establishment-1',
+      'HAMBURGUERIA',
+    );
+    expect(mockCreateProductType.mock.calls).toEqual([
+      ['token-123', { description: 'Bebidas', color: '#9E9E9E' }],
+      ['token-123', { description: 'Porções', color: '#9E9E9E' }],
+      ['token-123', { description: 'Sobremesas', color: '#9E9E9E' }],
+      ['token-123', { description: 'Combos', color: '#9E9E9E' }],
+    ]);
+    expect(mockCreateProductType).not.toHaveBeenCalledWith(
+      'token-123',
+      { description: 'Lanches', color: '#9E9E9E' },
+    );
+    expect(mockRunWithLock).toHaveBeenCalledTimes(1);
+    expect(mockSynchronizeWithServer).toHaveBeenCalledWith('token-123', 'establishment-1');
+  });
+
+  it('redirects a MANAGER opening onboarding directly without rendering or mutating', async () => {
+    mockUseAuth.mockReturnValue({
+      token: 'token-123',
+      user: { role: 'MANAGER', establishmentId: 'establishment-1' },
+    });
+    let renderer: ReturnType<typeof create>;
+
+    await act(async () => {
+      renderer = create(<OnboardingScreen />);
+      await flushPromises();
+    });
+
+    expect(mockRouterReplace).toHaveBeenCalledWith('/(tabs)');
+    expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
+    expect(mockGetEstablishment).not.toHaveBeenCalled();
+    expect(mockUpdateEstablishmentCategory).not.toHaveBeenCalled();
+    expect(mockCreateProductType).not.toHaveBeenCalled();
+  });
+
+  it('redirects an OWNER opening onboarding directly when the category is already configured', async () => {
+    mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: 'PIZZARIA' });
+    let renderer: ReturnType<typeof create>;
+
+    await act(async () => {
+      renderer = create(<OnboardingScreen />);
+      await flushPromises();
+    });
+
+    expect(mockGetEstablishment).toHaveBeenCalledWith('token-123');
+    expect(mockRouterReplace).toHaveBeenCalledWith('/(tabs)');
+    expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
+    expect(mockUpdateEstablishmentCategory).not.toHaveBeenCalled();
+    expect(mockCreateProductType).not.toHaveBeenCalled();
+  });
+});
+
+describe('category onboarding gate', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      token: 'token-123',
+      user: { role: 'OWNER', establishmentId: 'establishment-1' },
+    });
+  });
+
+  it('shows onboarding for an OWNER only when the server category is null', async () => {
+    mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: null });
+    let renderer: ReturnType<typeof create>;
+
+    await act(async () => {
+      renderer = create(
+        <CategoryOnboardingGate>
+          <View accessibilityLabel="app-content" />
+        </CategoryOnboardingGate>,
+      );
+      await flushPromises();
+    });
+
+    expect(mockGetEstablishment).toHaveBeenCalledWith('token-123');
+    expect(findByAccessibilityLabel(renderer!, 'HAMBURGUERIA')).toBeDefined();
+    expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'app-content')).toHaveLength(0);
+  });
+
+  it('removes onboarding after a successful confirmation without refetching the gate', async () => {
+    mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: null });
+    mockUpdateEstablishmentCategory.mockResolvedValue({ id: 'establishment-1', category: 'HAMBURGUERIA' });
+    mockCreateProductType.mockResolvedValue({ id: 'type-1' });
+    mockSynchronizeWithServer.mockResolvedValue(undefined);
+    mockRunWithLock.mockImplementation(async (callback) => callback());
+
+    let renderer: ReturnType<typeof create>;
+    await act(async () => {
+      renderer = create(
+        <CategoryOnboardingGate>
+          <View accessibilityLabel="app-content" />
+        </CategoryOnboardingGate>,
+      );
+      await flushPromises();
+    });
+
+    await act(async () => {
+      findByAccessibilityLabel(renderer!, 'HAMBURGUERIA').props.onPress();
+    });
+    await act(async () => {
+      findByAccessibilityLabel(renderer!, 'onboarding.confirm').props.onPress();
+      await flushPromises();
+    });
+
+    expect(mockGetEstablishment).toHaveBeenCalledTimes(1);
+    expect(renderer!.root.find((node) => node.props.accessibilityLabel === 'app-content')).toBeDefined();
+    expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
+  });
+
+  it('keeps the app available and skips the request for non-OWNER users', async () => {
+    mockUseAuth.mockReturnValue({
+      token: 'token-123',
+      user: { role: 'MANAGER', establishmentId: 'establishment-1' },
+    });
+
+    const renderer = create(
+      <CategoryOnboardingGate>
+        <View accessibilityLabel="app-content" />
+      </CategoryOnboardingGate>,
+    );
+    await act(async () => {
+      await flushPromises();
+    });
+
+    expect(mockGetEstablishment).not.toHaveBeenCalled();
+    expect(renderer.root.find((node) => node.props.accessibilityLabel === 'app-content')).toBeDefined();
+    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
+  });
+
+  it('does not show onboarding again when the category is already configured', async () => {
+    mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: 'PIZZARIA' });
+    let renderer: ReturnType<typeof create>;
+
+    await act(async () => {
+      renderer = create(
+        <CategoryOnboardingGate>
+          <View accessibilityLabel="app-content" />
+        </CategoryOnboardingGate>,
+      );
+      await flushPromises();
+    });
+
+    expect(renderer!.root.find((node) => node.props.accessibilityLabel === 'app-content')).toBeDefined();
+    expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
+  });
+});
+
+ succeeded in 215ms:
+import React from 'react';
+
+import OnboardingScreen from '@/app/onboarding';
+import { useAuth } from '@/context/AuthContext';
+import { useCategoryOnboardingAccess } from '@/hooks/useCategoryOnboardingAccess';
+import type { EstablishmentCategory } from '@/database/watermelon/categorySeeds';
+
+type Props = {
+  children: React.ReactNode;
+};
+
+export default function CategoryOnboardingGate({ children }: Props) {
+  const { token, user } = useAuth();
+  const access = useCategoryOnboardingAccess({
+    token,
+    role: user?.role,
+    establishmentId: user?.establishmentId,
+  });
+
+  if (access.allowed && access.establishment) {
+    return (
+      <OnboardingScreen
+        token={token}
+        establishmentId={access.establishment.id}
+        knownEstablishment={access.establishment}
+        onCompleted={(category: EstablishmentCategory) => {
+          access.markCategoryConfigured(category);
+        }}
+      />
+    );
+  }
+
+  return <>{children}</>;
+}
+
+ succeeded in 193ms:
+{
+  "name": "tozzoburger",
+  "main": "expo-router/entry",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "test": "jest --watchAll"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/$1"
+    }
+  },
+  "dependencies": {
+    "@expo/config-plugins": "~9.0.0",
+    "@expo/metro-config": "^0.19.8",
+    "@expo/prebuild-config": "~8.0.0",
+    "@expo/vector-icons": "^14.0.2",
+    "@nozbe/watermelondb": "^0.28.0",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-native-community/netinfo": "11.4.1",
+    "@react-native-picker/picker": "2.9.0",
+    "@react-navigation/native": "^7.0.0",
+    "expo": "~52.0.47",
+    "expo-asset": "~11.0.5",
+    "expo-crypto": "~14.0.2",
+    "expo-file-system": "~18.0.12",
+    "expo-font": "~13.0.1",
+    "expo-linking": "~7.0.5",
+    "expo-localization": "~16.0.1",
+    "expo-modules-autolinking": "~2.0.0",
+    "expo-router": "~4.0.21",
+    "expo-secure-store": "~14.0.1",
+    "expo-sharing": "~13.0.1",
+    "expo-splash-screen": "~0.29.24",
+    "expo-sqlite": "~15.1.4",
+    "expo-status-bar": "~2.0.1",
+    "expo-system-ui": "~4.0.9",
+    "expo-web-browser": "~14.0.2",
+    "i18next": "^23.16.8",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-i18next": "^15.2.0",
+    "react-native": "0.76.9",
+    "react-native-ble-plx": "^3.2.1",
+    "react-native-calendars": "^1.1312.0",
+    "react-native-chart-kit": "^6.12.0",
+    "react-native-reanimated": "~3.16.1",
+    "react-native-safe-area-context": "4.12.0",
+    "react-native-screens": "~4.4.0",
+    "react-native-svg": "15.8.0",
+    "react-native-view-shot": "~4.0.3",
+    "react-native-web": "~0.19.13"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/jest": "^30.0.0",
+    "@types/react": "~18.3.12",
+    "@types/react-test-renderer": "^19.1.0",
+    "@types/uuid": "^10.0.0",
+    "better-sqlite3": "^13.0.3",
+    "jest": "^29.2.1",
+    "jest-expo": "~52.0.6",
+    "react-test-renderer": "18.3.1",
+    "typescript": "~5.3.3"
+  },
+  "private": true
+}
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read app/_layout.tsx' in C:\RN\TozzoBurger
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk grep -n "function AuthProvider|const AuthProvider|useAuth|isLoading|loading" context app components --glob "*.ts" --glob "*.tsx"' in C:\RN\TozzoBurger
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read context/AuthContext.tsx' in C:\RN\TozzoBurger
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk grep -n "getEstablishment|type Establishment|interface Establishment|updateEstablishmentCategory|createProductType" services --glob "*.ts" --glob "*.tsx"' in C:\RN\TozzoBurger
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk grep -n "CategoryOnboardingGate|/onboarding|OnboardingScreen" --glob "*.ts" --glob "*.tsx"' in C:\RN\TozzoBurger
+ succeeded in 227ms:
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { useFonts } from 'expo-font';
+import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { Suspense, useEffect } from 'react';
+import { useState } from 'react';
+import 'react-native-reanimated';
+import { SQLiteProvider } from 'expo-sqlite';  // Importar o SQLiteProvider
+import { initializeDatabase } from '@/database/initializeDatabase';  // Importe sua função de inicialização
+import { CartProvider } from '@/context/CartContext';
+import { AuthProvider } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
+import { AutoSyncProvider } from '@/context/AutoSyncContext';
+import { useRouter, usePathname } from 'expo-router';
+
+import { useColorScheme } from '@/components/useColorScheme';
+import AppLoadingScreen from '@/components/AppLoadingScreen';
+import { StatusBar } from 'expo-status-bar';
+import { I18nextProvider, useTranslation } from 'react-i18next';
+import { i18n, initializeI18n } from '@/i18n';
+import CategoryOnboardingGate from '@/components/CategoryOnboardingGate';
+
+export {
+  // Catch any errors thrown by the Layout component.
+  ErrorBoundary,
+} from 'expo-router';
+
+export const unstable_settings = {
+  // Ensure that reloading on `/modal` keeps a back button present.
+  initialRouteName: '(tabs)',
+};
+
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync();
+
+export default function RootLayout() {
+  const [loaded, error] = useFonts({
+    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    ...FontAwesome.font,
+  });
+  const [i18nInitialized, setI18nInitialized] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    void initializeI18n()
+      .then(() => {
+        if (mounted) setI18nInitialized(true);
+      })
+      .catch((bootstrapError) => {
+        console.warn('Failed to initialize local i18n resources', bootstrapError);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
+  useEffect(() => {
+    if (error) throw error;
+  }, [error]);
+
+  useEffect(() => {
+    if (loaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded]);
+
+  return (
+    <I18nextProvider i18n={i18n}>
+      {!loaded || !i18nInitialized ? (
+        <AppLoadingScreen stage="initializing" />
+      ) : (
+        <Suspense fallback={<AppLoadingScreen stage="initializing" />}>
+          <SQLiteProvider databaseName="database.db" onInit={initializeDatabase} useSuspense>
+            <AuthProvider>
+              <AutoSyncProvider>
+                <CartProvider>
+                  <RootLayoutNav />
+                </CartProvider>
+              </AutoSyncProvider>
+            </AuthProvider>
+          </SQLiteProvider>
+        </Suspense>
+      )}
+    </I18nextProvider>
+  );
+}
+
+function RootLayoutNav() {
+  const colorScheme = useColorScheme();
+  const { user, loading } = useAuth();
+  const { t } = useTranslation();
+  const router = useRouter();
+  const pathname = usePathname();
+  // Redirect to login or main tabs depending on auth
+  // Use replace so user can't go back to the wrong screen
+  useEffect(() => {
+    if (loading) return;
+    if (!user && pathname !== '/login') {
+      (router as any).replace('/login');
+      return;
+    }
+
+    if (user && pathname === '/login') {
+      (router as any).replace('/(tabs)');
+    }
+  }, [loading, user, router, pathname]);
+
+  if (loading) return <AppLoadingScreen stage={user ? 'preparing' : 'authenticating'} />;
+
+  return (
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <StatusBar 
+        style={colorScheme === 'dark' ? 'light' : 'dark'} 
+        backgroundColor={colorScheme === 'dark' ? '#000' : '#fff'} 
+        translucent={true}
+      />
+      <CategoryOnboardingGate>
+        <Stack>
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modais/contaModal" options={{ presentation: 'modal', title: t('navigation.account') }} />
+          <Stack.Screen name="modais/produtoModal" options={{ presentation: 'modal', title: t('navigation.product') }} />
+          <Stack.Screen name="modais/pedidoModal" options={{ presentation: 'modal', title: t('navigation.orders') }} />
+          <Stack.Screen name="modais/contaHistoricoModal" options={{ presentation: 'modal', title: t('navigation.closedAccount') }} />
+          <Stack.Screen name="modais/adicionalModal" options={{ presentation: 'modal', title: t('navigation.addOn') }} />
+          <Stack.Screen name="modais/relatorioModal" options={{ presentation: 'modal', title: t('navigation.report') }} />
+        </Stack>
+      </CategoryOnboardingGate>
+    </ThemeProvider>
+  );
+}
+
+ succeeded in 226ms:
+106 matches in 26 files:
+
+app\(tabs)\__tests__\configsI18n.test.tsx:38:useAuth: () => ({
+app\(tabs)\_layout.tsx:8:import { useAuth } from '@/context/AuthContext';
+app\(tabs)\_layout.tsx:25:const { user } = useAuth();
+app\(tabs)\configs.tsx:11:import { useAuth } from '@/context/AuthContext';
+app\(tabs)\configs.tsx:32:const { user, login, logout, token } = useAuth();
+app\(tabs)\configs.tsx:207:<Button title={loginLoading ? t('auth.loggingIn') : t('auth.login')} onPress=...
+app\(tabs)\configs.tsx:284:<ActivityIndicator size="large" color={colors.primary} accessibilityLabel={t(...
+app\(tabs)\historico.tsx:15:import { useAuth } from '@/context/AuthContext';
+app\(tabs)\historico.tsx:67:&& !state.loadingInitial
+app\(tabs)\historico.tsx:68:&& !state.loadingMore
+app\(tabs)\historico.tsx:85:function createSalesState(loadingInitial = false): SalesState {
+app\(tabs)\historico.tsx:91:loadingInitial,
+app\(tabs)\historico.tsx:126:const { token } = useAuth();
+app\(tabs)\historico.tsx:139:const [loadingPrint, setLoadingPrint] = useState<string | null>(null);
+app\(tabs)\historico.tsx:181:loadingInitial: page === 1,
+app\(tabs)\historico.tsx:182:loadingMore: page !== 1,
+app\(tabs)\historico.tsx:198:loadingInitial: false,
+app\(tabs)\historico.tsx:199:loadingMore: false,
+app\(tabs)\historico.tsx:212:loadingInitial: false,
+app\(tabs)\historico.tsx:213:loadingMore: false,
+app\(tabs)\historico.tsx:230:loadingInitial: page === 1,
+app\(tabs)\historico.tsx:231:loadingMore: page !== 1,
+app\(tabs)\historico.tsx:247:loadingInitial: false,
+app\(tabs)\historico.tsx:248:loadingMore: false,
+app\(tabs)\historico.tsx:261:loadingInitial: false,
+app\(tabs)\historico.tsx:262:loadingMore: false,
+app\(tabs)\historico.tsx:439:{activeState.loadingInitial ? (
+app\(tabs)\historico.tsx:462:printing={loadingPrint === sale.id}
+app\(tabs)\historico.tsx:474:ListFooterComponent={activeState.loadingMore ? <ActivityIndicator style={styl...
+app\(tabs)\index.tsx:40:const { products, productTypes, productTypeId, filterByProductType, setSearch...
+app\(tabs)\index.tsx:93:const showSkeleton = useMinLoadingDuration(isLoading && !hasData);
+app\(tabs)\index.tsx:100:refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefres...
+app\(tabs)\index.tsx:104:ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerL...
+app\(tabs)\pedidos.tsx:12:import { useAuth } from '@/context/AuthContext';
+app\(tabs)\pedidos.tsx:51:const { user } = useAuth();
+app\(tabs)\pedidos.tsx:56:const [isLoading, setIsLoading] = useState(true);
+app\(tabs)\pedidos.tsx:113:const showSkeleton = useMinLoadingDuration(isLoading && !hasData);
+app\(tabs)\pedidos.tsx:139:refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefres...
+app\(tabs)\produtos.tsx:22:const { products, productTypes, productTypeId, filterByProductType, setSearch...
+app\(tabs)\produtos.tsx:37:const showSkeleton = useMinLoadingDuration(isLoading && !hasData);
+app\(tabs)\produtos.tsx:43:refreshControl={<RefreshControl refreshing={refreshing || isLoading} onRefres...
+app\(tabs)\produtos.tsx:47:ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerL...
+app\__tests__\historico.test.ts:24:jest.mock('@/context/AuthContext', () => ({ useAuth: jest.fn() }));
+app\__tests__\historico.test.ts:47:loadingInitial: false,
+app\__tests__\historico.test.ts:48:loadingMore: false,
+app\__tests__\i18nResources.test.tsx:23:jest.mock('@/context/AuthContext', () => ({ useAuth: () => mockUseAuth() }));
+app\__tests__\i18nSurfaces.test.tsx:83:useAuth: mockUseAuth,
+app\__tests__\i18nSurfaces.test.tsx:96:return createElement('app-loading');
+app\__tests__\i18nSurfaces.test.tsx:121:mockUseAuth.mockReturnValue({ user: null, loading: false, login: jest.fn() });
+app\__tests__\i18nSurfaces.test.tsx:194:expect(renderer!.root.findAll((node) => String(node.type) === 'app-loading'))...
+app\__tests__\onboarding.test.tsx:23:useAuth: () => mockUseAuth(),
+app\_layout.tsx:13:import { useAuth } from '@/context/AuthContext';
+app\_layout.tsx:30:// Ensure that reloading on `/modal` keeps a back button present.
+app\_layout.tsx:34:// Prevent the splash screen from auto-hiding before asset loading is complete.
+app\_layout.tsx:94:const { user, loading } = useAuth();
+app\_layout.tsx:101:if (loading) return;
+app\_layout.tsx:110:}, [loading, user, router, pathname]);
+app\_layout.tsx:112:if (loading) return <AppLoadingScreen stage={user ? 'preparing' : 'authentica...
+app\login.tsx:5:import { useAuth } from '@/context/AuthContext';
+app\login.tsx:11:const { login } = useAuth();
+app\login.tsx:17:const [loading, setLoading] = useState(false);
+app\login.tsx:73:loading={loading}
+app\login.tsx:74:disabled={loading}
+app\modais\__tests__\pedidoModal.test.tsx:40:useAuth: () => ({ user: { id: 'seller-1', name: 'Caixa', role: 'EMPLOYEE' } }),
+app\modais\contaHistoricoModal.tsx:53:const [isLoading, setIsLoading] = useState(true);
+app\modais\contaHistoricoModal.tsx:54:const [loadingPrint, setLoadingPrint] = useState<string | null>(null);
+app\modais\contaHistoricoModal.tsx:170:if (isLoading) {
+app\modais\contaHistoricoModal.tsx:174:<Text>{t('common.loading')}</Text>
+app\modais\contaHistoricoModal.tsx:182:<Text style={styles.title}>{t('sales.loadingDetails')}</Text>
+app\modais\contaHistoricoModal.tsx:219:loading={Boolean(loadingPrint)}
+app\modais\contaModal.tsx:14:import { useAuth } from '@/context/AuthContext';
+app\modais\contaModal.tsx:30:const { user } = useAuth();
+app\modais\pedidoModal.tsx:10:import { useAuth } from '@/context/AuthContext';
+app\modais\pedidoModal.tsx:57:const { user } = useAuth();
+app\modais\relatorioModal.tsx:48:const [loading, setLoading] = useState(true);
+app\modais\relatorioModal.tsx:228:{loading ? (
+app\modais\relatorioModal.tsx:229:<View style={styles.loadingContainer}>
+app\modais\relatorioModal.tsx:231:<Text style={styles.loadingText}>{t('charts.loading')}</Text>
+app\modais\relatorioModal.tsx:318:{!loading && relatorioData.length > 0 && (
+app\modais\relatorioModal.tsx:454:loadingContainer: {
+app\modais\relatorioModal.tsx:459:loadingText: {
+app\onboarding.tsx:13:import { useAuth } from '@/context/AuthContext';
+app\onboarding.tsx:41:const { token: authToken, user } = useAuth();
+app\onboarding.tsx:174:loading={saving}
+components\CategoryOnboardingGate.tsx:4:import { useAuth } from '@/context/AuthContext';
+components\CategoryOnboardingGate.tsx:13:const { token, user } = useAuth();
+components\VendaItem.tsx:26:...(onPrint ? [{ icon: 'print' as const, label: t('common.print'), onPress: o...
+components\ui\Button.tsx:11:loading?: boolean;
+components\ui\Button.tsx:15:export function Button({ title, variant = 'primary', loading = false, disable...
+components\ui\Button.tsx:18:const isDisabled = disabled || loading;
+components\ui\Button.tsx:31:{loading ? (
+components\ui\Button.tsx:54:{loading ? (
+components\ui\IconButton.tsx:13:loading?: boolean;
+components\ui\IconButton.tsx:20:export function IconButton({ icon, label, onPress, disabled, destructive, loa...
+components\ui\IconButton.tsx:23:const isDisabled = disabled || loading;
+components\ui\IconButton.tsx:35:{loading ? (
+components\ui\RecordCard.tsx:17:loading?: boolean;
+components\ui\RecordCard.tsx:73:loading={action.loading}
+context\AuthContext.tsx:21:loading: boolean;
+context\AuthContext.tsx:28:export const AuthProvider = ({ children }: { children: ReactNode }) => {
+context\AuthContext.tsx:32:const [loading, setLoading] = useState<boolean>(true);
+context\AuthContext.tsx:225:<AuthContext.Provider value={{ user, token, loading, login, logout }}>
+context\AuthContext.tsx:231:export const useAuth = () => {
+context\AuthContext.tsx:233:if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+context\AutoSyncContext.tsx:5:import { useAuth } from '@/context/AuthContext';
+context\AutoSyncContext.tsx:24:const { token, user } = useAuth();
+
+ succeeded in 227ms:
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import * as api from '@/services/api';
+import * as SecureStore from 'expo-secure-store';
+import { useSQLiteContext } from 'expo-sqlite';
+import { seedProductType } from '@/database/initializeDatabase';
+import { synchronizeWithServer } from '@/database/watermelon/sync';
+import { runWithLock } from '@/database/syncGuard';
+import { resetWatermelonLocalData } from '@/database/watermelon/database';
+
+type User = {
+  id?: number | string;
+  name?: string;
+  email?: string;
+  establishmentId?: number | string | null;
+  role?: string | null;
+};
+
+type AuthContextData = {
+  user: User | null;
+  token: string | null;
+  loading: boolean;
+  login: (email: string, senha: string) => Promise<boolean>;
+  logout: () => void;
+};
+
+const AuthContext = createContext<AuthContextData | undefined>(undefined);
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const database = useSQLiteContext()
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const TOKEN_KEY = 'tozzo_token_v1';
+
+  // Rehydrate token on mount and validate it
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const stored = await SecureStore.getItemAsync(TOKEN_KEY);
+        if (stored && mounted) {
+          setToken(stored);
+          try {
+            const me = await api.getMe(stored);
+            if (me && mounted) {
+              setUser(me);
+              try {
+                const schema = await database.getFirstAsync<{ userId?: number | null }>(`SELECT userId FROM TB_SCHEMA LIMIT 1`).catch(() => null);
+                const userId = schema && typeof schema.userId !== 'undefined' ? schema.userId : null;
+                if (!userId) {
+                      const uid = Number((me as any).id);
+                      await database.runAsync('UPDATE TB_SCHEMA SET userId = ?', [!isNaN(uid) ? uid : null]);
+                }
+              } catch (err) {
+                console.warn('Failed to run seedProdutosPadrao after rehydrate', err);
+              }
+            }
+          } catch (err: any) {
+            // Only clear token on explicit auth errors (401/402/403).
+            // For network/server errors (offline) keep the stored token.
+            const status = err?.response?.status ?? err?.status ?? null;
+            if (status === 401 || status === 402 || status === 403) {
+              console.warn('Stored token invalid, clearing', err);
+              await SecureStore.deleteItemAsync(TOKEN_KEY);
+              if (mounted) {
+                setToken(null);
+                setUser(null);
+              }
+            } else {
+              console.warn('Network/server error validating token — keeping stored token', err);
+              try {
+                const prev = await database.getFirstAsync<{
+                  id?: number;
+                  name?: string;
+                  email?: string;
+                  establishmentId?: number | string; establishmentName?: string;
+                  role?: string | null;
+                }>(`SELECT id, name, email, establishmentId, establishmentName, role FROM TB_USERS LIMIT 1`).catch(() => null);
+                if (prev && mounted) {
+                  setUser({
+                    id: prev.id,
+                    name: prev.name,
+                    email: prev.email,
+                    establishmentId: prev.establishmentId,
+                    role: prev.role ?? 'EMPLOYEE',
+                  });
+                }
+              } catch (e) {
+                console.warn('Failed to load local TB_USERS after network error', e);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load token from SecureStore', err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const login = async (email: string, senha: string) => {
+    setLoading(true);
+    try {
+      const body = await api.login(email, senha);
+      // Expect the API to return an object that includes a token string.
+      // Common keys: token, accessToken. Try both.
+      const t = body?.token ?? body?.accessToken ?? body?.access_token ?? null;
+      if (!t) return false;
+      try {
+        await SecureStore.setItemAsync(TOKEN_KEY, t);
+      } catch (err) {
+        console.warn('Failed to persist token to SecureStore', err);
+      }
+
+      // Fetch user profile
+      try {
+        const me = await api.getMe(t);
+        if (!me) {
+          console.warn('Failed to fetch /usuarios/me: empty profile');
+          return false;
+        }
+        setUser(me);
+
+        try {
+          const prev = await database.getFirstAsync<{ id?: number; email?: string; establishmentId?: string }>(`SELECT id, email, establishmentId FROM TB_USERS LIMIT 1`).catch(() => null);
+          const meId = (me as any)?.id;
+          const meEmail = (me as any)?.email ?? null;
+          const meEstab = (me as any)?.establishmentId ?? null;
+          const meRole = (me as any)?.role ?? 'EMPLOYEE';
+          const meNome = (me as any)?.name ?? null;
+          const meNomeEstab = (me as any)?.establishmentName ?? null;
+          const meIdNum = isNaN(Number(meId)) ? null : Number(meId);
+
+          const insertUser = async () => {
+            await database.execAsync('DELETE FROM TB_USERS;');
+            await database.runAsync(
+              'INSERT INTO TB_USERS (name, email, establishmentId, establishmentName, role) VALUES (?, ?, ?, ?, ?)',
+              [meNome, meEmail, meEstab, meNomeEstab, meRole]
+            );
+          };
+
+          if (!prev) {
+            await insertUser();
+            await database.runAsync('UPDATE TB_SCHEMA SET userId = ?, establishmentId = ?', [meIdNum, meEstab]).catch((e) => console.warn('[auth] db op failed', e));
+            await seedProductType(database).catch((e) => console.warn('[auth] db op failed', e));
+          } else {
+            if (String(prev.establishmentId) !== String(meEstab)) {
+              try {
+                await database.execAsync('BEGIN;');
+                const deletes = [
+                  'DELETE FROM RL_SALE_PRODUCT;',
+                  'DELETE FROM RL_ORDER_PRODUCT;',
+                  'DELETE FROM TB_PRODUCTS;',
+                  'DELETE FROM TB_PRODUCT_TYPES;',
+                  'DELETE FROM TB_SALES;',
+                  'DELETE FROM TB_ORDERS;',
+                  'DELETE FROM TB_PRINTERS;'
+                ];
+                for (const d of deletes) {
+                  await database.execAsync(d).catch((e) => console.warn('[auth] db op failed', e));
+                }
+                await database.execAsync('DELETE FROM TB_USERS;').catch((e) => console.warn('[auth] db op failed', e));
+                await database.runAsync(
+                  'INSERT INTO TB_USERS (name, email, establishmentId, establishmentName, role) VALUES (?, ?, ?, ?, ?)',
+                  [meNome, meEmail, meEstab, meNomeEstab, meRole]
+                ).catch((e) => console.warn('[auth] db op failed', e));
+                await database.runAsync('UPDATE TB_SCHEMA SET userId = ?, establishmentId = ?', [meIdNum, meEstab]).catch((e) => console.warn('[auth] db op failed', e));
+                await database.execAsync('COMMIT;');
+
+                await resetWatermelonLocalData().catch((e) => console.warn('[auth] Watermelon local data reset failed', e));
+              } catch (err) {
+                await database.execAsync('ROLLBACK;').catch((e) => console.warn('[auth] db op failed', e));
+                console.warn('Failed during destructive swap; rolled back', err);
+              }
+
+                await seedProductType(database).catch((e) => console.warn('[auth] db op failed', e));
+            } else {
+              await database.execAsync('DELETE FROM TB_USERS;').catch((e) => console.warn('[auth] db op failed', e));
+              await database.runAsync(
+                'INSERT INTO TB_USERS (name, email, establishmentId, establishmentName, role) VALUES (?, ?, ?, ?, ?)',
+                [meNome, meEmail, meEstab, meNomeEstab, meRole]
+              ).catch((e) => console.warn('[auth] db op failed', e));
+              await database.runAsync('UPDATE TB_SCHEMA SET userId = ?', [meIdNum]).catch((e) => console.warn('[auth] db op failed', e));
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to check/replace TB_USERS on login', err);
+        }
+        setToken(t);
+        // The first sync must not block navigation. The list screens show their
+        // skeletons while this background sync populates the local database.
+        void runWithLock(() => synchronizeWithServer(t, (me as any)?.establishmentId))
+          .then((res) => {
+            if (res === null) console.log('[sync] skipped login-triggered sync; another sync is in progress');
+          })
+          .catch((err) => console.warn('sync after login failed', err));
+        
+      } catch (err) {
+        console.warn('Failed to fetch /usuarios/me', err);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.warn('Login failed', err);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = () => {
+    setToken(null);
+    setUser(null);
+    SecureStore.deleteItemAsync(TOKEN_KEY).catch((err) => console.warn('Failed to delete token', err));
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
+};
+
+export default AuthContext;
+
+ succeeded in 236ms:
+24 matches in 4 files:
+
+services\__tests__\api.test.ts:2:createProductType,
+services\__tests__\api.test.ts:3:getEstablishment,
+services\__tests__\api.test.ts:5:updateEstablishmentCategory,
+services\__tests__\api.test.ts:80:await expect(getEstablishment('token-123')).resolves.toEqual(establishment);
+services\__tests__\api.test.ts:100:await expect(updateEstablishmentCategory('token-123', 'establishment-1', 'HAM...
+services\__tests__\api.test.ts:122:await expect(createProductType('token-123', {
+services\__tests__\categoryOnboarding.test.ts:2:import { createProductType, updateEstablishmentCategory } from '@/services/api';
+services\__tests__\categoryOnboarding.test.ts:7:createProductType: jest.fn(),
+services\__tests__\categoryOnboarding.test.ts:8:updateEstablishmentCategory: jest.fn(),
+services\__tests__\categoryOnboarding.test.ts:19:const mockCreateProductType = createProductType as jest.MockedFunction<typeof...
+services\__tests__\categoryOnboarding.test.ts:20:const mockUpdateEstablishmentCategory = updateEstablishmentCategory as jest.M...
+services\api.ts:53:export type Establishment = {
+services\api.ts:176:export async function getEstablishment(token: string): Promise<Establishment> {
+services\api.ts:187:console.error('API getEstablishment error:', url.toString(), error.message);
+services\api.ts:194:console.error('Network/getEstablishment request failed', url.toString(), err?...
+services\api.ts:199:export async function updateEstablishmentCategory(
+services\api.ts:220:console.error('API updateEstablishmentCategory error:', url.toString(), error...
+services\api.ts:227:console.error('Network/updateEstablishmentCategory request failed', url.toStr...
+services\api.ts:232:export async function createProductType(
+services\api.ts:252:console.error('API createProductType error:', url.toString(), error.message);
+services\api.ts:259:console.error('Network/createProductType request failed', url.toString(), err...
+services\categoryOnboarding.ts:2:import { createProductType, updateEstablishmentCategory } from '@/services/api';
+services\categoryOnboarding.ts:20:await updateEstablishmentCategory(token, establishmentId, category);
+services\categoryOnboarding.ts:26:await createProductType(token, {
+
+ exited 1 in 261ms:
+grep: unknown option -- glob
+Usage: grep [OPTION]... PATTERN [FILE]...
+Try 'grep --help' for more information.
+
+2026-08-28T20:12:52.949455Z ERROR codex_core::tools::router: error=exec_command failed for `"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk git blame -L 1,110 -- hooks/useCategoryOnboardingAccess.ts'`: CreateProcess { message: "Rejected(\"Failed to create unified exec process: runner failed during SpawnChild: CreateProcessAsUserW failed: 5 (Acesso negado.) | cwd=C:\\\\RN\\\\TozzoBurger | cmd=\\\"C:\\\\Program Files\\\\WindowsApps\\\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\\\pwsh.exe\\\" -NoProfile -Command \\\"try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}\\nrtk git blame -L 1,110 -- hooks/useCategoryOnboardingAccess.ts\\\" | env_u16_len=7125 | si_flags=256 | creation_flags=525312 (Windows error 5)\")" }
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk git log --oneline -8' in C:\RN\TozzoBurger
+ succeeded in 156ms:
+75f0bb8 docs(sdd): review + fix round 1 da Task 9 da Fase 7 (mobile)
+6fd6bf6 fix: guard direct category onboarding route
+db6fd1e docs(sdd): report Task 9 mobile worker
+04f2172 feat: add category onboarding
+efc1eb1 docs(sdd): review da Task 8 da Fase 7 (mobile sync), feita direto pelo controller
+a204626 docs(sdd): relatório de worker da Task 8 da Fase 7 (mobile sync)
+3296ac9 fix: retry Watermelon sync conflicts
+a6623bb feat: replace mobile sync with WatermelonDB
+
+2026-08-28T20:12:59.446718Z ERROR codex_core::tools::router: error=exec_command failed for `"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk git blame -L 1,120 -- app/onboarding.tsx'`: CreateProcess { message: "Rejected(\"Failed to create unified exec process: runner failed during SpawnChild: CreateProcessAsUserW failed: 5 (Acesso negado.) | cwd=C:\\\\RN\\\\TozzoBurger | cmd=\\\"C:\\\\Program Files\\\\WindowsApps\\\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\\\pwsh.exe\\\" -NoProfile -Command \\\"try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}\\nrtk git blame -L 1,120 -- app/onboarding.tsx\\\" | env_u16_len=7125 | si_flags=256 | creation_flags=525312 (Windows error 5)\")" }
+2026-08-28T20:13:02.288038Z ERROR codex_core::tools::router: error=exec_command failed for `"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk git blame -- app/onboarding.tsx'`: CreateProcess { message: "Rejected(\"Failed to create unified exec process: runner failed during SpawnChild: CreateProcessAsUserW failed: 5 (Acesso negado.) | cwd=C:\\\\RN\\\\TozzoBurger | cmd=\\\"C:\\\\Program Files\\\\WindowsApps\\\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\\\pwsh.exe\\\" -NoProfile -Command \\\"try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}\\nrtk git blame -- app/onboarding.tsx\\\" | env_u16_len=7125 | si_flags=256 | creation_flags=525312 (Windows error 5)\")" }
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk grep -n "allowed|shouldRedirect|useCategoryOnboardingAccess|router.replace|knownEstablishment|category === null" app/onboarding.tsx hooks/useCategoryOnboardingAccess.ts components/CategoryOnboardingGate.tsx' in C:\RN\TozzoBurger
+ succeeded in 174ms:
+25 matches in 3 files:
+
+app/onboarding.tsx:23:import { useCategoryOnboardingAccess } from '@/hooks/useCategoryOnboardingAcc...
+app/onboarding.tsx:31:knownEstablishment?: Establishment | null;
+app/onboarding.tsx:38:knownEstablishment,
+app/onboarding.tsx:46:const access = useCategoryOnboardingAccess({
+app/onboarding.tsx:50:knownEstablishment,
+app/onboarding.tsx:60:if (!access.shouldRedirect || redirected.current) return;
+app/onboarding.tsx:63:router.replace('/(tabs)');
+app/onboarding.tsx:64:}, [access.shouldRedirect, router]);
+app/onboarding.tsx:111:if (!access.allowed) return null;
+components/CategoryOnboardingGate.tsx:5:import { useCategoryOnboardingAccess } from '@/hooks/useCategoryOnboardingAcc...
+components/CategoryOnboardingGate.tsx:14:const access = useCategoryOnboardingAccess({
+components/CategoryOnboardingGate.tsx:20:if (access.allowed && access.establishment) {
+components/CategoryOnboardingGate.tsx:25:knownEstablishment={access.establishment}
+hooks/useCategoryOnboardingAccess.ts:11:knownEstablishment?: Establishment | null;
+hooks/useCategoryOnboardingAccess.ts:17:allowed: boolean;
+hooks/useCategoryOnboardingAccess.ts:18:shouldRedirect: boolean;
+hooks/useCategoryOnboardingAccess.ts:22:export function useCategoryOnboardingAccess({
+hooks/useCategoryOnboardingAccess.ts:26:knownEstablishment,
+hooks/useCategoryOnboardingAccess.ts:30:const hasKnownEstablishment = knownEstablishment !== undefined;
+hooks/useCategoryOnboardingAccess.ts:31:const [establishment, setEstablishment] = useState<Establishment | null>(know...
+hooks/useCategoryOnboardingAccess.ts:38:setEstablishment(knownEstablishment ?? null);
+hooks/useCategoryOnboardingAccess.ts:72:}, [eligible, establishmentId, hasKnownEstablishment, knownEstablishment, tok...
+hooks/useCategoryOnboardingAccess.ts:75:const allowed = eligible && !checking && establishment?.category === null && ...
+hooks/useCategoryOnboardingAccess.ts:83:allowed,
+hooks/useCategoryOnboardingAccess.ts:84:shouldRedirect: !checking && !allowed,
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk grep -n "redirects a MANAGER|category is already configured|mockGetEstablishment|router.replace" app/__tests__/onboarding.test.tsx' in C:\RN\TozzoBurger
+ succeeded in 167ms:
+14 matches in 6 files:
+
+142:0:'establishment-1', category: 'PIZZARIA' });
+168:0:'establishment-1', category: null });
+186:0:'establishment-1', category: null });
+236:0:'establishment-1', category: 'PIZZARIA' });
+69:0:'establishment-1', category: null });
+app/__tests__/onboarding.test.tsx:47:const mockGetEstablishment = getEstablishment as jest.MockedFunction<typeof g...
+app/__tests__/onboarding.test.tsx:122:it('redirects a MANAGER opening onboarding directly without rendering or muta...
+app/__tests__/onboarding.test.tsx:136:expect(mockGetEstablishment).not.toHaveBeenCalled();
+app/__tests__/onboarding.test.tsx:141:it('redirects an OWNER opening onboarding directly when the category is alrea...
+app/__tests__/onboarding.test.tsx:150:expect(mockGetEstablishment).toHaveBeenCalledWith('token-123');
+app/__tests__/onboarding.test.tsx:180:expect(mockGetEstablishment).toHaveBeenCalledWith('token-123');
+app/__tests__/onboarding.test.tsx:210:expect(mockGetEstablishment).toHaveBeenCalledTimes(1);
+app/__tests__/onboarding.test.tsx:230:expect(mockGetEstablishment).not.toHaveBeenCalled();
+app/__tests__/onboarding.test.tsx:235:it('does not show onboarding again when the category is already configured', ...
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read --help' in C:\RN\TozzoBurger
+ succeeded in 107ms:
+Read file with intelligent filtering
+
+Usage: rtk.exe read [OPTIONS] <FILES>...
+
+Arguments:
+  <FILES>...  Files to read (supports multiple, like cat)
+
+Options:
+  -l, --level <LEVEL>            Filter: none (default, full content), minimal, aggressive [default: none]
+  -m, --max-lines <MAX_LINES>    Max lines
+      --tail-lines <TAIL_LINES>  Keep only last N lines
+  -n, --line-numbers             Show line numbers
+  -v, --verbose...               Verbosity level (-v, -vv, -vvv)
+      --ultra-compact            Ultra-compact mode: ASCII icons, inline format (Level 2 optimizations)
+      --skip-env                 Set SKIP_ENV_VALIDATION=1 for child processes (Next.js, tsc, lint, prisma)
+  -h, --help                     Print help
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read -n app/onboarding.tsx' in C:\RN\TozzoBurger
+ succeeded in 149ms:
+  1 │ import React, { useEffect, useRef, useState } from 'react';
+  2 │ import {
+  3 │   Pressable,
+  4 │   ScrollView,
+  5 │   StyleSheet,
+  6 │   Text,
+  7 │   TextInput,
+  8 │   View,
+  9 │ } from 'react-native';
+ 10 │ import { useTranslation } from 'react-i18next';
+ 11 │ import { useRouter } from 'expo-router';
+ 12 │ 
+ 13 │ import { useAuth } from '@/context/AuthContext';
+ 14 │ import {
+ 15 │   CATEGORY_OPTIONS,
+ 16 │   type EstablishmentCategory,
+ 17 │   getCategorySeed,
+ 18 │ } from '@/database/watermelon/categorySeeds';
+ 19 │ import {
+ 20 │   completeCategoryOnboarding,
+ 21 │ } from '@/services/categoryOnboarding';
+ 22 │ import { Button } from '@/components/ui/Button';
+ 23 │ import { useCategoryOnboardingAccess } from '@/hooks/useCategoryOnboardingAccess';
+ 24 │ import type { Establishment } from '@/services/api';
+ 25 │ 
+ 26 │ type EstablishmentId = string | number;
+ 27 │ 
+ 28 │ export type OnboardingScreenProps = {
+ 29 │   token?: string | null;
+ 30 │   establishmentId?: EstablishmentId | null;
+ 31 │   knownEstablishment?: Establishment | null;
+ 32 │   onCompleted?: (category: EstablishmentCategory) => void;
+ 33 │ };
+ 34 │ 
+ 35 │ export default function OnboardingScreen({
+ 36 │   token: tokenOverride,
+ 37 │   establishmentId: establishmentIdOverride,
+ 38 │   knownEstablishment,
+ 39 │   onCompleted,
+ 40 │ }: OnboardingScreenProps = {}) {
+ 41 │   const { token: authToken, user } = useAuth();
+ 42 │   const { t } = useTranslation();
+ 43 │   const router = useRouter();
+ 44 │   const token = tokenOverride ?? authToken;
+ 45 │   const establishmentId = establishmentIdOverride ?? user?.establishmentId;
+ 46 │   const access = useCategoryOnboardingAccess({
+ 47 │     token,
+ 48 │     role: user?.role,
+ 49 │     establishmentId,
+ 50 │     knownEstablishment,
+ 51 │   });
+ 52 │   const redirected = useRef(false);
+ 53 │   const [category, setCategory] = useState<EstablishmentCategory | null>(null);
+ 54 │   const [productTypeDescriptions, setProductTypeDescriptions] = useState<string[]>([]);
+ 55 │   const [newDescription, setNewDescription] = useState('');
+ 56 │   const [saving, setSaving] = useState(false);
+ 57 │   const [error, setError] = useState<string | null>(null);
+ 58 │ 
+ 59 │   useEffect(() => {
+ 60 │     if (!access.shouldRedirect || redirected.current) return;
+ 61 │ 
+ 62 │     redirected.current = true;
+ 63 │     router.replace('/(tabs)');
+ 64 │   }, [access.shouldRedirect, router]);
+ 65 │ 
+ 66 │   const chooseCategory = (nextCategory: EstablishmentCategory) => {
+ 67 │     setCategory(nextCategory);
+ 68 │     setProductTypeDescriptions(getCategorySeed(nextCategory));
+ 69 │     setNewDescription('');
+ 70 │     setError(null);
+ 71 │   };
+ 72 │ 
+ 73 │   const addDescription = () => {
+ 74 │     const description = newDescription.trim();
+ 75 │     if (description.length === 0) return;
+ 76 │ 
+ 77 │     setProductTypeDescriptions((current) => (
+ 78 │       current.includes(description) ? current : [...current, description]
+ 79 │     ));
+ 80 │     setNewDescription('');
+ 81 │   };
+ 82 │ 
+ 83 │   const removeDescription = (index: number) => {
+ 84 │     setProductTypeDescriptions((current) => current.filter((_, itemIndex) => itemIndex !== index));
+ 85 │   };
+ 86 │ 
+ 87 │   const confirm = async () => {
+ 88 │     if (!category || !token || establishmentId === null || establishmentId === undefined) {
+ 89 │       setError(t('common.onboardingSaveError'));
+ 90 │       return;
+ 91 │     }
+ 92 │ 
+ 93 │     setSaving(true);
+ 94 │     setError(null);
+ 95 │     try {
+ 96 │       await completeCategoryOnboarding({
+ 97 │         token,
+ 98 │         establishmentId,
+ 99 │         category,
+100 │         productTypeDescriptions,
+101 │       });
+102 │       onCompleted?.(category);
+103 │     } catch (confirmationError) {
+104 │       console.warn('Category onboarding failed', confirmationError);
+105 │       setError(t('common.onboardingSaveError'));
+106 │     } finally {
+107 │       setSaving(false);
+108 │     }
+109 │   };
+110 │ 
+111 │   if (!access.allowed) return null;
+112 │ 
+113 │   return (
+114 │     <ScrollView contentContainerStyle={styles.container}>
+115 │       <Text style={styles.title}>{t('common.onboardingTitle')}</Text>
+116 │       <Text style={styles.subtitle}>{t('common.onboardingChooseCategory')}</Text>
+117 │ 
+118 │       <View style={styles.categories}>
+119 │         {CATEGORY_OPTIONS.map((option) => {
+120 │           const selected = category === option;
+121 │           return (
+122 │             <Pressable
+123 │               key={option}
+124 │               accessibilityRole="button"
+125 │               accessibilityLabel={option}
+126 │               onPress={() => chooseCategory(option)}
+127 │               style={[styles.category, selected && styles.categorySelected]}
+128 │             >
+129 │               <Text style={styles.categoryText}>{option}</Text>
+130 │             </Pressable>
+131 │           );
+132 │         })}
+133 │       </View>
+134 │ 
+135 │       {category && (
+136 │         <View style={styles.editor}>
+137 │           <Text style={styles.sectionTitle}>{t('common.onboardingSuggestedTypes')}</Text>
+138 │           {productTypeDescriptions.map((description, index) => (
+139 │             <View key={`${description}-${index}`} style={styles.typeRow}>
+140 │               <Text style={styles.typeText}>{description}</Text>
+141 │               <Pressable
+142 │                 accessibilityRole="button"
+143 │                 accessibilityLabel={`onboarding.removeType:${description}`}
+144 │                 onPress={() => removeDescription(index)}
+145 │                 style={styles.removeButton}
+146 │               >
+147 │                 <Text style={styles.removeText}>×</Text>
+148 │               </Pressable>
+149 │             </View>
+150 │           ))}
+151 │ 
+152 │           <View style={styles.addRow}>
+153 │             <TextInput
+154 │               accessibilityLabel="onboarding.typeInput"
+155 │               placeholder={t('common.onboardingTypePlaceholder')}
+156 │               value={newDescription}
+157 │               onChangeText={setNewDescription}
+158 │               style={styles.input}
+159 │             />
+160 │             <Button
+161 │               accessibilityLabel="onboarding.addType"
+162 │               title={t('common.onboardingAddType')}
+163 │               onPress={addDescription}
+164 │               variant="outline"
+165 │               style={styles.addButton}
+166 │             />
+167 │           </View>
+168 │ 
+169 │           {error && <Text style={styles.error}>{error}</Text>}
+170 │           <Button
+171 │             accessibilityLabel="onboarding.confirm"
+172 │             title={saving ? t('common.onboardingSaving') : t('common.onboardingConfirm')}
+173 │             onPress={confirm}
+174 │             loading={saving}
+175 │             disabled={saving}
+176 │             style={styles.confirmButton}
+177 │           />
+178 │           <Button
+179 │             accessibilityLabel="onboarding.changeCategory"
+180 │             title={t('common.onboardingChangeCategory')}
+181 │             onPress={() => setCategory(null)}
+182 │             variant="outline"
+183 │             disabled={saving}
+184 │           />
+185 │         </View>
+186 │       )}
+187 │     </ScrollView>
+188 │   );
+189 │ }
+190 │ 
+191 │ const styles = StyleSheet.create({
+192 │   container: {
+193 │     flexGrow: 1,
+194 │     padding: 24,
+195 │     justifyContent: 'center',
+196 │     backgroundColor: '#fff',
+197 │   },
+198 │   title: {
+199 │     fontSize: 26,
+200 │     fontWeight: '700',
+201 │     marginBottom: 8,
+202 │     color: '#000',
+203 │   },
+204 │   subtitle: {
+205 │     fontSize: 16,
+206 │     marginBottom: 20,
+207 │     color: '#333',
+208 │   },
+209 │   categories: {
+210 │     gap: 10,
+211 │   },
+212 │   category: {
+213 │     borderWidth: 1,
+214 │     borderColor: '#000',
+215 │     borderRadius: 8,
+216 │     padding: 14,
+217 │   },
+218 │   categorySelected: {
+219 │     backgroundColor: '#e8e8e8',
+220 │   },
+221 │   categoryText: {
+222 │     color: '#000',
+223 │     fontWeight: '600',
+224 │   },
+225 │   editor: {
+226 │     marginTop: 24,
+227 │   },
+228 │   sectionTitle: {
+229 │     fontSize: 18,
+230 │     fontWeight: '700',
+231 │     marginBottom: 12,
+232 │     color: '#000',
+233 │   },
+234 │   typeRow: {
+235 │     minHeight: 44,
+236 │     flexDirection: 'row',
+237 │     alignItems: 'center',
+238 │     justifyContent: 'space-between',
+239 │     borderBottomWidth: StyleSheet.hairlineWidth,
+240 │     borderBottomColor: '#999',
+241 │   },
+242 │   typeText: {
+243 │     color: '#000',
+244 │     fontSize: 16,
+245 │   },
+246 │   removeButton: {
+247 │     paddingHorizontal: 12,
+248 │     paddingVertical: 8,
+249 │   },
+250 │   removeText: {
+251 │     color: '#ef4444',
+252 │     fontSize: 24,
+253 │   },
+254 │   addRow: {
+255 │     flexDirection: 'row',
+256 │     alignItems: 'center',
+257 │     gap: 8,
+258 │     marginTop: 16,
+259 │   },
+260 │   input: {
+261 │     flex: 1,
+262 │     height: 48,
+263 │     borderWidth: 1,
+264 │     borderColor: '#000',
+265 │     borderRadius: 8,
+266 │     paddingHorizontal: 12,
+267 │     color: '#000',
+268 │   },
+269 │   addButton: {
+270 │     minHeight: 48,
+271 │   },
+272 │   confirmButton: {
+273 │     marginTop: 20,
+274 │     marginBottom: 10,
+275 │   },
+276 │   error: {
+277 │     color: '#b91c1c',
+278 │     marginTop: 12,
+279 │   },
+280 │ });
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read -n hooks/useCategoryOnboardingAccess.ts' in C:\RN\TozzoBurger
+ succeeded in 142ms:
+ 1 │ import { useEffect, useState } from 'react';
+ 2 │ 
+ 3 │ import { getEstablishment, type Establishment } from '@/services/api';
+ 4 │ 
+ 5 │ type EstablishmentId = string | number;
+ 6 │ 
+ 7 │ type Options = {
+ 8 │   token: string | null | undefined;
+ 9 │   role: string | null | undefined;
+10 │   establishmentId: EstablishmentId | null | undefined;
+11 │   knownEstablishment?: Establishment | null;
+12 │ };
+13 │ 
+14 │ export type CategoryOnboardingAccess = {
+15 │   establishment: Establishment | null;
+16 │   checking: boolean;
+17 │   allowed: boolean;
+18 │   shouldRedirect: boolean;
+19 │   markCategoryConfigured: (category: Establishment['category']) => void;
+20 │ };
+21 │ 
+22 │ export function useCategoryOnboardingAccess({
+23 │   token,
+24 │   role,
+25 │   establishmentId,
+26 │   knownEstablishment,
+27 │ }: Options): CategoryOnboardingAccess {
+28 │   const isOwner = role === 'OWNER';
+29 │   const eligible = Boolean(token && isOwner && establishmentId !== null && establishmentId !== undefined);
+30 │   const hasKnownEstablishment = knownEstablishment !== undefined;
+31 │   const [establishment, setEstablishment] = useState<Establishment | null>(knownEstablishment ?? null);
+32 │   const [checking, setChecking] = useState(eligible && !hasKnownEstablishment);
+33 │ 
+34 │   useEffect(() => {
+35 │     let mounted = true;
+36 │ 
+37 │     if (hasKnownEstablishment) {
+38 │       setEstablishment(knownEstablishment ?? null);
+39 │       setChecking(false);
+40 │       return () => {
+41 │         mounted = false;
+42 │       };
+43 │     }
+44 │ 
+45 │     if (!eligible || !token) {
+46 │       setEstablishment(null);
+47 │       setChecking(false);
+48 │       return () => {
+49 │         mounted = false;
+50 │       };
+51 │     }
+52 │ 
+53 │     setChecking(true);
+54 │     setEstablishment(null);
+55 │     getEstablishment(token)
+56 │       .then((nextEstablishment) => {
+57 │         if (mounted) setEstablishment(nextEstablishment);
+58 │       })
+59 │       .catch((error) => {
+60 │         if (mounted) {
+61 │           console.warn('Could not load establishment category', error);
+62 │           setEstablishment(null);
+63 │         }
+64 │       })
+65 │       .finally(() => {
+66 │         if (mounted) setChecking(false);
+67 │       });
+68 │ 
+69 │     return () => {
+70 │       mounted = false;
+71 │     };
+72 │   }, [eligible, establishmentId, hasKnownEstablishment, knownEstablishment, token]);
+73 │ 
+74 │   const hasEstablishmentId = establishment?.id !== null && establishment?.id !== undefined;
+75 │   const allowed = eligible && !checking && establishment?.category === null && hasEstablishmentId;
+76 │   const markCategoryConfigured = (category: Establishment['category']) => {
+77 │     setEstablishment((current) => current ? { ...current, category } : current);
+78 │   };
+79 │ 
+80 │   return {
+81 │     establishment,
+82 │     checking,
+83 │     allowed,
+84 │     shouldRedirect: !checking && !allowed,
+85 │     markCategoryConfigured,
+86 │   };
+87 │ }
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read -n components/CategoryOnboardingGate.tsx' in C:\RN\TozzoBurger
+ succeeded in 148ms:
+ 1 │ import React from 'react';
+ 2 │ 
+ 3 │ import OnboardingScreen from '@/app/onboarding';
+ 4 │ import { useAuth } from '@/context/AuthContext';
+ 5 │ import { useCategoryOnboardingAccess } from '@/hooks/useCategoryOnboardingAccess';
+ 6 │ import type { EstablishmentCategory } from '@/database/watermelon/categorySeeds';
+ 7 │ 
+ 8 │ type Props = {
+ 9 │   children: React.ReactNode;
+10 │ };
+11 │ 
+12 │ export default function CategoryOnboardingGate({ children }: Props) {
+13 │   const { token, user } = useAuth();
+14 │   const access = useCategoryOnboardingAccess({
+15 │     token,
+16 │     role: user?.role,
+17 │     establishmentId: user?.establishmentId,
+18 │   });
+19 │ 
+20 │   if (access.allowed && access.establishment) {
+21 │     return (
+22 │       <OnboardingScreen
+23 │         token={token}
+24 │         establishmentId={access.establishment.id}
+25 │         knownEstablishment={access.establishment}
+26 │         onCompleted={(category: EstablishmentCategory) => {
+27 │           access.markCategoryConfigured(category);
+28 │         }}
+29 │       />
+30 │     );
+31 │   }
+32 │ 
+33 │   return <>{children}</>;
+34 │ }
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read -n app/__tests__/onboarding.test.tsx' in C:\RN\TozzoBurger
+ succeeded in 158ms:
+  1 │ import React from 'react';
+  2 │ import { act, create } from 'react-test-renderer';
+  3 │ import { View } from 'react-native';
+  4 │ 
+  5 │ import OnboardingScreen from '@/app/onboarding';
+  6 │ import CategoryOnboardingGate from '@/components/CategoryOnboardingGate';
+  7 │ import {
+  8 │   createProductType,
+  9 │   getEstablishment,
+ 10 │   updateEstablishmentCategory,
+ 11 │ } from '@/services/api';
+ 12 │ import { runWithLock } from '@/database/syncGuard';
+ 13 │ import { synchronizeWithServer } from '@/database/watermelon/sync';
+ 14 │ 
+ 15 │ const mockUseAuth = jest.fn();
+ 16 │ const mockRouterReplace = jest.fn();
+ 17 │ 
+ 18 │ jest.mock('expo-router', () => ({
+ 19 │   useRouter: () => ({ replace: mockRouterReplace }),
+ 20 │ }));
+ 21 │ 
+ 22 │ jest.mock('@/context/AuthContext', () => ({
+ 23 │   useAuth: () => mockUseAuth(),
+ 24 │ }));
+ 25 │ 
+ 26 │ jest.mock('@/services/api', () => ({
+ 27 │   createProductType: jest.fn(),
+ 28 │   getEstablishment: jest.fn(),
+ 29 │   updateEstablishmentCategory: jest.fn(),
+ 30 │ }));
+ 31 │ 
+ 32 │ jest.mock('@/database/syncGuard', () => ({
+ 33 │   runWithLock: jest.fn(),
+ 34 │ }));
+ 35 │ 
+ 36 │ jest.mock('@/database/watermelon/sync', () => ({
+ 37 │   synchronizeWithServer: jest.fn(),
+ 38 │ }));
+ 39 │ 
+ 40 │ jest.mock('react-i18next', () => ({
+ 41 │   useTranslation: () => ({
+ 42 │     t: (_key: string, fallback?: string) => fallback ?? _key,
+ 43 │   }),
+ 44 │ }));
+ 45 │ 
+ 46 │ const mockCreateProductType = createProductType as jest.MockedFunction<typeof createProductType>;
+ 47 │ const mockGetEstablishment = getEstablishment as jest.MockedFunction<typeof getEstablishment>;
+ 48 │ const mockUpdateEstablishmentCategory = updateEstablishmentCategory as jest.MockedFunction<typeof updateEstablishmentCategory>;
+ 49 │ const mockRunWithLock = runWithLock as jest.MockedFunction<typeof runWithLock>;
+ 50 │ const mockSynchronizeWithServer = synchronizeWithServer as jest.MockedFunction<typeof synchronizeWithServer>;
+ 51 │ 
+ 52 │ function findByAccessibilityLabel(renderer: ReturnType<typeof create>, label: string) {
+ 53 │   return renderer.root.find((node) => node.props.accessibilityLabel === label);
+ 54 │ }
+ 55 │ 
+ 56 │ function flushPromises() {
+ 57 │   return new Promise<void>((resolve) => setImmediate(resolve));
+ 58 │ }
+ 59 │ 
+ 60 │ describe('category onboarding screen', () => {
+ 61 │   beforeEach(() => {
+ 62 │     jest.clearAllMocks();
+ 63 │     mockUseAuth.mockReturnValue({
+ 64 │       token: 'token-123',
+ 65 │       user: { role: 'OWNER', establishmentId: 'establishment-1' },
+ 66 │     });
+ 67 │     mockUpdateEstablishmentCategory.mockResolvedValue({ id: 'establishment-1', category: 'HAMBURGUERIA' });
+ 68 │     mockCreateProductType.mockResolvedValue({ id: 'type-1' });
+ 69 │     mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: null });
+ 70 │     mockSynchronizeWithServer.mockResolvedValue(undefined);
+ 71 │     mockRunWithLock.mockImplementation(async (callback) => callback());
+ 72 │   });
+ 73 │ 
+ 74 │   it('uses the edited list when confirming a category', async () => {
+ 75 │     let renderer: ReturnType<typeof create>;
+ 76 │     await act(async () => {
+ 77 │       renderer = create(
+ 78 │         <OnboardingScreen token="token-123" establishmentId="establishment-1" />,
+ 79 │       );
+ 80 │       await flushPromises();
+ 81 │     });
+ 82 │ 
+ 83 │     await act(async () => {
+ 84 │       findByAccessibilityLabel(renderer!, 'HAMBURGUERIA').props.onPress();
+ 85 │     });
+ 86 │ 
+ 87 │     const input = findByAccessibilityLabel(renderer!, 'onboarding.typeInput');
+ 88 │     await act(async () => {
+ 89 │       input.props.onChangeText('Combos');
+ 90 │     });
+ 91 │     await act(async () => {
+ 92 │       findByAccessibilityLabel(renderer!, 'onboarding.addType').props.onPress();
+ 93 │     });
+ 94 │     await act(async () => {
+ 95 │       findByAccessibilityLabel(renderer!, 'onboarding.removeType:Lanches').props.onPress();
+ 96 │     });
+ 97 │ 
+ 98 │     await act(async () => {
+ 99 │       findByAccessibilityLabel(renderer!, 'onboarding.confirm').props.onPress();
+100 │       await flushPromises();
+101 │     });
+102 │ 
+103 │     expect(mockUpdateEstablishmentCategory).toHaveBeenCalledWith(
+104 │       'token-123',
+105 │       'establishment-1',
+106 │       'HAMBURGUERIA',
+107 │     );
+108 │     expect(mockCreateProductType.mock.calls).toEqual([
+109 │       ['token-123', { description: 'Bebidas', color: '#9E9E9E' }],
+110 │       ['token-123', { description: 'Porções', color: '#9E9E9E' }],
+111 │       ['token-123', { description: 'Sobremesas', color: '#9E9E9E' }],
+112 │       ['token-123', { description: 'Combos', color: '#9E9E9E' }],
+113 │     ]);
+114 │     expect(mockCreateProductType).not.toHaveBeenCalledWith(
+115 │       'token-123',
+116 │       { description: 'Lanches', color: '#9E9E9E' },
+117 │     );
+118 │     expect(mockRunWithLock).toHaveBeenCalledTimes(1);
+119 │     expect(mockSynchronizeWithServer).toHaveBeenCalledWith('token-123', 'establishment-1');
+120 │   });
+121 │ 
+122 │   it('redirects a MANAGER opening onboarding directly without rendering or mutating', async () => {
+123 │     mockUseAuth.mockReturnValue({
+124 │       token: 'token-123',
+125 │       user: { role: 'MANAGER', establishmentId: 'establishment-1' },
+126 │     });
+127 │     let renderer: ReturnType<typeof create>;
+128 │ 
+129 │     await act(async () => {
+130 │       renderer = create(<OnboardingScreen />);
+131 │       await flushPromises();
+132 │     });
+133 │ 
+134 │     expect(mockRouterReplace).toHaveBeenCalledWith('/(tabs)');
+135 │     expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
+136 │     expect(mockGetEstablishment).not.toHaveBeenCalled();
+137 │     expect(mockUpdateEstablishmentCategory).not.toHaveBeenCalled();
+138 │     expect(mockCreateProductType).not.toHaveBeenCalled();
+139 │   });
+140 │ 
+141 │   it('redirects an OWNER opening onboarding directly when the category is already configured', async () => {
+142 │     mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: 'PIZZARIA' });
+143 │     let renderer: ReturnType<typeof create>;
+144 │ 
+145 │     await act(async () => {
+146 │       renderer = create(<OnboardingScreen />);
+147 │       await flushPromises();
+148 │     });
+149 │ 
+150 │     expect(mockGetEstablishment).toHaveBeenCalledWith('token-123');
+151 │     expect(mockRouterReplace).toHaveBeenCalledWith('/(tabs)');
+152 │     expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
+153 │     expect(mockUpdateEstablishmentCategory).not.toHaveBeenCalled();
+154 │     expect(mockCreateProductType).not.toHaveBeenCalled();
+155 │   });
+156 │ });
+157 │ 
+158 │ describe('category onboarding gate', () => {
+159 │   beforeEach(() => {
+160 │     jest.clearAllMocks();
+161 │     mockUseAuth.mockReturnValue({
+162 │       token: 'token-123',
+163 │       user: { role: 'OWNER', establishmentId: 'establishment-1' },
+164 │     });
+165 │   });
+166 │ 
+167 │   it('shows onboarding for an OWNER only when the server category is null', async () => {
+168 │     mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: null });
+169 │     let renderer: ReturnType<typeof create>;
+170 │ 
+171 │     await act(async () => {
+172 │       renderer = create(
+173 │         <CategoryOnboardingGate>
+174 │           <View accessibilityLabel="app-content" />
+175 │         </CategoryOnboardingGate>,
+176 │       );
+177 │       await flushPromises();
+178 │     });
+179 │ 
+180 │     expect(mockGetEstablishment).toHaveBeenCalledWith('token-123');
+181 │     expect(findByAccessibilityLabel(renderer!, 'HAMBURGUERIA')).toBeDefined();
+182 │     expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'app-content')).toHaveLength(0);
+183 │   });
+184 │ 
+185 │   it('removes onboarding after a successful confirmation without refetching the gate', async () => {
+186 │     mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: null });
+187 │     mockUpdateEstablishmentCategory.mockResolvedValue({ id: 'establishment-1', category: 'HAMBURGUERIA' });
+188 │     mockCreateProductType.mockResolvedValue({ id: 'type-1' });
+189 │     mockSynchronizeWithServer.mockResolvedValue(undefined);
+190 │     mockRunWithLock.mockImplementation(async (callback) => callback());
+191 │ 
+192 │     let renderer: ReturnType<typeof create>;
+193 │     await act(async () => {
+194 │       renderer = create(
+195 │         <CategoryOnboardingGate>
+196 │           <View accessibilityLabel="app-content" />
+197 │         </CategoryOnboardingGate>,
+198 │       );
+199 │       await flushPromises();
+200 │     });
+201 │ 
+202 │     await act(async () => {
+203 │       findByAccessibilityLabel(renderer!, 'HAMBURGUERIA').props.onPress();
+204 │     });
+205 │     await act(async () => {
+206 │       findByAccessibilityLabel(renderer!, 'onboarding.confirm').props.onPress();
+207 │       await flushPromises();
+208 │     });
+209 │ 
+210 │     expect(mockGetEstablishment).toHaveBeenCalledTimes(1);
+211 │     expect(renderer!.root.find((node) => node.props.accessibilityLabel === 'app-content')).toBeDefined();
+212 │     expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
+213 │   });
+214 │ 
+215 │   it('keeps the app available and skips the request for non-OWNER users', async () => {
+216 │     mockUseAuth.mockReturnValue({
+217 │       token: 'token-123',
+218 │       user: { role: 'MANAGER', establishmentId: 'establishment-1' },
+219 │     });
+220 │ 
+221 │     const renderer = create(
+222 │       <CategoryOnboardingGate>
+223 │         <View accessibilityLabel="app-content" />
+224 │       </CategoryOnboardingGate>,
+225 │     );
+226 │     await act(async () => {
+227 │       await flushPromises();
+228 │     });
+229 │ 
+230 │     expect(mockGetEstablishment).not.toHaveBeenCalled();
+231 │     expect(renderer.root.find((node) => node.props.accessibilityLabel === 'app-content')).toBeDefined();
+232 │     expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
+233 │   });
+234 │ 
+235 │   it('does not show onboarding again when the category is already configured', async () => {
+236 │     mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: 'PIZZARIA' });
+237 │     let renderer: ReturnType<typeof create>;
+238 │ 
+239 │     await act(async () => {
+240 │       renderer = create(
+241 │         <CategoryOnboardingGate>
+242 │           <View accessibilityLabel="app-content" />
+243 │         </CategoryOnboardingGate>,
+244 │       );
+245 │       await flushPromises();
+246 │     });
+247 │ 
+248 │     expect(renderer!.root.find((node) => node.props.accessibilityLabel === 'app-content')).toBeDefined();
+249 │     expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
+250 │   });
+251 │ });
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command "rtk read C:\\Users\\lipoi\\.codex\\plugins\\cache\\trailofbits\\differential-review\\1.1.2\\skills\\differential-review\\methodology.md" in C:\RN\TozzoBurger
+ succeeded in 169ms:
+# Differential Review Methodology
+
+Detailed phase-by-phase workflow for security-focused code review.
+
+## Pre-Analysis: Baseline Context Building
+
+**FIRST ACTION - Build complete baseline understanding:**
+
+If `audit-context-building` skill is available:
+
+```bash
+# Checkout baseline commit
+git checkout <baseline_commit>
+
+# Invoke audit-context-building skill on baseline codebase
+# Scope = entire relevant project (e.g., packages/contracts/contracts/ for Solidity, src/ for Rust, etc.)
+audit-context-building --scope [entire project or main contract directory] --focus invariants,trust-boundaries,validation-patterns,call-graphs,state-flows
+
+# Examples:
+# For Solidity: audit-context-building --scope packages/contracts/contracts
+# For Rust: audit-context-building --scope src
+# For full repo: audit-context-building --scope .
+```
+
+**Capture from baseline analysis:**
+- System-wide invariants (what must ALWAYS be true across all code)
+- Trust boundaries and privilege levels (who can do what)
+- Validation patterns (what gets checked where - defense-in-depth)
+- Complete call graphs for critical functions (who calls what)
+- State flow diagrams (how state changes)
+- External dependencies and trust assumptions
+
+**Why this matters:**
+- Understand what the code was SUPPOSED to do before changes
+- Identify implicit security assumptions in baseline
+- Detect when changes violate baseline invariants
+- Know which patterns are system-wide vs local
+- Catch when changes break defense-in-depth
+
+**Store baseline context for reference during differential analysis.**
+
+After baseline analysis, checkout back to head commit to analyze changes.
+
+---
+
+## Phase 0: Intake & Triage
+
+**Extract changes:**
+```bash
+# For commit range
+git diff <base>..<head> --stat
+git log <base>..<head> --oneline
+
+# For PR
+gh pr view <number> --json files,additions,deletions
+
+# Get all changed files
+git diff <base>..<head> --name-only
+```
+
+**Assess codebase size:**
+```bash
+find . -name "*.sol" -o -name "*.rs" -o -name "*.go" -o -name "*.ts" | wc -l
+```
+
+**Classify complexity:**
+- **SMALL**: <20 files → Deep analysis (read all deps)
+- **MEDIUM**: 20-200 files → Focused analysis (1-hop deps)
+- **LARGE**: 200+ files → Surgical (critical paths only)
+
+**Risk score each file:**
+- **HIGH**: Auth, crypto, external calls, value transfer, validation removal
+- **MEDIUM**: Business logic, state changes, new public APIs
+- **LOW**: Comments, tests, UI, logging
+
+---
+
+## Phase 1: Changed Code Analysis
+
+For each changed file:
+
+1. **Read both versions** (baseline and changed)
+
+2. **Analyze each diff region:**
+   ```
+   BEFORE: [exact code]
+   AFTER: [exact code]
+   CHANGE: [behavioral impact]
+   SECURITY: [implications]
+   ```
+
+3. **Git blame removed code:**
+   ```bash
+   # When was it added? Why?
+   git log -S "removed_code" --all --oneline
+   git blame <baseline> -- file.sol | grep "pattern"
+   ```
+
+   **Red flags:**
+   - Removed code from "fix", "security", "CVE" commits → CRITICAL
+   - Recently added (<1 month) then removed → HIGH
+
+4. **Check for regressions (re-added code):**
+   ```bash
+   git log -S "added_code" --all -p
+   ```
+
+   Pattern: Code added → removed for security → re-added now = REGRESSION
+
+5. **Micro-adversarial analysis** for each change:
+   - What attack did removed code prevent?
+   - What new surface does new code expose?
+   - Can modified logic be bypassed?
+   - Are checks weaker? Edge cases covered?
+
+6. **Generate concrete attack scenarios:**
+   ```
+   SCENARIO: [attack goal]
+   PRECONDITIONS: [required state]
+   STEPS:
+     1. [specific action]
+     2. [expected outcome]
+     3. [exploitation]
+   WHY IT WORKS: [reference code change]
+   IMPACT: [severity + scope]
+   ```
+
+---
+
+## Phase 2: Test Coverage Analysis
+
+**Identify coverage gaps:**
+```bash
+# Production code changes (exclude tests)
+git diff <range> --name-only | grep -v "test"
+
+# Test changes
+git diff <range> --name-only | grep "test"
+
+# For each changed function, search for tests
+grep -r "test.*functionName" test/ --include="*.sol" --include="*.js"
+```
+
+**Risk elevation rules:**
+- NEW function + NO tests → Elevate risk MEDIUM→HIGH
+- MODIFIED validation + UNCHANGED tests → HIGH RISK
+- Complex logic (>20 lines) + NO tests → HIGH RISK
+
+---
+
+## Phase 3: Blast Radius Analysis
+
+**Calculate impact:**
+```bash
+# Count callers for each modified function
+grep -r "functionName(" --include="*.sol" . | wc -l
+```
+
+**Classify blast radius:**
+- 1-5 calls: LOW
+- 6-20 calls: MEDIUM
+- 21-50 calls: HIGH
+- 50+ calls: CRITICAL
+
+**Priority matrix:**
+
+| Change Risk | Blast Radius | Priority | Analysis Depth |
+|-------------|--------------|----------|----------------|
+| HIGH | CRITICAL | P0 | Deep + all deps |
+| HIGH | HIGH/MEDIUM | P1 | Deep |
+| HIGH | LOW | P2 | Standard |
+| MEDIUM | CRITICAL/HIGH | P1 | Standard + callers |
+
+---
+
+## Phase 4: Deep Context Analysis
+
+**If `audit-context-building` skill is available**, invoke it to help answer all the questions below for each HIGH RISK changed function:
+
+```bash
+# Run audit-context-building on the changed function and its dependencies
+audit-context-building --scope [file containing changed function] --focus flow-analysis,call-graphs,invariants,root-cause
+```
+
+**The audit-context-building skill will help you answer:**
+
+1. **Map complete function flow:**
+   - Entry conditions (preconditions, requires, modifiers)
+   - State reads (which variables accessed)
+   - State writes (which variables modified)
+   - External calls (to contracts, APIs, system)
+   - Return values and side effects
+
+2. **Trace internal calls:**
+   - List all functions called
+   - Recursively map their flows
+   - Build complete call graph
+
+3. **Trace external calls:**
+   - Identify trust boundaries crossed
+   - List assumptions about external behavior
+   - Check for reentrancy risks
+
+4. **Identify invariants:**
+   - What must ALWAYS be true?
+   - What must NEVER happen?
+   - Are invariants maintained after changes?
+
+5. **Five Whys root cause:**
+   - WHY was this code changed?
+   - WHY did the original code exist?
+   - WHY might this break?
+   - WHY is this approach chosen?
+   - WHY could this fail in production?
+
+**If `audit-context-building` skill is NOT available**, manually perform the line-by-line analysis above using Read, Grep, and code tracing.
+
+**Cross-cutting pattern detection:**
+```bash
+# Find repeated validation patterns
+grep -r "require.*amount > 0" --include="*.sol" .
+grep -r "onlyOwner" --include="*.sol" .
+
+# Check if any removed in diff
+git diff <range> | grep "^-.*require.*amount > 0"
+```
+
+**Flag if removal breaks defense-in-depth.**
+
+---
+
+**Next steps:**
+- For HIGH RISK changes, proceed to [adversarial.md](adversarial.md)
+- For report generation, see [reporting.md](reporting.md)
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command "rtk read C:\\Users\\lipoi\\.codex\\plugins\\cache\\trailofbits\\differential-review\\1.1.2\\skills\\differential-review\\reporting.md" in C:\RN\TozzoBurger
+ succeeded in 157ms:
+# Report Generation (Phase 6)
+
+Comprehensive markdown report structure and formatting guidelines.
+
+---
+
+## Report Structure
+
+Generate markdown report with these mandatory sections:
+
+### 1. Executive Summary
+
+- Severity distribution table
+- Risk assessment (CRITICAL/HIGH/MEDIUM/LOW)
+- Final recommendation (APPROVE/REJECT/CONDITIONAL)
+- Key metrics (test gaps, blast radius, red flags)
+
+**Template:**
+```markdown
+# Executive Summary
+
+| Severity | Count |
+|----------|-------|
+| 🔴 CRITICAL | X |
+| 🟠 HIGH | Y |
+| 🟡 MEDIUM | Z |
+| 🟢 LOW | W |
+
+**Overall Risk:** CRITICAL/HIGH/MEDIUM/LOW
+**Recommendation:** APPROVE/REJECT/CONDITIONAL
+
+**Key Metrics:**
+- Files analyzed: X/Y (Z%)
+- Test coverage gaps: N functions
+- High blast radius changes: M functions
+- Security regressions detected: P
+```
+
+---
+
+### 2. What Changed
+
+- Commit timeline with visual
+- File summary table
+- Lines changed stats
+
+**Template:**
+```markdown
+## What Changed
+
+**Commit Range:** `base..head`
+**Commits:** X
+**Timeline:** YYYY-MM-DD to YYYY-MM-DD
+
+| File | +Lines | -Lines | Risk | Blast Radius |
+|------|--------|--------|------|--------------|
+| file1.sol | +50 | -20 | HIGH | CRITICAL |
+| file2.sol | +10 | -5 | MEDIUM | LOW |
+
+**Total:** +N, -M lines across K files
+```
+
+---
+
+### 3. Critical Findings
+
+For each HIGH/CRITICAL issue:
+
+```markdown
+### [SEVERITY] Title
+
+**File**: path/to/file.ext:lineNumber
+**Commit**: hash
+**Blast Radius**: N callers (HIGH/MEDIUM/LOW)
+**Test Coverage**: YES/NO/PARTIAL
+
+**Description**: [clear explanation]
+
+**Historical Context**:
+- Git blame: Added in commit X (date)
+- Message: "[original commit message]"
+- [Why this code existed]
+
+**Attack Scenario**:
+[Concrete exploitation steps from adversarial.md]
+
+**Proof of Concept**:
+```code demonstrating issue```
+
+**Recommendation**:
+[Specific fix with code]
+```
+
+**Example:**
+```markdown
+### 🔴 CRITICAL: Authorization Bypass in Withdraw
+
+**File**: TokenVault.sol:156
+**Commit**: abc123def
+**Blast Radius**: 23 callers (HIGH)
+**Test Coverage**: NO
+
+**Description**:
+Removed `require(msg.sender == owner)` check allows any user to withdraw funds.
+
+**Historical Context**:
+- Git blame: Added 2024-06-15 (commit def456)
+- Message: "Add owner check per audit finding #45"
+- Code existed to prevent unauthorized withdrawals
+
+**Attack Scenario**:
+1. Attacker calls `withdraw(1000 ether)`
+2. No authorization check (removed)
+3. 1000 ETH transferred to attacker
+4. Protocol funds drained
+
+**Proof of Concept**:
+```solidity
+// As any address
+vault.withdraw(vault.balance());
+// Success - funds stolen
+```
+
+**Recommendation**:
+```solidity
+function withdraw(uint256 amount) external {
++   require(msg.sender == owner, "Unauthorized");
+    // ... rest of function
+}
+```
+```
+
+---
+
+### 4. Test Coverage Analysis
+
+- Coverage statistics
+- Untested changes list
+- Risk assessment
+
+**Template:**
+```markdown
+## Test Coverage Analysis
+
+**Coverage:** X% of changed code
+
+**Untested Changes:**
+| Function | Risk | Impact |
+|----------|------|--------|
+| functionA() | HIGH | No validation tests |
+| functionB() | MEDIUM | Logic untested |
+
+**Risk Assessment:**
+N HIGH-risk functions without tests → Recommend blocking merge
+```
+
+---
+
+### 5. Blast Radius Analysis
+
+- High-impact functions table
+- Dependency graph
+- Impact quantification
+
+**Template:**
+```markdown
+## Blast Radius Analysis
+
+**High-Impact Changes:**
+| Function | Callers | Risk | Priority |
+|----------|---------|------|----------|
+| transfer() | 89 | HIGH | P0 |
+| validate() | 45 | MEDIUM | P1 |
+```
+
+---
+
+### 6. Historical Context
+
+- Security-related removals
+- Regression risks
+- Commit message red flags
+
+**Template:**
+```markdown
+## Historical Context
+
+**Security-Related Removals:**
+- Line 45: `require` removed (added 2024-03 for CVE-2024-1234)
+- Line 78: Validation removed (added 2023-12 "security hardening")
+
+**Regression Risks:**
+- Code pattern removed in commit X, re-added in commit Y
+```
+
+---
+
+### 7. Recommendations
+
+- Immediate actions (blocking)
+- Before production (tracking)
+- Technical debt (future)
+
+**Template:**
+```markdown
+## Recommendations
+
+### Immediate (Blocking)
+- [ ] Fix CRITICAL issue in TokenVault.sol:156
+- [ ] Add tests for withdraw() function
+
+### Before Production
+- [ ] Security audit of auth changes
+- [ ] Load test blast radius functions
+
+### Technical Debt
+- [ ] Refactor validation pattern consistency
+```
+
+---
+
+### 8. Analysis Methodology
+
+- Strategy used (DEEP/FOCUSED/SURGICAL)
+- Files analyzed
+- Coverage estimate
+- Techniques applied
+- Limitations
+- Confidence level
+
+**Template:**
+```markdown
+## Analysis Methodology
+
+**Strategy:** FOCUSED (80 files, medium codebase)
+
+**Analysis Scope:**
+- Files reviewed: 45/80 (56%)
+- HIGH RISK: 100% coverage
+- MEDIUM RISK: 60% coverage
+- LOW RISK: Excluded
+
+**Techniques:**
+- Git blame on all removals
+- Blast radius calculation
+- Test coverage analysis
+- Adversarial modeling for HIGH RISK
+
+**Limitations:**
+- Did not analyze external dependencies
+- Limited to 1-hop caller analysis
+
+**Confidence:** HIGH for analyzed scope, MEDIUM overall
+```
+
+---
+
+### 9. Appendices
+
+- Commit reference table
+- Key definitions
+- Contact info
+
+---
+
+## Formatting Guidelines
+
+**Tables:** Use markdown tables for structured data
+
+**Code blocks:** Always include syntax highlighting
+```solidity
+// Solidity code
+```
+```rust
+// Rust code
+```
+
+**Status indicators:**
+- ✅ Complete
+- ⚠️ Warning
+- ❌ Failed/Blocked
+
+**Severity:**
+- 🔴 CRITICAL
+- 🟠 HIGH
+- 🟡 MEDIUM
+- 🟢 LOW
+
+**Before/After comparisons:**
+```markdown
+**BEFORE:**
+```code
+old code
+```
+
+**AFTER:**
+```code
+new code
+```
+```
+
+**Line number references:** Always include
+- Format: `file.sol:L123`
+- Link to commit: `file.sol:L123 (commit abc123)`
+
+---
+
+## File Naming and Location
+
+**Priority order for output:**
+1. Current working directory (if project repo)
+2. User's Desktop
+3. `~/.claude/skills/differential-review/output/`
+
+**Filename format:**
+```
+<PROJECT>_DIFFERENTIAL_REVIEW_<DATE>.md
+
+Example: VeChain_Stargate_DIFFERENTIAL_REVIEW_2025-12-26.md
+```
+
+---
+
+## User Notification Template
+
+After generating report:
+
+```markdown
+Report generated successfully!
+
+📄 File: [filename]
+📁 Location: [path]
+📏 Size: XX KB
+⏱️ Review Time: ~X hours
+
+Summary:
+- X findings (Y critical, Z high)
+- Final recommendation: APPROVE/REJECT/CONDITIONAL
+- Confidence: HIGH/MEDIUM/LOW
+
+Next steps:
+- Review findings in detail
+- Address CRITICAL/HIGH issues before merge
+- Consider chaining with issue-writer for stakeholder report
+```
+
+---
+
+## Integration with issue-writer
+
+After generating differential review, transform into audit report:
+
+```bash
+issue-writer --input DIFFERENTIAL_REVIEW_REPORT.md --format audit-report
+```
+
+This creates polished documentation for non-technical stakeholders.
+
+---
+
+## Error Handling
+
+If file write fails:
+1. Try Desktop location
+2. Try temp directory
+3. As last resort, output full report to chat
+4. Notify user to save manually
+
+**Always prioritize persistent artifact generation over ephemeral chat output.**
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command "rtk read C:\\Users\\lipoi\\.codex\\plugins\\cache\\trailofbits\\differential-review\\1.1.2\\skills\\differential-review\\patterns.md" in C:\RN\TozzoBurger
+ succeeded in 147ms:
+# Common Vulnerability Patterns
+
+Quick reference for detecting common security issues in code changes.
+
+**Specialized Pattern Resources:**
+For specific contexts, reference these additional pattern databases:
+
+**Domain-Specific:**
+- `domain-specific-audits/defi-bridges/resources/` - 127 bridge-specific findings
+- `domain-specific-audits/tick-math/resources/` - 81 tick math findings
+- `domain-specific-audits/merkle-trees/resources/` - 67 merkle tree findings
+- [Check `domain-specific-audits/skills/` for additional domains]
+
+**Solidity-Specific:**
+- `not-so-smart-contracts` - Automated Solidity vulnerability detectors
+- `token-integration-analyzer` - Token integration safety patterns
+- `building-secure-contracts/development-guidelines` - Solidity best practices
+
+These complement the generic patterns below.
+
+---
+
+## Security Regressions
+
+**Pattern:** Previously removed code is re-added
+
+**Detection:**
+```bash
+# Code previously removed for security
+git log -S "pattern" --all --grep="security\|fix\|CVE"
+```
+
+**Red flags:**
+- Commit message contains "security", "fix", "CVE", "vulnerability"
+- Code removed <6 months ago
+- No explanation in current PR for re-addition
+
+**Example:**
+```solidity
+// Removed in commit abc123 "Fix reentrancy CVE-2024-1234"
+// Re-added in current PR
+function emergencyWithdraw() {
+    // REGRESSION: Reentrancy vulnerability re-introduced
+}
+```
+
+---
+
+## Double Decrease/Increase Bugs
+
+**Pattern:** Same accounting operation twice for same event
+
+**Detection:** Look for two state updates in related functions for same logical action
+
+**Example:**
+```solidity
+// Request exit
+function requestExit() {
+    balance[user] -= amount;  // First decrease
+}
+
+// Process exit
+function processExit() {
+    balance[user] -= amount;  // Second decrease - BUG!
+}
+```
+
+**Impact:** User balance decremented twice, protocol loses funds
+
+---
+
+## Missing Validation
+
+**Pattern:** Removed `require`/`assert`/`check` without replacement
+
+**Detection:**
+```bash
+git diff <range> | grep "^-.*require"
+git diff <range> | grep "^-.*assert"
+git diff <range> | grep "^-.*revert"
+```
+
+**Questions to ask:**
+- Was validation moved elsewhere?
+- Is it redundant (defensive programming)?
+- Does removal expose vulnerability?
+
+**Example:**
+```diff
+function withdraw(uint256 amount) {
+-   require(amount > 0, "Zero amount");
+-   require(amount <= balance[msg.sender], "Insufficient");
+    balance[msg.sender] -= amount;
+}
+```
+
+**Risk:** Zero-amount withdrawals, underflow attacks now possible
+
+---
+
+## Underflow/Overflow
+
+**Pattern:** Arithmetic without SafeMath or checks
+
+**Detection:**
+- Look for `+`, `-`, `*`, `/` in Solidity <0.8.0
+- Check if SafeMath removed
+- Look for unchecked blocks in Solidity >=0.8.0
+
+**Example:**
+```solidity
+// Solidity 0.7 without SafeMath
+balance[user] -= amount;  // Can underflow if amount > balance
+
+// Solidity 0.8+ with unchecked
+unchecked {
+    balance[user] -= amount;  // Deliberately bypasses overflow check
+}
+```
+
+**Risk:** Integer wrap-around leads to incorrect balances
+
+---
+
+## Reentrancy
+
+**Pattern:** External call before state update
+
+**Detection:** Look for CEI (Checks-Effects-Interactions) pattern violations
+
+**Example:**
+```solidity
+// VULNERABLE: External call before state update
+function withdraw() {
+    uint amount = balances[msg.sender];
+    (bool success,) = msg.sender.call{value: amount}("");  // External call FIRST
+    require(success);
+    balances[msg.sender] = 0;  // State update AFTER
+}
+
+// SAFE: State update before external call
+function withdraw() {
+    uint amount = balances[msg.sender];
+    balances[msg.sender] = 0;  // State update FIRST
+    (bool success,) = msg.sender.call{value: amount}("");  // External call AFTER
+    require(success);
+}
+```
+
+**Impact:** Attacker can recursively call withdraw() before balance is zeroed
+
+---
+
+## Access Control Bypass
+
+**Pattern:** Removed or relaxed permission checks
+
+**Detection:**
+```bash
+git diff <range> | grep "^-.*onlyOwner"
+git diff <range> | grep "^-.*onlyAdmin"
+git diff <range> | grep "^-.*require.*msg.sender"
+```
+
+**Questions:**
+- Who can now call this function?
+- What's the new trust model?
+- Was check moved to caller?
+
+**Example:**
+```diff
+- function setConfig(uint value) external onlyOwner {
++ function setConfig(uint value) external {
+      config = value;
+  }
+```
+
+**Risk:** Any user can now modify critical configuration
+
+---
+
+## Race Conditions / Front-Running
+
+**Pattern:** State-dependent logic without protection
+
+**Detection:** Look for two-step processes without commit-reveal or timelocks
+
+**Example:**
+```solidity
+// Step 1: Approve
+function approve(address spender, uint amount) {
+    allowance[msg.sender][spender] = amount;
+}
+
+// Step 2: User can front-run between approval changes
+// Attacker sees tx changing approval from 100 to 50
+// Front-runs to spend 100, then spends 50 after = 150 total
+```
+
+**Risk:** MEV/front-running exploits state transitions
+
+---
+
+## Timestamp Manipulation
+
+**Pattern:** Security logic depending on `block.timestamp`
+
+**Detection:**
+```bash
+grep -r "block.timestamp" --include="*.sol"
+grep -r "now\b" --include="*.sol"  # Solidity <0.7
+```
+
+**Example:**
+```solidity
+// VULNERABLE
+require(block.timestamp > deadline, "Too early");
+// Miner can manipulate timestamp by ~15 seconds
+
+// SAFER
+require(block.number > deadlineBlock, "Too early");
+// Block numbers are harder to manipulate
+```
+
+**Risk:** Miners can manipulate timestamps within tolerance
+
+---
+
+## Unchecked Return Values
+
+**Pattern:** External call without checking success
+
+**Detection:**
+```bash
+git diff <range> | grep "\.call\|\.send\|\.transfer"
+```
+
+**Example:**
+```solidity
+// VULNERABLE
+token.transfer(user, amount);  // Ignores return value
+
+// SAFE
+require(token.transfer(user, amount), "Transfer failed");
+// Or use SafeERC20 wrapper
+```
+
+**Risk:** Silent failures lead to inconsistent state
+
+---
+
+## Denial of Service
+
+**Pattern:** Unbounded loops, external call reverts blocking execution
+
+**Detection:**
+- Arrays that grow without limit
+- Loops over user-controlled array
+- Critical function depends on external call success
+
+**Example:**
+```solidity
+// DOS: Attacker adds many users, making loop too expensive
+function distributeRewards() {
+    for (uint i = 0; i < users.length; i++) {
+        users[i].transfer(reward);  // Runs out of gas
+    }
+}
+```
+
+**Risk:** Function becomes unusable due to gas limits
+
+---
+
+## Quick Detection Commands
+
+**Find removed security checks:**
+```bash
+git diff <range> | grep "^-" | grep -E "require|assert|revert"
+```
+
+**Find new external calls:**
+```bash
+git diff <range> | grep "^+" | grep -E "\.call|\.delegatecall|\.staticcall"
+```
+
+**Find changed access modifiers:**
+```bash
+git diff <range> | grep -E "onlyOwner|onlyAdmin|internal|private|public|external"
+```
+
+**Find arithmetic changes:**
+```bash
+git diff <range> | grep -E "\+|\-|\*|/"
+```
+
+---
+
+**For detailed analysis workflow, see [methodology.md](methodology.md)**
+**For building exploit scenarios, see [adversarial.md](adversarial.md)**
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command "rtk read C:\\Users\\lipoi\\.codex\\plugins\\cache\\trailofbits\\differential-review\\1.1.2\\skills\\differential-review\\adversarial.md" in C:\RN\TozzoBurger
+ succeeded in 146ms:
+# Adversarial Vulnerability Analysis (Phase 5)
+
+Structured methodology for finding vulnerabilities through attacker modeling.
+
+**When to use:** After completing deep context analysis (Phase 4), apply this to all HIGH RISK changes.
+
+---
+
+## 1. Define Specific Attacker Model
+
+**WHO is the attacker?**
+- Unauthenticated external user
+- Authenticated regular user
+- Malicious administrator
+- Compromised contract/service
+- Front-runner/MEV bot
+
+**WHAT access/privileges do they have?**
+- Public API access only
+- Authenticated user role
+- Specific permissions/tokens
+- Contract call capabilities
+
+**WHERE do they interact with the system?**
+- Specific HTTP endpoints
+- Smart contract functions
+- RPC interfaces
+- External APIs
+
+---
+
+## 2. Identify Concrete Attack Vectors
+
+```
+ENTRY POINT: [Exact function/endpoint attacker can access]
+
+ATTACK SEQUENCE:
+1. [Specific API call/transaction with parameters]
+2. [How this reaches the vulnerable code]
+3. [What happens in the vulnerable code]
+4. [Impact achieved]
+
+PROOF OF ACCESSIBILITY:
+- Show the function is public/external
+- Demonstrate attacker has required permissions
+- Prove attack path exists through actual interfaces
+```
+
+---
+
+## 3. Rate Realistic Exploitability
+
+**EASY:** Exploitable via public APIs with no special privileges
+- Single transaction/call
+- Common user access level
+- No complex conditions required
+
+**MEDIUM:** Requires specific conditions or elevated privileges
+- Multiple steps or timing requirements
+- Elevated but obtainable privileges
+- Specific system state needed
+
+**HARD:** Requires privileged access or rare conditions
+- Admin/owner privileges needed
+- Rare edge case conditions
+- Significant resources required
+
+---
+
+## 4. Build Complete Exploit Scenario
+
+```
+ATTACKER STARTING POSITION:
+[What the attacker has at the beginning]
+
+STEP-BY-STEP EXPLOITATION:
+Step 1: [Concrete action through accessible interface]
+  - Command: [Exact call/request]
+  - Parameters: [Specific values]
+  - Expected result: [What happens]
+
+Step 2: [Next action]
+  - Command: [Exact call/request]
+  - Why this works: [Reference to code change]
+  - System state change: [What changed]
+
+Step 3: [Final impact]
+  - Result: [Concrete harm achieved]
+  - Evidence: [How to verify impact]
+
+CONCRETE IMPACT:
+[Specific, measurable impact - not "could cause issues"]
+- Exact amount of funds drained
+- Specific privileges escalated
+- Particular data exposed
+```
+
+---
+
+## 5. Cross-Reference with Baseline Context
+
+From baseline analysis (see [methodology.md](methodology.md#pre-analysis-baseline-context-building)), check:
+- Does this violate a system-wide invariant?
+- Does this break a trust boundary?
+- Does this bypass a validation pattern?
+- Is this a regression of a previous fix?
+
+---
+
+## Vulnerability Report Template
+
+Generate this for each finding:
+
+```markdown
+## [SEVERITY] Vulnerability Title
+
+**Attacker Model:**
+- WHO: [Specific attacker type]
+- ACCESS: [Exact privileges]
+- INTERFACE: [Specific entry point]
+
+**Attack Vector:**
+[Step-by-step exploit through accessible interfaces]
+
+**Exploitability:** EASY/MEDIUM/HARD
+**Justification:** [Why this rating]
+
+**Concrete Impact:**
+[Specific, measurable harm - not theoretical]
+
+**Proof of Concept:**
+```code
+// Exact code to reproduce
+```
+
+**Root Cause:**
+[Reference specific code change at file.sol:L123]
+
+**Blast Radius:** [N callers affected]
+**Baseline Violation:** [Which invariant/pattern broken]
+```
+
+---
+
+## Example: Complete Adversarial Analysis
+
+**Change:** Removed `require(amount > 0)` check from `withdraw()` function
+
+### 1. Attacker Model
+- **WHO:** Unauthenticated external user
+- **ACCESS:** Can call public contract functions
+- **INTERFACE:** `withdraw(uint256 amount)` at 0x1234...
+
+### 2. Attack Vector
+**ENTRY POINT:** `withdraw(0)`
+
+**ATTACK SEQUENCE:**
+1. Call `withdraw(0)` from attacker address
+2. Code bypasses amount check (removed)
+3. Withdraw event emitted with 0 amount
+4. Accounting updated incorrectly
+
+**PROOF:** Function is `external`, no auth required
+
+### 3. Exploitability
+**RATING:** EASY
+- Single transaction
+- Public function
+- No special state required
+
+### 4. Exploit Scenario
+**ATTACKER POSITION:** Has user account with 0 balance
+
+**EXPLOITATION:**
+```solidity
+Step 1: attacker.withdraw(0)
+  - Passes removed validation
+  - Emits Withdraw(user, 0)
+  - Updates withdrawnAmount[user] += 0
+
+Step 2: Off-chain indexer sees Withdraw event
+  - Credits attacker for 0 withdrawal
+  - But accounting thinks withdrawal happened
+
+Step 3: Accounting mismatch exploited
+  - Total supply decremented
+  - User balance not changed
+  - System invariants broken
+```
+
+**IMPACT:**
+- Protocol accounting corrupted
+- Can be used to manipulate LP calculations
+- Estimated $50K impact on pool prices
+
+### 5. Baseline Violation
+- Violates invariant: "All withdrawals must transfer non-zero value"
+- Breaks validation pattern: Amount checks present in all other value transfers
+- Regression: Check added in commit abc123 "Fix zero-amount exploit"
+
+---
+
+**Next:** Document all findings in final report (see [reporting.md](reporting.md))
+
+2026-08-28T20:13:32.014416Z ERROR codex_core::tools::router: error=exec_command failed for `"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk jest app/__tests__/onboarding.test.tsx --runInBand --no-cache'`: CreateProcess { message: "Rejected(\"Failed to create unified exec process: runner failed during SpawnChild: CreateProcessAsUserW failed: 5 (Acesso negado.) | cwd=C:\\\\RN\\\\TozzoBurger | cmd=\\\"C:\\\\Program Files\\\\WindowsApps\\\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\\\pwsh.exe\\\" -NoProfile -Command \\\"try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}\\nrtk jest app/__tests__/onboarding.test.tsx --runInBand --no-cache\\\" | env_u16_len=7125 | si_flags=256 | creation_flags=525312 (Windows error 5)\")" }
+2026-08-28T20:13:36.475295Z ERROR codex_core::tools::router: error=exec_command failed for `"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk jest --help'`: CreateProcess { message: "Rejected(\"Failed to create unified exec process: runner failed during SpawnChild: CreateProcessAsUserW failed: 5 (Acesso negado.) | cwd=C:\\\\RN\\\\TozzoBurger | cmd=\\\"C:\\\\Program Files\\\\WindowsApps\\\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\\\pwsh.exe\\\" -NoProfile -Command \\\"try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}\\nrtk jest --help\\\" | env_u16_len=7125 | si_flags=256 | creation_flags=525312 (Windows error 5)\")" }
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk git --help' in C:\RN\TozzoBurger
+ succeeded in 131ms:
+Git commands with compact output
+
+Usage: rtk.exe git [OPTIONS] <COMMAND>
+
+Commands:
+  diff      Condensed diff output
+  log       One-line commit history
+  status    Compact status (supports all git status flags)
+  show      Compact show (commit summary + stat + compacted diff)
+  add       Add files → "ok"
+  commit    Commit → "ok \<hash\>"
+  push      Push → "ok \<branch\>"
+  pull      Pull → "ok \<stats\>"
+  branch    Compact branch listing (current/local/remote)
+  fetch     Fetch → "ok fetched (N new refs)"
+  stash     Stash management (list, show, pop, apply, drop)
+  worktree  Compact worktree listing
+  help      Print this message or the help of the given subcommand(s)
+
+Options:
+  -C <DIRECTORY>               Change to directory before executing (like git -C <path>, can be repeated)
+  -c <CONFIG_OVERRIDE>         Git configuration override (like git -c key=value, can be repeated)
+      --git-dir <GIT_DIR>      Set the path to the .git directory
+      --work-tree <WORK_TREE>  Set the path to the working tree
+      --no-pager               Disable pager (like git --no-pager)
+      --no-optional-locks      Skip optional locks (like git --no-optional-locks)
+      --bare                   Treat repository as bare (like git --bare)
+      --literal-pathspecs      Treat pathspecs literally (like git --literal-pathspecs)
+  -v, --verbose...             Verbosity level (-v, -vv, -vvv)
+      --ultra-compact          Ultra-compact mode: ASCII icons, inline format (Level 2 optimizations)
+      --skip-env               Set SKIP_ENV_VALIDATION=1 for child processes (Next.js, tsc, lint, prisma)
+  -h, --help                   Print help
+
+2026-08-28T20:13:46.771939Z ERROR codex_core::tools::router: error=exec_command failed for `"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'git blame -- app/onboarding.tsx'`: CreateProcess { message: "Rejected(\"Failed to create unified exec process: runner failed during SpawnChild: CreateProcessAsUserW failed: 5 (Acesso negado.) | cwd=C:\\\\RN\\\\TozzoBurger | cmd=\\\"C:\\\\Program Files\\\\WindowsApps\\\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\\\pwsh.exe\\\" -NoProfile -Command \\\"try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}\\ngit blame -- app/onboarding.tsx\\\" | env_u16_len=7125 | si_flags=256 | creation_flags=525312 (Windows error 5)\")" }
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk git show db6fd1e:app/onboarding.tsx' in C:\RN\TozzoBurger
+ succeeded in 203ms:
+import React, { useState } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useTranslation } from 'react-i18next';
+
+import { useAuth } from '@/context/AuthContext';
+import {
+  CATEGORY_OPTIONS,
+  type EstablishmentCategory,
+  getCategorySeed,
+} from '@/database/watermelon/categorySeeds';
+import {
+  completeCategoryOnboarding,
+} from '@/services/categoryOnboarding';
+import { Button } from '@/components/ui/Button';
+
+type EstablishmentId = string | number;
+
+export type OnboardingScreenProps = {
+  token?: string | null;
+  establishmentId?: EstablishmentId | null;
+  onCompleted?: (category: EstablishmentCategory) => void;
+};
+
+export default function OnboardingScreen({
+  token: tokenOverride,
+  establishmentId: establishmentIdOverride,
+  onCompleted,
+}: OnboardingScreenProps = {}) {
+  const { token: authToken, user } = useAuth();
+  const { t } = useTranslation();
+  const token = tokenOverride ?? authToken;
+  const establishmentId = establishmentIdOverride ?? user?.establishmentId;
+  const [category, setCategory] = useState<EstablishmentCategory | null>(null);
+  const [productTypeDescriptions, setProductTypeDescriptions] = useState<string[]>([]);
+  const [newDescription, setNewDescription] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const chooseCategory = (nextCategory: EstablishmentCategory) => {
+    setCategory(nextCategory);
+    setProductTypeDescriptions(getCategorySeed(nextCategory));
+    setNewDescription('');
+    setError(null);
+  };
+
+  const addDescription = () => {
+    const description = newDescription.trim();
+    if (description.length === 0) return;
+
+    setProductTypeDescriptions((current) => (
+      current.includes(description) ? current : [...current, description]
+    ));
+    setNewDescription('');
+  };
+
+  const removeDescription = (index: number) => {
+    setProductTypeDescriptions((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const confirm = async () => {
+    if (!category || !token || establishmentId === null || establishmentId === undefined) {
+      setError(t('common.onboardingSaveError'));
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      await completeCategoryOnboarding({
+        token,
+        establishmentId,
+        category,
+        productTypeDescriptions,
+      });
+      onCompleted?.(category);
+    } catch (confirmationError) {
+      console.warn('Category onboarding failed', confirmationError);
+      setError(t('common.onboardingSaveError'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>{t('common.onboardingTitle')}</Text>
+      <Text style={styles.subtitle}>{t('common.onboardingChooseCategory')}</Text>
+
+      <View style={styles.categories}>
+        {CATEGORY_OPTIONS.map((option) => {
+          const selected = category === option;
+          return (
+            <Pressable
+              key={option}
+              accessibilityRole="button"
+              accessibilityLabel={option}
+              onPress={() => chooseCategory(option)}
+              style={[styles.category, selected && styles.categorySelected]}
+            >
+              <Text style={styles.categoryText}>{option}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {category && (
+        <View style={styles.editor}>
+          <Text style={styles.sectionTitle}>{t('common.onboardingSuggestedTypes')}</Text>
+          {productTypeDescriptions.map((description, index) => (
+            <View key={`${description}-${index}`} style={styles.typeRow}>
+              <Text style={styles.typeText}>{description}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`onboarding.removeType:${description}`}
+                onPress={() => removeDescription(index)}
+                style={styles.removeButton}
+              >
+                <Text style={styles.removeText}>×</Text>
+              </Pressable>
+            </View>
+          ))}
+
+          <View style={styles.addRow}>
+            <TextInput
+              accessibilityLabel="onboarding.typeInput"
+              placeholder={t('common.onboardingTypePlaceholder')}
+              value={newDescription}
+              onChangeText={setNewDescription}
+              style={styles.input}
+            />
+            <Button
+              accessibilityLabel="onboarding.addType"
+              title={t('common.onboardingAddType')}
+              onPress={addDescription}
+              variant="outline"
+              style={styles.addButton}
+            />
+          </View>
+
+          {error && <Text style={styles.error}>{error}</Text>}
+          <Button
+            accessibilityLabel="onboarding.confirm"
+            title={saving ? t('common.onboardingSaving') : t('common.onboardingConfirm')}
+            onPress={confirm}
+            loading={saving}
+            disabled={saving}
+            style={styles.confirmButton}
+          />
+          <Button
+            accessibilityLabel="onboarding.changeCategory"
+            title={t('common.onboardingChangeCategory')}
+            onPress={() => setCategory(null)}
+            variant="outline"
+            disabled={saving}
+          />
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flexGrow: 1,
+    padding: 24,
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '700',
+    marginBottom: 8,
+    color: '#000',
+  },
+  subtitle: {
+    fontSize: 16,
+    marginBottom: 20,
+    color: '#333',
+  },
+  categories: {
+    gap: 10,
+  },
+  category: {
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 8,
+    padding: 14,
+  },
+  categorySelected: {
+    backgroundColor: '#e8e8e8',
+  },
+  categoryText: {
+    color: '#000',
+    fontWeight: '600',
+  },
+  editor: {
+    marginTop: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
+    color: '#000',
+  },
+  typeRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#999',
+  },
+  typeText: {
+    color: '#000',
+    fontSize: 16,
+  },
+  removeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  removeText: {
+    color: '#ef4444',
+    fontSize: 24,
+  },
+  addRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+  },
+  input: {
+    flex: 1,
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    color: '#000',
+  },
+  addButton: {
+    minHeight: 48,
+  },
+  confirmButton: {
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  error: {
+    color: '#b91c1c',
+    marginTop: 12,
+  },
+});
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk git show db6fd1e:components/CategoryOnboardingGate.tsx' in C:\RN\TozzoBurger
+ succeeded in 213ms:
+import React, { useEffect, useState } from 'react';
+
+import OnboardingScreen from '@/app/onboarding';
+import { useAuth } from '@/context/AuthContext';
+import { getEstablishment, type Establishment } from '@/services/api';
+import type { EstablishmentCategory } from '@/database/watermelon/categorySeeds';
+
+type Props = {
+  children: React.ReactNode;
+};
+
+export default function CategoryOnboardingGate({ children }: Props) {
+  const { token, user } = useAuth();
+  const role = user?.role;
+  const establishmentId = user?.establishmentId;
+  const isOwner = role === 'OWNER';
+  const eligible = Boolean(token && isOwner && establishmentId !== null && establishmentId !== undefined);
+  const [establishment, setEstablishment] = useState<Establishment | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    if (!eligible || !token) {
+      setEstablishment(null);
+      setChecking(false);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    setChecking(true);
+    setEstablishment(null);
+    getEstablishment(token)
+      .then((nextEstablishment) => {
+        if (mounted) setEstablishment(nextEstablishment);
+      })
+      .catch((error) => {
+        if (mounted) {
+          console.warn('Could not load establishment category', error);
+          setEstablishment(null);
+        }
+      })
+      .finally(() => {
+        if (mounted) setChecking(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [eligible, establishmentId, token]);
+
+  if (
+    eligible
+    && !checking
+    && establishment?.category === null
+    && establishment.id !== null
+    && establishment.id !== undefined
+  ) {
+    return (
+      <OnboardingScreen
+        token={token}
+        establishmentId={establishment.id}
+        onCompleted={(category: EstablishmentCategory) => {
+          setEstablishment((current) => current ? { ...current, category } : current);
+        }}
+      />
+    );
+  }
+
+  return <>{children}</>;
+}
+
+2026-08-28T20:13:53.657940Z ERROR codex_core::tools::router: error=exec_command failed for `"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk git show 6fd6bf6:app/onboarding.tsx'`: CreateProcess { message: "Rejected(\"Failed to create unified exec process: runner failed during SpawnChild: CreateProcessAsUserW failed: 5 (Acesso negado.) | cwd=C:\\\\RN\\\\TozzoBurger | cmd=\\\"C:\\\\Program Files\\\\WindowsApps\\\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\\\pwsh.exe\\\" -NoProfile -Command \\\"try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}\\nrtk git show 6fd6bf6:app/onboarding.tsx\\\" | env_u16_len=7125 | si_flags=256 | creation_flags=525312 (Windows error 5)\")" }
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read -n services/api.ts' in C:\RN\TozzoBurger
+ succeeded in 187ms:
+  1 │ import { buildSalesQueryParams, DEFAULT_SALES_LIMIT, DEFAULT_SALES_PAGE, SalesFilters, SalesListResponse, SalesPagination } from './sales';
+  2 │ import { fromLegacySyncResponse, fromLegacyUser } from './legacyWire';
+  3 │ import type { EstablishmentCategory } from '@/database/watermelon/categorySeeds';
+  4 │ 
+  5 │ // Fallback = produção. Para dev/homolog, defina EXPO_PUBLIC_API_URL no .env (ver .env.example).
+  6 │ export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.tozzo.uk';
+  7 │ 
+  8 │ // Túnel ngrok (dev local) mostra uma pagina de aviso HTML pro primeiro acesso de
+  9 │ // qualquer client sem esse header, mesmo pra requests que nao sao de browser —
+ 10 │ // isso quebraria o parse de JSON das respostas. Sem efeito em tozzo.uk/dev-api.tozzo.uk.
+ 11 │ const NGROK_HEADERS: Record<string, string> = BASE_URL.includes('ngrok')
+ 12 │   ? { 'ngrok-skip-browser-warning': 'true' }
+ 13 │   : {};
+ 14 │ 
+ 15 │ async function handleJsonResponse(res: Response) {
+ 16 │   const txt = await res.text();
+ 17 │   try {
+ 18 │     return txt ? JSON.parse(txt) : {};
+ 19 │   } catch (err) {
+ 20 │     return txt;
+ 21 │   }
+ 22 │ }
+ 23 │ 
+ 24 │ export type WatermelonSyncTableChangeSet = {
+ 25 │   created: unknown[];
+ 26 │   updated: unknown[];
+ 27 │   deleted: string[];
+ 28 │ };
+ 29 │ 
+ 30 │ export type WatermelonSyncChangeSet = Record<string, WatermelonSyncTableChangeSet>;
+ 31 │ 
+ 32 │ export type SyncPullRequest = {
+ 33 │   lastPulledAt?: number | null;
+ 34 │   schemaVersion: number;
+ 35 │ };
+ 36 │ 
+ 37 │ export type SyncPullResponse = {
+ 38 │   changes: WatermelonSyncChangeSet;
+ 39 │   timestamp: number;
+ 40 │ };
+ 41 │ 
+ 42 │ export type SyncIgnoredItem = {
+ 43 │   type: string;
+ 44 │   entityId: string | null;
+ 45 │   reason: string;
+ 46 │ };
+ 47 │ 
+ 48 │ export type SyncPushResponse = {
+ 49 │   ignored?: SyncIgnoredItem[];
+ 50 │   ignored_order_deletes?: SyncIgnoredItem[];
+ 51 │ };
+ 52 │ 
+ 53 │ export type Establishment = {
+ 54 │   id: string | number;
+ 55 │   category: EstablishmentCategory | null;
+ 56 │   [key: string]: unknown;
+ 57 │ };
+ 58 │ 
+ 59 │ export type ProductTypePayload = {
+ 60 │   description: string;
+ 61 │   color: string;
+ 62 │ };
+ 63 │ 
+ 64 │ export class ApiHttpError extends Error {
+ 65 │   readonly status: number;
+ 66 │   readonly body: unknown;
+ 67 │   readonly code?: string;
+ 68 │   readonly details?: unknown;
+ 69 │ 
+ 70 │   constructor(status: number, body: unknown, fallbackMessage = `HTTP ${status}`) {
+ 71 │     const record = body && typeof body === 'object' ? body as Record<string, unknown> : null;
+ 72 │     const message = typeof record?.message === 'string'
+ 73 │       ? record.message
+ 74 │       : typeof body === 'string' && body.trim().length > 0
+ 75 │         ? body
+ 76 │         : fallbackMessage;
+ 77 │     super(message);
+ 78 │     this.name = 'ApiHttpError';
+ 79 │     this.status = status;
+ 80 │     this.body = body;
+ 81 │     this.code = typeof record?.code === 'string'
+ 82 │       ? record.code
+ 83 │       : typeof record?.error === 'string'
+ 84 │         ? record.error
+ 85 │         : undefined;
+ 86 │     this.details = record?.details;
+ 87 │   }
+ 88 │ }
+ 89 │ 
+ 90 │ function positiveInteger(value: unknown, fallback: number): number {
+ 91 │   const parsed = Number(typeof value === 'string' ? value.trim() : value);
+ 92 │   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+ 93 │ }
+ 94 │ 
+ 95 │ function nonNegativeInteger(value: unknown): number | undefined {
+ 96 │   const parsed = Number(typeof value === 'string' ? value.trim() : value);
+ 97 │   return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
+ 98 │ }
+ 99 │ 
+100 │ function validPagination(value: unknown): SalesPagination | undefined {
+101 │   if (!value || typeof value !== 'object') return undefined;
+102 │   const pagination = value as Partial<Record<keyof SalesPagination, unknown>>;
+103 │   const page = integerAtLeast(pagination.page, 1);
+104 │   const limit = integerAtLeast(pagination.limit, 1);
+105 │   const total = integerAtLeast(pagination.total, 0);
+106 │   const totalPages = integerAtLeast(pagination.totalPages, 0);
+107 │   if (page == null || limit == null || total == null || totalPages == null || typeof pagination.hasNextPage !== 'boolean') return undefined;
+108 │   return { page, limit, total, totalPages, hasNextPage: pagination.hasNextPage };
+109 │ }
+110 │ 
+111 │ function integerAtLeast(value: unknown, minimum: number): number | undefined {
+112 │   if (typeof value !== 'number' || !Number.isInteger(value) || value < minimum) return undefined;
+113 │   return value;
+114 │ }
+115 │ 
+116 │ function readTotalCountHeader(res: Response): number | undefined {
+117 │   const headers = (res as Response & { headers?: { get?: (name: string) => string | null } }).headers;
+118 │   const value = headers?.get?.('X-Total-Count');
+119 │   return nonNegativeInteger(value);
+120 │ }
+121 │ 
+122 │ function fallbackSalesPagination(res: Response, filters: SalesFilters, receivedCount: number): SalesPagination {
+123 │   const page = positiveInteger(filters.page, DEFAULT_SALES_PAGE);
+124 │   const limit = positiveInteger(filters.limit, DEFAULT_SALES_LIMIT);
+125 │   const total = readTotalCountHeader(res) ?? receivedCount;
+126 │   const totalPages = Math.ceil(total / limit);
+127 │   return { page, limit, total, totalPages, hasNextPage: page < totalPages };
+128 │ }
+129 │ 
+130 │ export async function login(email: string, password: string) {
+131 │   const url = `${BASE_URL}/auth/login`;
+132 │   try {
+133 │     const res = await fetch(url, {
+134 │       method: 'POST',
+135 │       headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...NGROK_HEADERS },
+136 │       body: JSON.stringify({ email, senha: password }),
+137 │     });
+138 │ 
+139 │     if (!res.ok) {
+140 │       const errBody = await handleJsonResponse(res).catch(() => null);
+141 │       const message = (errBody && (errBody.message || JSON.stringify(errBody))) || `HTTP ${res.status}`;
+142 │       console.error('API login error:', url, message);
+143 │       throw new Error(message);
+144 │     }
+145 │ 
+146 │     const body = await handleJsonResponse(res);
+147 │     return body && typeof body === 'object' ? { ...body, user: body.user ? fromLegacyUser(body.user) : body.user } : body;
+148 │   } catch (err: any) {
+149 │     console.error('Network/login request failed', url, err?.message ?? err);
+150 │     throw err;
+151 │   }
+152 │ }
+153 │ 
+154 │ export async function getMe(token: string) {
+155 │   const url = `${BASE_URL}/usuarios/me`;
+156 │   try {
+157 │     const res = await fetch(url, {
+158 │       method: 'GET',
+159 │       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
+160 │     });
+161 │ 
+162 │     if (!res.ok) {
+163 │       const errBody = await handleJsonResponse(res).catch(() => null);
+164 │       const message = (errBody && (errBody.message || JSON.stringify(errBody))) || `HTTP ${res.status}`;
+165 │       console.error('API getMe error:', url, message);
+166 │       throw new Error(message);
+167 │     }
+168 │ 
+169 │     return fromLegacyUser(await handleJsonResponse(res));
+170 │   } catch (err: any) {
+171 │     console.error('Network/getMe request failed', url, err?.message ?? err);
+172 │     throw err;
+173 │   }
+174 │ }
+175 │ 
+176 │ export async function getEstablishment(token: string): Promise<Establishment> {
+177 │   const url = new URL('/estabelecimentos', BASE_URL);
+178 │   try {
+179 │     const res = await fetch(url, {
+180 │       method: 'GET',
+181 │       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
+182 │     });
+183 │ 
+184 │     if (!res.ok) {
+185 │       const errBody = await handleJsonResponse(res).catch(() => null);
+186 │       const error = new ApiHttpError(res.status, errBody);
+187 │       console.error('API getEstablishment error:', url.toString(), error.message);
+188 │       throw error;
+189 │     }
+190 │ 
+191 │     return await handleJsonResponse(res) as Establishment;
+192 │   } catch (err: any) {
+193 │     if (err instanceof ApiHttpError) throw err;
+194 │     console.error('Network/getEstablishment request failed', url.toString(), err?.message ?? err);
+195 │     throw err;
+196 │   }
+197 │ }
+198 │ 
+199 │ export async function updateEstablishmentCategory(
+200 │   token: string,
+201 │   establishmentId: string | number,
+202 │   category: EstablishmentCategory,
+203 │ ): Promise<Establishment> {
+204 │   const url = new URL(`/establishments/${encodeURIComponent(String(establishmentId))}`, BASE_URL);
+205 │   try {
+206 │     const res = await fetch(url, {
+207 │       method: 'PATCH',
+208 │       headers: {
+209 │         'Content-Type': 'application/json',
+210 │         Authorization: `Bearer ${token}`,
+211 │         Accept: 'application/json',
+212 │         ...NGROK_HEADERS,
+213 │       },
+214 │       body: JSON.stringify({ category }),
+215 │     });
+216 │ 
+217 │     if (!res.ok) {
+218 │       const errBody = await handleJsonResponse(res).catch(() => null);
+219 │       const error = new ApiHttpError(res.status, errBody);
+220 │       console.error('API updateEstablishmentCategory error:', url.toString(), error.message);
+221 │       throw error;
+222 │     }
+223 │ 
+224 │     return await handleJsonResponse(res) as Establishment;
+225 │   } catch (err: any) {
+226 │     if (err instanceof ApiHttpError) throw err;
+227 │     console.error('Network/updateEstablishmentCategory request failed', url.toString(), err?.message ?? err);
+228 │     throw err;
+229 │   }
+230 │ }
+231 │ 
+232 │ export async function createProductType(
+233 │   token: string,
+234 │   payload: ProductTypePayload,
+235 │ ): Promise<Record<string, unknown>> {
+236 │   const url = new URL('/tipos', BASE_URL);
+237 │   try {
+238 │     const res = await fetch(url, {
+239 │       method: 'POST',
+240 │       headers: {
+241 │         'Content-Type': 'application/json',
+242 │         Authorization: `Bearer ${token}`,
+243 │         Accept: 'application/json',
+244 │         ...NGROK_HEADERS,
+245 │       },
+246 │       body: JSON.stringify(payload),
+247 │     });
+248 │ 
+249 │     if (!res.ok) {
+250 │       const errBody = await handleJsonResponse(res).catch(() => null);
+251 │       const error = new ApiHttpError(res.status, errBody);
+252 │       console.error('API createProductType error:', url.toString(), error.message);
+253 │       throw error;
+254 │     }
+255 │ 
+256 │     return await handleJsonResponse(res) as Record<string, unknown>;
+257 │   } catch (err: any) {
+258 │     if (err instanceof ApiHttpError) throw err;
+259 │     console.error('Network/createProductType request failed', url.toString(), err?.message ?? err);
+260 │     throw err;
+261 │   }
+262 │ }
+263 │ 
+264 │ export async function pullChanges(token: string, params: SyncPullRequest): Promise<SyncPullResponse> {
+265 │   const url = new URL('/sync/pull', BASE_URL);
+266 │   url.searchParams.set('schemaVersion', String(params.schemaVersion));
+267 │   if (params.lastPulledAt !== undefined && params.lastPulledAt !== null) {
+268 │     url.searchParams.set('lastPulledAt', String(params.lastPulledAt));
+269 │   }
+270 │ 
+271 │   try {
+272 │     const res = await fetch(url, {
+273 │       method: 'GET',
+274 │       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
+275 │     });
+276 │ 
+277 │     if (!res.ok) {
+278 │       const errBody = await handleJsonResponse(res).catch(() => null);
+279 │       const error = new ApiHttpError(res.status, errBody);
+280 │       console.error('API sync pull error:', url.toString(), error.message);
+281 │       throw error;
+282 │     }
+283 │ 
+284 │     return await handleJsonResponse(res) as SyncPullResponse;
+285 │   } catch (err: any) {
+286 │     if (err instanceof ApiHttpError) throw err;
+287 │     console.error('Network/sync pull request failed', url.toString(), err?.message ?? err);
+288 │     throw err;
+289 │   }
+290 │ }
+291 │ 
+292 │ export async function pushChanges(
+293 │   token: string,
+294 │   payload: { changes: WatermelonSyncChangeSet; lastPulledAt: number },
+295 │ ): Promise<SyncPushResponse> {
+296 │   const url = new URL('/sync/push', BASE_URL);
+297 │   try {
+298 │     const res = await fetch(url, {
+299 │       method: 'POST',
+300 │       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
+301 │       body: JSON.stringify(payload),
+302 │     });
+303 │ 
+304 │     if (!res.ok) {
+305 │       const errBody = await handleJsonResponse(res).catch(() => null);
+306 │       const error = new ApiHttpError(res.status, errBody);
+307 │       console.error('API sync push error:', url.toString(), error.message);
+308 │       throw error;
+309 │     }
+310 │ 
+311 │     return await handleJsonResponse(res) as SyncPushResponse;
+312 │   } catch (err: any) {
+313 │     if (err instanceof ApiHttpError) throw err;
+314 │     console.error('Network/sync push request failed', url.toString(), err?.message ?? err);
+315 │     throw err;
+316 │   }
+317 │ }
+318 │ 
+319 │ export async function listSales(token: string, filters: SalesFilters = {}): Promise<SalesListResponse> {
+320 │   const url = new URL('/vendas', BASE_URL);
+321 │   url.search = buildSalesQueryParams(filters).toString();
+322 │ 
+323 │   try {
+324 │     const res = await fetch(url.toString(), {
+325 │       method: 'GET',
+326 │       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...NGROK_HEADERS },
+327 │     });
+328 │ 
+329 │     if (!res.ok) {
+330 │       const errBody = await handleJsonResponse(res).catch(() => null);
+331 │       const message = (errBody && (errBody.message || JSON.stringify(errBody))) || `HTTP ${res.status}`;
+332 │       console.error('API listVendas error:', url.toString(), message);
+333 │       throw new Error(message);
+334 │     }
+335 │ 
+336 │     const body = await handleJsonResponse(res);
+337 │     const normalized = fromLegacySyncResponse({ vendas: Array.isArray(body?.sales) ? body.sales : body?.vendas ?? [] });
+338 │     const sales = normalized.sales ?? [];
+339 │     const pagination = validPagination(body?.pagination);
+340 │     return {
+341 │       sales,
+342 │       closing: body?.closing ?? body?.fechamento ?? 0,
+343 │       pagination: pagination ?? fallbackSalesPagination(res, filters, sales.length),
+344 │     };
+345 │   } catch (err: any) {
+346 │     console.error('Network/listVendas request failed', url.toString(), err?.message ?? err);
+347 │     throw err;
+348 │   }
+349 │ }
+350 │ 
+351 │ /** @deprecated Use listSales; the public URL remains /vendas. */
+352 │ export const listVendas = listSales;
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk grep -n "OnboardingScreen|CategoryOnboardingGate|/onboarding" app components hooks' in C:\RN\TozzoBurger
+ succeeded in 197ms:
+22 matches in 4 files:
+
+app\__tests__\onboarding.test.tsx:5:import OnboardingScreen from '@/app/onboarding';
+app\__tests__\onboarding.test.tsx:6:import CategoryOnboardingGate from '@/components/CategoryOnboardingGate';
+app\__tests__\onboarding.test.tsx:78:<OnboardingScreen token="token-123" establishmentId="establishment-1" />,
+app\__tests__\onboarding.test.tsx:130:renderer = create(<OnboardingScreen />);
+app\__tests__\onboarding.test.tsx:146:renderer = create(<OnboardingScreen />);
+app\__tests__\onboarding.test.tsx:173:<CategoryOnboardingGate>
+app\__tests__\onboarding.test.tsx:175:</CategoryOnboardingGate>,
+app\__tests__\onboarding.test.tsx:195:<CategoryOnboardingGate>
+app\__tests__\onboarding.test.tsx:197:</CategoryOnboardingGate>,
+app\__tests__\onboarding.test.tsx:222:<CategoryOnboardingGate>
+app\__tests__\onboarding.test.tsx:224:</CategoryOnboardingGate>,
+app\__tests__\onboarding.test.tsx:241:<CategoryOnboardingGate>
+app\__tests__\onboarding.test.tsx:243:</CategoryOnboardingGate>,
+app\_layout.tsx:22:import CategoryOnboardingGate from '@/components/CategoryOnboardingGate';
+app\_layout.tsx:121:<CategoryOnboardingGate>
+app\_layout.tsx:132:</CategoryOnboardingGate>
+app\onboarding.tsx:28:export type OnboardingScreenProps = {
+app\onboarding.tsx:35:export default function OnboardingScreen({
+app\onboarding.tsx:40:}: OnboardingScreenProps = {}) {
+components\CategoryOnboardingGate.tsx:3:import OnboardingScreen from '@/app/onboarding';
+components\CategoryOnboardingGate.tsx:12:export default function CategoryOnboardingGate({ children }: Props) {
+components\CategoryOnboardingGate.tsx:22:<OnboardingScreen
+
+2026-08-28T20:14:23.603515Z ERROR codex_core::tools::router: error=exec_command failed for `"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk git show 6fd6bf6'`: CreateProcess { message: "Rejected(\"Failed to create unified exec process: runner failed during SpawnChild: CreateProcessAsUserW failed: 5 (Acesso negado.) | cwd=C:\\\\RN\\\\TozzoBurger | cmd=\\\"C:\\\\Program Files\\\\WindowsApps\\\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\\\pwsh.exe\\\" -NoProfile -Command \\\"try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}\\nrtk git show 6fd6bf6\\\" | env_u16_len=7125 | si_flags=256 | creation_flags=525312 (Windows error 5)\")" }
+codex
+A revisão estática confirma que a nova hook falha fechada: sem `OWNER` não há GET nem tela, e categoria diferente de `null` mantém a tela desmontada. Vou validar isso também com a suíte focada e o typecheck; ambos são comandos de leitura/verificação e não alteram código.
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk jest app/__tests__/onboarding.test.tsx --runInBand --no-cache' in C:\RN\TozzoBurger
+ succeeded in 5959ms:
+PASS (7) FAIL (0)
+
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk tsc --noEmit --pretty false' in C:\RN\TozzoBurger
+ succeeded in 4169ms:
+TypeScript: No errors found
+
+2026-08-28T20:15:27.854022Z ERROR codex_core::tools::router: error=exec_command failed for `"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk git diff --check db6fd1e 6fd6bf6'`: CreateProcess { message: "Rejected(\"Failed to create unified exec process: runner failed during SpawnChild: CreateProcessAsUserW failed: 5 (Acesso negado.) | cwd=C:\\\\RN\\\\TozzoBurger | cmd=\\\"C:\\\\Program Files\\\\WindowsApps\\\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\\\pwsh.exe\\\" -NoProfile -Command \\\"try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}\\nrtk git diff --check db6fd1e 6fd6bf6\\\" | env_u16_len=7125 | si_flags=256 | creation_flags=525312 (Windows error 5)\")" }
+codex
+A suíte focada passou (`7` testes) e o TypeScript passou sem erros. A extração preserva a condição do gate original (mesmo `eligible`, mesma checagem estrita de `category === null`); não encontrei alteração nova de fluxo em PATCH/POST ou de autorização fora da correção. Vou fazer a checagem final de estado e gravar o relatório.
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk git status --short' in C:\RN\TozzoBurger
+ succeeded in 215ms:
+?? docs/superpowers/sdd/2026-08-27-fase-7-t6-brief.md
+?? docs/superpowers/sdd/2026-08-27-fase-7-t6-diff.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t6-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t6-review-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t6-review-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-brief.md
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-diff.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix1-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix1-diff.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix1-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix1b-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix1b-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix2-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix2-diff.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix2-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix2b-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-fix2b-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-rereview1-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-rereview1-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-rereview2-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-rereview2-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-review-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-review-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-worker-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t7-worker-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-brief.md
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-concern-fix-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-concern-fix-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-diff.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-review-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-review-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-worker-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t8-worker-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-brief.md
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-diff.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-fix1-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-fix1-diff.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-fix1-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-rereview1-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-review-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-review-last-message.txt
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-worker-codex-stdout.log
+?? docs/superpowers/sdd/2026-08-27-fase-7-t9-worker-last-message.txt
+apply patch
+patch: completed
+C:\RN\TozzoBurger\docs\superpowers\sdd\2026-08-27-fase-7-t9-rereview1.md
+exec
+"C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'rtk read docs/superpowers/sdd/2026-08-27-fase-7-t9-rereview1.md' in C:\RN\TozzoBurger
+ succeeded in 169ms:
+# Task 9 — Re-review (fix round 1)
+
+## Finding da revisão original
+- [Important] Bypass de RBAC/categoria pela rota direta: ADDRESSED — `useCategoryOnboardingAccess` só considera o acesso elegível quando há token, `role === 'OWNER'` e `establishmentId` (`hooks/useCategoryOnboardingAccess.ts:28-29`); para usuário não-`OWNER`, a rota não faz o GET (`hooks/useCategoryOnboardingAccess.ts:45-50`), não renderiza a tela (`app/onboarding.tsx:111`) e redireciona para `/(tabs)` (`app/onboarding.tsx:59-64`). Para `OWNER`, o GET é aguardado (`hooks/useCategoryOnboardingAccess.ts:53-67`) e `allowed` exige estritamente `establishment?.category === null` (`hooks/useCategoryOnboardingAccess.ts:74-75`); categoria já configurada deixa `allowed` falso, mantendo a tela desmontada e acionando o redirecionamento (`hooks/useCategoryOnboardingAccess.ts:84`, `app/onboarding.tsx:59-64`). Os testes regressivos cobrem os dois cenários: `MANAGER` na rota direta em `app/__tests__/onboarding.test.tsx:122-138` e `OWNER` com categoria configurada em `app/__tests__/onboarding.test.tsx:141-154`. A suíte focada passou com 7 testes e o TypeScript passou sem erros.
+
+## Quebras novas no diff de correção
+Nenhuma.
+
+## Veredito
+Todos endereçados.
+
+codex
+Relatório gravado em [`docs/superpowers/sdd/2026-08-27-fase-7-t9-rereview1.md`](C:\RN\TozzoBurger\docs\superpowers\sdd\2026-08-27-fase-7-t9-rereview1.md). Nenhum código foi alterado; não houve commit/push.
+
+```md
+# Task 9 — Re-review (fix round 1)
+
+## Finding da revisão original
+- [Important] Bypass de RBAC/categoria pela rota direta: ADDRESSED — a rota bloqueia não-`OWNER`, categoria já configurada e possui testes regressivos para ambos os cenários.
+
+## Quebras novas no diff de correção
+Nenhuma.
+
+## Veredito
+Todos endereçados.
+```
+tokens used
+110.204
+Relatório gravado em [`docs/superpowers/sdd/2026-08-27-fase-7-t9-rereview1.md`](C:\RN\TozzoBurger\docs\superpowers\sdd\2026-08-27-fase-7-t9-rereview1.md). Nenhum código foi alterado; não houve commit/push.
+
+```md
+# Task 9 — Re-review (fix round 1)
+
+## Finding da revisão original
+- [Important] Bypass de RBAC/categoria pela rota direta: ADDRESSED — a rota bloqueia não-`OWNER`, categoria já configurada e possui testes regressivos para ambos os cenários.
+
+## Quebras novas no diff de correção
+Nenhuma.
+
+## Veredito
+Todos endereçados.
+```

@@ -1,0 +1,23 @@
+# Task 11 (mobile) — Review
+
+## Spec compliance
+
+✅ `constants/status.ts` e seu teste foram removidos. Nenhuma referência executável restante.
+
+✅ `PedidoItem` não possui mais badge/status; mantém apenas `accentColor` neutra obrigatória (`components/PedidoItem.tsx:29`).
+
+✅ `VendaItem` não importa nem chama `getStatusColor` (`components/VendaItem.tsx:1-4,32`).
+
+✅ Status por item permanece intacto (`app/modais/pedidoModal.tsx:19-41,181-195`).
+
+✅ `isCancelled` e `strikethrough={isCancelled}` permanecem intactos (`components/VendaItem.tsx:20,37`).
+
+✅ Testes removidos correspondiam ao código morto. Suíte: 35/35 suítes, 152/152 testes, 1 snapshot. `tsc --noEmit` passou.
+
+## Achados
+
+Nenhum achado
+
+## Veredito
+
+Aprovado
