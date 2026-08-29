@@ -49,6 +49,12 @@ varredura de segurança básica — têm spec própria, feita depois.
    `User` existente, sem tabela de versionamento à parte (YAGNI — sem
    necessidade concreta hoje de rastrear múltiplas versões aceitas).
 6. **Cookies/analytics**: fora de escopo, sistema não usa hoje.
+7. **Idioma do texto legal**: entra no i18n normal do front, traduzido nos 6
+   idiomas já suportados (en/pt-BR/es/fr/zh/hi), mesmo texto-base sendo
+   rascunho não validado juridicamente — igual a qualquer outra página do
+   dashboard, cobertas pelo checker de chaves da Fase 6
+   (`i18n:check`). Namespace novo `legal` (não reaproveitar `auth`, textos
+   longos demais pra misturar com labels curtos de formulário).
 
 ## Escopo técnico
 
@@ -68,12 +74,21 @@ varredura de segurança básica — têm spec própria, feita depois.
 ### Front (`front-tozzo.uk`)
 
 - 2 rotas públicas novas, sem autenticação: `/privacidade` e `/termos`,
-  cada uma renderizando o texto estático (componente próprio ou markdown
-  renderizado — decisão de implementação, sem preferência forte do design).
-- `LoginPage.tsx` (modo registro): checkbox obrigatório "Li e aceito a
-  [Política de Privacidade](/privacidade) e os
-  [Termos de Uso](/termos)" (links abrem em nova aba). Botão de submit do
-  cadastro fica desabilitado até o checkbox ser marcado. Envia
+  cada uma renderizando o texto estático a partir de chaves i18n do
+  namespace `legal` (mesmo padrão `useTranslation` já usado no resto do
+  front — ver `LoginPage.tsx` como referência).
+- Namespace novo `legal` adicionado como chave top-level dentro de cada um
+  dos 6 arquivos `src/i18n/locales/{en,pt-BR,es,fr,zh,hi}.json` (estrutura
+  real confirmada: 1 arquivo por locale, namespaces como chaves internas —
+  ex: `common`, `auth`, `errors` já existem nesse padrão; `legal` entra do
+  lado deles, não é arquivo separado). Conteúdo real nos 6 idiomas (não
+  placeholder), mesmo sendo rascunho não validado juridicamente — precisa
+  passar no `i18n:check` (chave presente, sem chave extra, placeholders
+  batendo) igual qualquer outro namespace.
+- `LoginPage.tsx` (modo registro): checkbox obrigatório com label traduzido
+  (namespace `auth`, nova chave, ex: `termsCheckboxLabel`) contendo os 2
+  links pra `/privacidade` e `/termos` (abrem em nova aba). Botão de submit
+  do cadastro fica desabilitado até o checkbox ser marcado. Envia
   `termsAccepted: true` no payload de `POST /auth/register`.
 - Sem mudança em nenhuma outra tela do dashboard.
 
