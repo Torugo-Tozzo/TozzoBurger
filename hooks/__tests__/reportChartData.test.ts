@@ -1,4 +1,4 @@
-import { buildReportChartData } from '@/app/modais/reportChartData';
+import { buildReportChartData } from '@/hooks/reportChartData';
 
 describe('report chart data', () => {
   it('uses the active translation for the aggregated Other label', () => {
