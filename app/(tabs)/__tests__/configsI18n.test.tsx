@@ -80,13 +80,16 @@ describe('Settings language selector', () => {
   });
 
   it('offers exactly the six supported locales', () => {
-    const renderer = create(
-      <I18nextProvider i18n={i18n}>
-        <BluetoothScreen />
-      </I18nextProvider>,
-    );
+    let renderer: ReturnType<typeof create>;
+    act(() => {
+      renderer = create(
+        <I18nextProvider i18n={i18n}>
+          <BluetoothScreen />
+        </I18nextProvider>,
+      );
+    });
 
-    const items = renderer.root.findAll(
+    const items = renderer!.root.findAll(
       (node) => (node.type as string) === 'PickerItem' && (SUPPORTED_LOCALES as readonly string[]).includes(node.props.value),
     );
     expect(items.map((item) => item.props.value)).toEqual([...SUPPORTED_LOCALES]);
@@ -94,12 +97,15 @@ describe('Settings language selector', () => {
 
   it('does not show a restart warning when changing locale', async () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
-    const renderer = create(
-      <I18nextProvider i18n={i18n}>
-        <BluetoothScreen />
-      </I18nextProvider>,
-    );
-    const picker = renderer.root.find(
+    let renderer: ReturnType<typeof create>;
+    act(() => {
+      renderer = create(
+        <I18nextProvider i18n={i18n}>
+          <BluetoothScreen />
+        </I18nextProvider>,
+      );
+    });
+    const picker = renderer!.root.find(
       (node) =>
         (node.type as string) === 'Picker' &&
         (SUPPORTED_LOCALES as readonly string[]).includes(node.props.selectedValue),
@@ -115,13 +121,16 @@ describe('Settings language selector', () => {
   });
 
   it('offers exactly the five printer paper widths', () => {
-    const renderer = create(
-      <I18nextProvider i18n={i18n}>
-        <BluetoothScreen />
-      </I18nextProvider>,
-    );
+    let renderer: ReturnType<typeof create>;
+    act(() => {
+      renderer = create(
+        <I18nextProvider i18n={i18n}>
+          <BluetoothScreen />
+        </I18nextProvider>,
+      );
+    });
 
-    const items = renderer.root.findAll(
+    const items = renderer!.root.findAll(
       (node) => (node.type as string) === 'PickerItem' && ['44mm', '58mm', '76mm', '80mm', '110mm'].includes(node.props.value),
     );
     expect(items.map((item) => item.props.value)).toEqual(['44mm', '58mm', '76mm', '80mm', '110mm']);

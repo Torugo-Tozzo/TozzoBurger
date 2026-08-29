@@ -62,11 +62,11 @@ function withWatermelonJsiMainApplication(config) {
       src: contentsWithImport,
       newSrc: isJava
         ? `            packages.add(new ${JSI_PACKAGE_CLASS}());`
-        : `            packages.add(${JSI_PACKAGE_CLASS}())`,
+        : `              add(${JSI_PACKAGE_CLASS}())`,
       tag: 'watermelondb-jsi-package',
       anchor: isJava
         ? /List<ReactPackage> packages = new PackageList\(this\)\.getPackages\(\);/
-        : /val packages = PackageList\(this\)\.packages/,
+        : /PackageList\(this\)\.packages\.apply \{/,
       offset: 1,
       comment: '            //',
     });

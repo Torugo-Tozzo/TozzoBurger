@@ -86,20 +86,23 @@ describe('Task 7C presentation i18n', () => {
   });
 
   it('translates standard catalog IDs while leaving custom descriptions untouched', () => {
-    const renderer = create(
-      <I18nextProvider i18n={i18n}>
-        <FiltroTipos
-          data={[
-            { id: ProductTypeId.BURGER, description: 'Hambúrguer' },
-            { id: 'custom-type-id', description: 'Custom family recipe' },
-          ]}
-          selectedId={null}
-          onSelect={jest.fn()}
-        />
-      </I18nextProvider>,
-    );
+    let renderer: ReturnType<typeof create>;
+    act(() => {
+      renderer = create(
+        <I18nextProvider i18n={i18n}>
+          <FiltroTipos
+            data={[
+              { id: ProductTypeId.BURGER, description: 'Hambúrguer' },
+              { id: 'custom-type-id', description: 'Custom family recipe' },
+            ]}
+            selectedId={null}
+            onSelect={jest.fn()}
+          />
+        </I18nextProvider>,
+      );
+    });
 
-    const text = renderedText(renderer.toJSON());
+    const text = renderedText(renderer!.toJSON());
     expect(text).toContain('Burger');
     expect(text).toContain('Custom family recipe');
     expect(text).not.toContain('Hambúrguer');
@@ -110,24 +113,27 @@ describe('Task 7C presentation i18n', () => {
       await i18n.changeLanguage('pt-BR');
     });
 
-    const renderer = create(
-      <I18nextProvider i18n={i18n}>
-        <PedidoItem
-          data={{
-            id: 'order-1',
-            total: 25,
-            openedAt: '2026-08-25T15:04:05.000Z',
-            customerName: null,
-            isOpen: true,
-            updated_at: 1,
-          }}
-          products={[]}
-          onEdit={jest.fn()}
-        />
-      </I18nextProvider>,
-    );
+    let renderer: ReturnType<typeof create>;
+    act(() => {
+      renderer = create(
+        <I18nextProvider i18n={i18n}>
+          <PedidoItem
+            data={{
+              id: 'order-1',
+              total: 25,
+              openedAt: '2026-08-25T15:04:05.000Z',
+              customerName: null,
+              isOpen: true,
+              updated_at: 1,
+            }}
+            products={[]}
+            onEdit={jest.fn()}
+          />
+        </I18nextProvider>,
+      );
+    });
 
-    expect(renderedText(renderer.toJSON())).not.toContain('Aberto');
+    expect(renderedText(renderer!.toJSON())).not.toContain('Aberto');
   });
 
   it('localizes receipt labels and numbers without translating business content or printer controls', async () => {

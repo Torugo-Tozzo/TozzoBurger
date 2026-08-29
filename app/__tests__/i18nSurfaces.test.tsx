@@ -128,8 +128,11 @@ describe('mobile i18n integration surfaces', () => {
 
   it('looks up translated login labels and keeps email/password inputs technical', () => {
     const { default: LoginScreen } = require('@/app/login');
-    const renderer = create(<LoginScreen />);
-    const inputs = renderer.root.findAll((node) => String(node.type) === 'TextInput');
+    let renderer: ReturnType<typeof create>;
+    act(() => {
+      renderer = create(<LoginScreen />);
+    });
+    const inputs = renderer!.root.findAll((node) => String(node.type) === 'TextInput');
 
     expect(inputs.map((input) => input.props.placeholder)).toEqual([
       'auth.emailPlaceholder',
@@ -145,8 +148,11 @@ describe('mobile i18n integration surfaces', () => {
     const { default: TabLayout } = require('@/app/(tabs)/_layout');
 
     mockUseAuth.mockReturnValue({ user: { role: 'CUSTOMER' } });
-    let renderer = create(<TabLayout />);
-    let screens = renderer.root.findAll((node) => String(node.type) === 'tab-screen');
+    let renderer: ReturnType<typeof create>;
+    act(() => {
+      renderer = create(<TabLayout />);
+    });
+    let screens = renderer!.root.findAll((node) => String(node.type) === 'tab-screen');
 
     expect(screens.map((screen) => screen.props.name)).toEqual([
       'index',
@@ -162,8 +168,10 @@ describe('mobile i18n integration surfaces', () => {
 
     mockT.mockClear();
     mockUseAuth.mockReturnValue({ user: { role: 'EMPLOYEE' } });
-    renderer = create(<TabLayout />);
-    screens = renderer.root.findAll((node) => String(node.type) === 'tab-screen');
+    act(() => {
+      renderer = create(<TabLayout />);
+    });
+    screens = renderer!.root.findAll((node) => String(node.type) === 'tab-screen');
 
     expect(screens.find((screen) => screen.props.name === 'historico')?.props.options.href).toBe('/historico');
     expect(screens.find((screen) => screen.props.name === 'produtos')?.props.options.href).toBe('/produtos');

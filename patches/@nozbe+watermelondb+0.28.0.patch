@@ -1,0 +1,12 @@
+diff --git a/node_modules/@nozbe/watermelondb/native/android-jsi/build.gradle b/node_modules/@nozbe/watermelondb/native/android-jsi/build.gradle
+index 9ae589d..01a05c1 100644
+--- a/node_modules/@nozbe/watermelondb/native/android-jsi/build.gradle
++++ b/node_modules/@nozbe/watermelondb/native/android-jsi/build.gradle
+@@ -21,6 +21,7 @@ android {
+         versionName "1.0"
+         externalNativeBuild {
+             cmake {
++                arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                 // Not sure if this is necessary. I added this in attempt to fix catching
+                 // C++ errors across .so bounds, but it still doesn't work, so can probably get rid
+                 // of this
