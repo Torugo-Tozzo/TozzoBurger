@@ -79,17 +79,20 @@ describe('7B translations against the real bundled resources', () => {
       await i18n.changeLanguage(fixture.locale);
     });
 
-    const renderer = create(
-      <I18nextProvider i18n={i18n}>
-        <>
-          <LoginScreen />
-          <TabLayout />
-        </>
-      </I18nextProvider>,
-    );
+    let renderer: ReturnType<typeof create>;
+    await act(async () => {
+      renderer = create(
+        <I18nextProvider i18n={i18n}>
+          <>
+            <LoginScreen />
+            <TabLayout />
+          </>
+        </I18nextProvider>,
+      );
+    });
 
-    const inputs = renderer.root.findAll((node) => String(node.type) === 'TextInput');
-    const menuScreen = renderer.root
+    const inputs = renderer!.root.findAll((node) => String(node.type) === 'TextInput');
+    const menuScreen = renderer!.root
       .findAll((node) => String(node.type) === 'tab-screen')
       .find((screen) => screen.props.name === 'index');
 
