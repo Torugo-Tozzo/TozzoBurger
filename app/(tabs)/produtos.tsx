@@ -47,7 +47,7 @@ export default function ProdutosScreen() {
       ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footerLoader} /> : null}
       ItemSeparatorComponent={ListDivider}
       renderItem={({ item }) => {
-        const productType = productTypes?.find((t: any) => Number(t.id) === Number(item.productTypeId))?.description;
+        const productType = productTypes?.find((t: any) => t.id === item.productTypeId)?.description;
 
         return (
           <Product
@@ -63,7 +63,7 @@ export default function ProdutosScreen() {
                     text: t('products.remove'),
                     onPress: () => {
                       remove(item.id);
-                      filterByProductType(Number(productTypeId));
+                      filterByProductType(productTypeId || null);
                     },
                     style: 'destructive',
                   },
@@ -82,7 +82,7 @@ export default function ProdutosScreen() {
       <Input placeholder={t('common.search')} accessibilityLabel={t('common.search')} onChangeText={setSearch} style={styles.input} />
       <FiltroTipos
         data={productTypes}
-        selectedId={Number(productTypeId)}
+        selectedId={productTypeId || null}
         onSelect={filterByProductType}
       />
       {showSkeleton ? (

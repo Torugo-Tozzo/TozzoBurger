@@ -9,6 +9,7 @@ import { useProductDatabase } from '@/database/useProductDatabase';
 import { useRouter } from 'expo-router';
 import { useCart } from '@/context/CartContext';
 import { useTranslation } from 'react-i18next';
+import { ProductTypeId } from '@/constants/productTypeIds';
 
 export default function AdicionalModalScreen() {
   const { create } = useProductDatabase();
@@ -31,14 +32,14 @@ export default function AdicionalModalScreen() {
       const response = await create({
         name,
         price: parseFloat(price),
-        productTypeId: 8,
+        productTypeId: ProductTypeId.OTHER,
       });
 
       await addToCart({
         id: response.id,
         name,
         price: parseFloat(price),
-        productTypeId: 8,
+        productTypeId: ProductTypeId.OTHER,
         quantity: 1,
         updated_at: Date.now(),
       });

@@ -18,8 +18,8 @@ export default function ProdutoModalScreen() {
   const [name, setNome] = useState('');
   const [price, setPreco] = useState('');
   const [ingredients, setIngredientes] = useState('');
-  const [productTypeId, setTipoProdutoId] = useState<number | undefined>();
-  const [tiposProdutos, setTiposProdutos] = useState<{ id: number; description: string }[]>([]);
+  const [productTypeId, setTipoProdutoId] = useState<string | undefined>();
+  const [tiposProdutos, setTiposProdutos] = useState<{ id: string; description: string }[]>([]);
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -47,7 +47,7 @@ export default function ProdutoModalScreen() {
           if (product) {
             setNome(product.name);
             setPreco(product.price.toString());
-            setTipoProdutoId(product.productTypeId);
+            setTipoProdutoId(product.productTypeId ?? undefined);
             setIngredientes(product.ingredients?.toString() || '');
           }
         } catch (error) {
@@ -121,7 +121,7 @@ export default function ProdutoModalScreen() {
       <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, marginBottom: spacing.md }}>
         <Picker
           selectedValue={productTypeId}
-          onValueChange={(itemValue) => setTipoProdutoId(Number(itemValue))}
+          onValueChange={(itemValue) => setTipoProdutoId(itemValue as string)}
           style={{ color: colors.textMuted }}
           dropdownIconColor={colors.text}
           accessibilityLabel={t('products.productType')}

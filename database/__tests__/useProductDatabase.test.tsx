@@ -142,7 +142,7 @@ describe('useProductDatabase', () => {
     const result = await create({
       name: 'X-Salada',
       price: 25.5,
-      productTypeId: 1,
+      productTypeId: '1',
     });
 
     expect(result).toEqual({ id: expect.any(String) });
@@ -163,7 +163,7 @@ describe('useProductDatabase', () => {
       id: 'p1',
       name: 'X-Salada',
       price: 25.5,
-      productTypeId: 1,
+      productTypeId: '1',
       updated_at: 1234,
       sourceProductId: 'source-1',
       ingredients: 'queijo',
@@ -191,7 +191,7 @@ describe('useProductDatabase', () => {
     });
 
     const { update } = useProductDatabase();
-    await update({ id: product.id, name: 'X-Bacon', price: 30, productTypeId: 1, ingredients: 'bacon' });
+    await update({ id: product.id, name: 'X-Bacon', price: 30, productTypeId: '1', ingredients: 'bacon' });
 
     await expect(mockDatabase.get<Product>('products').find(product.id)).resolves.toMatchObject({
       name: 'X-Bacon',
@@ -231,7 +231,7 @@ describe('useProductDatabase', () => {
 
     const { searchByName } = useProductDatabase();
     await expect(searchByName('burger')).resolves.toEqual([
-      expect.objectContaining({ id: active.id, name: 'Burger Especial', productTypeId: 1 }),
+      expect.objectContaining({ id: active.id, name: 'Burger Especial', productTypeId: '1' }),
     ]);
   });
 
@@ -248,10 +248,10 @@ describe('useProductDatabase', () => {
     const productDatabase = useProductDatabase();
 
     await expect(productDatabase.getProductTypes()).resolves.toEqual([
-      { id: 1, description: 'Lanches' },
+      { id: '1', description: 'Lanches' },
     ]);
-    await expect(productDatabase.filterByProductType(1, 20, 0)).resolves.toEqual([
-      expect.objectContaining({ id: product.id, productTypeId: 1 }),
+    await expect(productDatabase.filterByProductType('1', 20, 0)).resolves.toEqual([
+      expect.objectContaining({ id: product.id, productTypeId: '1' }),
     ]);
     await expect(productDatabase.searchBySourceProductId('source-1')).resolves.toEqual([
       expect.objectContaining({ id: product.id, sourceProductId: 'source-1' }),
@@ -272,7 +272,7 @@ describe('useProductDatabase', () => {
     const created = await establishmentADatabase.create({
       name: 'Produto do A',
       price: 25,
-      productTypeId: 1,
+      productTypeId: '1',
       sourceProductId: 'source-a',
     });
 
@@ -280,7 +280,7 @@ describe('useProductDatabase', () => {
     const establishmentBDatabase = useProductDatabase();
 
     await expect(establishmentBDatabase.searchByName('Produto do A')).resolves.toEqual([]);
-    await expect(establishmentBDatabase.filterByProductType(1, 20, 0)).resolves.toEqual([]);
+    await expect(establishmentBDatabase.filterByProductType('1', 20, 0)).resolves.toEqual([]);
     await expect(establishmentBDatabase.searchBySourceProductId('source-a')).resolves.toEqual([]);
     await expect(establishmentBDatabase.show(created.id)).resolves.toBeNull();
     await expect(establishmentBDatabase.showAdd(created.id)).resolves.toBeNull();

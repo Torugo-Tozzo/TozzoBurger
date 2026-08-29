@@ -2,7 +2,7 @@ export type Product = {
   id: string
   name: string
   price: number
-  productTypeId: number
+  productTypeId: string | null
   quantity?: number | null
   sourceProductId?: string | null
   ingredients?: string | null

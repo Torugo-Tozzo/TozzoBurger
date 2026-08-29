@@ -9,6 +9,7 @@ import SyncIndicator from '@/components/SyncIndicator';
 import { formatarVendaParaImpressao } from '@/hooks/formatarVendaImpressao';
 import { connectToDevice, sendMessageToDevice } from '@/useBLE';
 import { i18n } from '@/i18n';
+import { ProductTypeId } from '@/constants/productTypeIds';
 
 const mockUseAutoSync = jest.fn();
 
@@ -89,8 +90,8 @@ describe('Task 7C presentation i18n', () => {
       <I18nextProvider i18n={i18n}>
         <FiltroTipos
           data={[
-            { id: 1, description: 'Hambúrguer' },
-            { id: 99, description: 'Custom family recipe' },
+            { id: ProductTypeId.BURGER, description: 'Hambúrguer' },
+            { id: 'custom-type-id', description: 'Custom family recipe' },
           ]}
           selectedId={null}
           onSelect={jest.fn()}

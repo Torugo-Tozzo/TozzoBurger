@@ -656,8 +656,7 @@ export function useSaleDatabase() {
       for (const item of items) {
         const product = await findProduct(item.productId, currentEstablishmentId);
         if (!product) continue;
-        if (selectedProductType && selectedProductType !== '100'
-          && product.productTypeId !== selectedProductType) continue;
+        if (selectedProductType && product.productTypeId !== selectedProductType) continue;
 
         const existing = report.get(product.id);
         if (existing) {

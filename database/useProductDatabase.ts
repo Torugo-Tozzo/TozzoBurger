@@ -12,19 +12,12 @@ type ProductInput = ProductData & {
   establishmentId?: string | number | null;
 };
 
-function toLegacyNumber(value: string | null): number {
-  if (value == null || value === '') return 0;
-
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function toProductData(product: ProductModel): ProductData {
   return {
     id: product.id,
     name: product.name,
     price: product.price,
-    productTypeId: toLegacyNumber(product.productTypeId),
+    productTypeId: product.productTypeId,
     sourceProductId: product.sourceProductId,
     ingredients: product.ingredients,
     updated_at: product.updatedAt.getTime(),
@@ -167,19 +160,19 @@ export function useProductDatabase() {
       .fetch();
 
     return productTypes.map((productType) => ({
-      id: toLegacyNumber(productType.id),
+      id: productType.id,
       description: productType.description,
     }));
   }
 
-  async function filterByProductType(productTypeId: number, limit: number, offset: number): Promise<ProductData[]> {
+  async function filterByProductType(productTypeId: string, limit: number, offset: number): Promise<ProductData[]> {
     if (!currentEstablishmentId) return [];
 
     const products = await productCollection()
       .query(
         Q.where('establishment_id', currentEstablishmentId),
         activeProductTypeClause(),
-        Q.where('product_type_id', String(productTypeId)),
+        Q.where('product_type_id', productTypeId),
         Q.sortBy('name', Q.asc),
         Q.sortBy('id', Q.asc),
         Q.take(limit),
