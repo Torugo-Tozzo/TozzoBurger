@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
-import { useSQLiteContext } from 'expo-sqlite';
+import { hasUnsyncedChanges } from '@nozbe/watermelondb/sync';
 import { useAuth } from '@/context/AuthContext';
-import { synchronizeWithServer } from '@/database/useSyncDatabase';
+import { database as watermelonDatabase } from '@/database/watermelon/database';
+import { synchronizeWithServer } from '@/database/watermelon/sync';
 import { runWithLock } from '@/database/syncGuard';
 
 type LastSyncResult = { ok: boolean | null; message?: string | null; time?: number | null };
@@ -20,8 +21,7 @@ type AutoSyncContextType = {
 const AutoSyncContext = createContext<AutoSyncContextType | undefined>(undefined);
 
 export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) => {
-  const database = useSQLiteContext();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
@@ -32,13 +32,8 @@ export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) =>
 
   const refreshPendingCount = async () => {
     try {
-      const rows = await (database as any).getAllAsync(
-        `SELECT
-          (SELECT COUNT(*) FROM TB_PRODUCTS WHERE sync_status = 'pending') +
-          (SELECT COUNT(*) FROM TB_SALES WHERE sync_status = 'pending') +
-          (SELECT COUNT(*) FROM TB_ORDERS WHERE sync_status = 'pending') as total`
-      );
-      setPendingCount(rows?.[0]?.total ?? 0);
+      const hasPendingChanges = await hasUnsyncedChanges({ database: watermelonDatabase });
+      setPendingCount(hasPendingChanges ? 1 : 0);
     } catch {
       // ignore
     }
@@ -57,7 +52,7 @@ export const AutoSyncProvider = ({ children }: { children: React.ReactNode }) =>
       res = await runWithLock(async () => {
         setIsSyncing(true);
         try {
-          return await synchronizeWithServer(database as any, token);
+          return await synchronizeWithServer(token, user?.establishmentId);
         } finally {
           setIsSyncing(false);
         }

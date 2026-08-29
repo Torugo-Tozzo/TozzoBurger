@@ -41,7 +41,7 @@ export function Product({ data, onDelete, onOpen, tipoNome, ...rest }: Props) {
           accessibilityRole="button"
           accessibilityLabel={t('catalog.ingredientsFor', { name: data.name })}
         >
-          <Badge label={tipoLabel} color={tipoColors[data.productTypeId] ?? '#888'} />
+          <Badge label={tipoLabel} color={(data.productTypeId && tipoColors[data.productTypeId]) ?? '#888'} />
         </Pressable>
 
         <View style={styles.buttonContainer}>

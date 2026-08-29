@@ -79,7 +79,7 @@ export default function VendaScreen() {
   }, [searchBySourceProductId, create, showAdd, addToCart, addIfNotInCart]);
 
   const renderItem = useCallback(({ item }: { item: Product }) => {
-    const productType = productTypes?.find((t: any) => Number(t.id) === Number(item.productTypeId))?.description;
+    const productType = productTypes?.find((t: any) => t.id === item.productTypeId)?.description;
     return <ProductItemVenda data={item} tipoNome={productType} onAddToCart={handleAddToConta} onAdicionaltoCart={handleAdicional} />;
   }, [productTypes, handleAddToConta, handleAdicional]);
 
@@ -112,7 +112,7 @@ export default function VendaScreen() {
 
       <FiltroTipos
         data={productTypes}
-        selectedId={Number(productTypeId)}
+        selectedId={productTypeId || null}
         onSelect={filterByProductType}
       />
 

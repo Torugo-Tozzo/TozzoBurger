@@ -50,7 +50,7 @@ function ProductItemVendaInner({ data, onAddToCart, onAdicionaltoCart, tipoNome 
         accessibilityRole="button"
         accessibilityLabel={t('catalog.ingredientsFor', { name: data.name })}
       >
-        <Badge label={tipoLabel} color={tipoColors[data.productTypeId] ?? '#888'} />
+        <Badge label={tipoLabel} color={(data.productTypeId && tipoColors[data.productTypeId]) ?? '#888'} />
       </Pressable>
 
       <Animated.View style={{ transform: [{ scale: iconScaleAnim }] }}>

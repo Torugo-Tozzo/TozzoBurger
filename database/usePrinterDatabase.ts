@@ -1,67 +1,74 @@
-import { useSQLiteContext } from "expo-sqlite";
-import { Printer } from "./types/Printer";
+import { Q } from '@nozbe/watermelondb';
+
+import { useAuth } from '../context/AuthContext';
+import { database } from './watermelon/database';
+import PrinterModel from './watermelon/models/Printer';
+
+function printerCollection() {
+  return database.get<PrinterModel>('printers');
+}
+
+async function findPrinter(establishmentId: string | null): Promise<PrinterModel | null> {
+  if (!establishmentId) return null;
+
+  const [printer] = await printerCollection().query(Q.where('id', establishmentId)).fetch();
+  return printer ?? null;
+}
 
 export function usePrinterDatabase() {
-    const database = useSQLiteContext();
+  const { user } = useAuth();
+  const establishmentId = user?.establishmentId == null || user.establishmentId === ''
+    ? null
+    : String(user.establishmentId);
 
-    // Cria ou atualiza a impressora padrão
-    async function setPrinter(uuid: string, name: string) {
-        try {
-            // Verifica se já existe um registro de impressora
-            const existingPrinter = await database.getFirstAsync<Printer>(
-                "SELECT * FROM TB_PRINTERS WHERE id = 1"
-            );
-
-            if (existingPrinter) {
-                // Se já existir, atualiza o UUID e o name
-                await database.runAsync(
-                    `UPDATE TB_PRINTERS SET uuid = ?, name = ? WHERE id = 1`,
-                    uuid,
-                    name
-                );
-            } else {
-                // Caso contrário, cria um novo registro para a impressora
-                await database.runAsync(
-                    `INSERT INTO TB_PRINTERS (id, uuid, name) VALUES (1, ?, ?)`,
-                    uuid,
-                    name
-                );
-            }
-        } catch (error) {
-            console.error("Erro ao definir impressora:", error);
-            throw error;
-        }
+  // Cria ou atualiza a impressora padrão
+  async function setPrinter(uuid: string, name: string) {
+    if (!establishmentId) {
+      throw new Error('Cannot configure a printer without an authenticated establishment');
     }
 
-    // Obtém o UUID e name da impressora registrada
-    async function getPrinter() {
-        try {
-            const printer = await database.getFirstAsync<Printer>(
-                "SELECT * FROM TB_PRINTERS WHERE id = 1"
-            );
+    await database.write(async () => {
+      const existingPrinter = await findPrinter(establishmentId);
 
-            if (!printer) {
-                // Caso não haja impressora registrada, retorna null ou um valor default
-                return { uuid: null, name: null };
-            }
+      if (existingPrinter) {
+        await existingPrinter.update((printer) => {
+          printer.uuid = uuid;
+          printer.name = name;
+        });
+        return;
+      }
 
-            return { uuid: printer.uuid, name: printer.name };
-        } catch (error) {
-            console.error("Erro ao obter impressora:", error);
-            throw error;
-        }
+      const preparedPrinter = printerCollection().prepareCreateFromDirtyRaw({
+        id: establishmentId,
+        _status: 'created',
+        _changed: '',
+        uuid,
+        name,
+      });
+
+      await database.batch(preparedPrinter);
+    });
+  }
+
+  // Obtém o UUID e name da impressora registrada
+  async function getPrinter() {
+    const printer = await findPrinter(establishmentId);
+
+    if (!printer) {
+      return { uuid: null, name: null };
     }
 
+    return { uuid: printer.uuid, name: printer.name };
+  }
 
-    // Remove a impressora registrada
-    async function removePrinter() {
-        try {
-            await database.runAsync("DELETE FROM TB_PRINTERS WHERE id = 1");
-        } catch (error) {
-            console.error("Erro ao remover impressora:", error);
-            throw error;
-        }
+  // Remove a impressora registrada
+  async function removePrinter() {
+    const printer = await findPrinter(establishmentId);
+
+    if (printer) {
+      await database.write(() => printer.destroyPermanently());
     }
+  }
 
-    return { setPrinter, getPrinter, removePrinter };
+  return { setPrinter, getPrinter, removePrinter };
 }

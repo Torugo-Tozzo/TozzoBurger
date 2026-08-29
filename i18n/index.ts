@@ -2,6 +2,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLocales } from 'expo-localization';
 import { createInstance } from 'i18next';
 
+// Hermes on Android doesn't reliably ship Intl.PluralRules — without it
+// i18next silently falls back to the deprecated v3 plural format. Polyfill
+// checks for native support before patching, so it's a no-op where Intl is
+// already complete.
+import 'intl-pluralrules';
+
 import { I18N_NAMESPACES, resources } from './resources';
 
 export const SUPPORTED_LOCALES = ['en', 'pt-BR', 'es', 'fr', 'zh', 'hi'] as const;

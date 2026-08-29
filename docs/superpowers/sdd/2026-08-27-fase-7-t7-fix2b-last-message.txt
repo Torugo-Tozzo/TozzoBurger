@@ -1,0 +1,9 @@
+Implementado na branch correta, sem push.
+
+- Corrigida paginação com filtro de horário e total baseado em preços históricos.
+- Adicionados testes regressivos.
+- Relatório atualizado em `docs/.../2026-08-27-fase-7-t7-mobile-worker.md`.
+- Commits: código `78f57873688da50f4864e487f37f46244a494f82`; relatório `4605f05`.
+- Review independente: sem achados.
+
+DONE — `78f57873688da50f4864e487f37f46244a494f82` — testes focados 14/14, suíte completa 133/133, TypeScript sem erros.

@@ -1,0 +1,29 @@
+Relatório gravado em [2026-08-27-fase-7-t7-review.md](C:\RN\TozzoBurger\docs\superpowers\sdd\2026-08-27-fase-7-t7-review.md).
+
+# Task 7 — Review
+
+## Spec compliance
+
+✅ Objetivo — hooks portados para Watermelon.
+
+✅ Passos 1–4 — implementação, testes focados, suíte completa, consulta local e `tsc` atendidos.
+
+✅ `SaleItem` permanece sem `status`.
+
+✅ Isolamento por `establishmentId` confirmado nas queries e mutações.
+
+❌ Nenhuma tela quebrou — há regressões funcionais na geração da venda, identificação do vendedor e uso do preço histórico.
+
+## Achados
+
+- [Critical] A geração ignora edições não salvas do pedido — `app/modais/pedidoModal.tsx:108-116,142-150`; `database/useSaleDatabase.ts:334-379` — copia os itens persistidos, não o estado exibido, e fecha o pedido, descartando alterações silenciosamente.
+
+- [Critical] `createdByName` é descartado — `app/modais/contaModal.tsx:75-83`; `database/useSaleDatabase.ts:264-275,322-332,474-480`; `app/modais/contaHistoricoModal.tsx:199-200` — o vendedor informado pode desaparecer do detalhe local.
+
+- [Important] Paginação não é aplicada na query Watermelon — `database/useSaleDatabase.ts:250-257,507-515` — todas as vendas são carregadas e só depois paginadas em memória.
+
+- [Minor] O teste de isolamento do cancelamento não comprova isolamento — `database/__tests__/useVendaDatabse.test.tsx:456-490` — a venda já está cancelada antes da troca de estabelecimento.
+
+## Veredito
+
+Reprovado (duas falhas Critical).

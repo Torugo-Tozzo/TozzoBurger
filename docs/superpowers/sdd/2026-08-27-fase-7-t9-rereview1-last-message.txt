@@ -1,0 +1,14 @@
+Relatório gravado em [`docs/superpowers/sdd/2026-08-27-fase-7-t9-rereview1.md`](C:\RN\TozzoBurger\docs\superpowers\sdd\2026-08-27-fase-7-t9-rereview1.md). Nenhum código foi alterado; não houve commit/push.
+
+```md
+# Task 9 — Re-review (fix round 1)
+
+## Finding da revisão original
+- [Important] Bypass de RBAC/categoria pela rota direta: ADDRESSED — a rota bloqueia não-`OWNER`, categoria já configurada e possui testes regressivos para ambos os cenários.
+
+## Quebras novas no diff de correção
+Nenhuma.
+
+## Veredito
+Todos endereçados.
+```

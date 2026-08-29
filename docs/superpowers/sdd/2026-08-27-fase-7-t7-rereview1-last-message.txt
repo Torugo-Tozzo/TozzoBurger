@@ -1,0 +1,15 @@
+Relatório gravado em [2026-08-27-fase-7-t7-rereview1.md](C:/RN/TozzoBurger/docs/superpowers/sdd/2026-08-27-fase-7-t7-rereview1.md). Nenhum código foi alterado; não houve commit/push.
+
+# Task 7 — Re-review (fix round 1)
+
+## Findings da revisão original
+- [Critical] Gerar venda ignora edições não salvas: ADDRESSED — estado atual é persistido antes da conversão.
+- [Critical] createdByName perdido: ADDRESSED — campo adicionado ao schema/migration, gravado nos fluxos de criação/sync e lido com fallback.
+- [Important] Paginação em memória: ADDRESSED — `Q.take`/`Q.skip` agora são aplicados nas queries Watermelon.
+
+## Quebras novas no diff de correção
+- [Important] Filtro de horário pode paginar incorretamente: o corte ocorre antes de `matchesTime`, fazendo vendas válidas após a primeira página desaparecerem.
+- [Important] Geração pode produzir total inconsistente: `updateOrder` recalcula o total com preços atuais, mas mantém preços unitários antigos dos itens.
+
+## Veredito
+Ainda há findings abertos: as duas quebras novas Important listadas acima.

@@ -39,5 +39,14 @@
   "clearCartConfirm": "Do you really want to clear the cart?",
   "notFoundTitle": "Oops!",
   "notFoundMessage": "This screen doesn't exist.",
-  "goHome": "Go to home screen!"
+  "goHome": "Go to home screen!",
+  "onboardingTitle": "Set up your establishment",
+  "onboardingChooseCategory": "Choose your establishment category",
+  "onboardingSuggestedTypes": "Suggested product types",
+  "onboardingTypePlaceholder": "New product type",
+  "onboardingAddType": "Add",
+  "onboardingConfirm": "Confirm category",
+  "onboardingChangeCategory": "Choose another category",
+  "onboardingSaving": "Saving…",
+  "onboardingSaveError": "Could not save the category. Please try again."
 }

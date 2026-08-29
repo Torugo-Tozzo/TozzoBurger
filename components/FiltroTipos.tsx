@@ -7,14 +7,14 @@ import { useTranslation } from 'react-i18next';
 import { getProductTypeLabel } from '@/components/productTypeLabel';
 
 type TipoProduto = {
-  id: number;
+  id: string;
   description: string;
 };
 
 type FiltroTiposProps = {
   data: TipoProduto[];
-  selectedId: number | null;
-  onSelect: (id: number | null) => void;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
 };
 
 const BUTTON_HEIGHT = 45;

@@ -1,0 +1,3 @@
+DONE — tudo implementado, testado, commitado, sem dúvidas em aberto.  
+Commit: `a1c0f642051e49adcb42f25be1067994a9448310`; testes 35/35, 152/152, snapshot OK; `npx tsc --noEmit` exit 0.  
+Relatório: [2026-08-27-fase-7-t11-mobile-worker.md](C:/RN/TozzoBurger/docs/superpowers/sdd/2026-08-27-fase-7-t11-mobile-worker.md)

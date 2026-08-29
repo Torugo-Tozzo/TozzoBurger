@@ -38,7 +38,8 @@
       "react-native-ble-plx",
       "expo-sqlite",
       "expo-secure-store",
-      "expo-localization"
+      "expo-localization",
+      "./plugins/withWatermelonJsi.js"
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,7 +1,7 @@
 import React from 'react';
 import { RecordCard, RecordCardAction } from '@/components/ui/RecordCard';
-import { getStatusColor, normalizeOrderStatus } from '@/constants/status';
 import { Order } from '@/database/types/Order';
+import Colors from '@/constants/Colors';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -13,8 +13,6 @@ type Props = {
 
 export function PedidoItem({ data, products, onEdit, onDelete }: Props) {
   const { t, i18n } = useTranslation();
-  const statusLabel = data.status ?? 'OPEN';
-  const normalizedStatus = normalizeOrderStatus(statusLabel);
 
   const horaFormatada = new Date(data.openedAt).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
   const autorTrecho = data.createdByName ? t('common.createdBy', { name: data.createdByName }) : '';
@@ -28,8 +26,7 @@ export function PedidoItem({ data, products, onEdit, onDelete }: Props) {
 
   return (
     <RecordCard
-      accentColor={getStatusColor(statusLabel)}
-      badge={{ label: t(`status.${statusKey(normalizedStatus)}`), color: getStatusColor(statusLabel) }}
+      accentColor={Colors.light.textMuted}
       title={(data.customerName && String(data.customerName).trim().length > 0) ? data.customerName : t('common.customerUnknown')}
       subtitle={products.length > 0 ? products.join(', ') : undefined}
       meta={`${autorTrecho}${horaFormatada}`}
@@ -37,15 +34,6 @@ export function PedidoItem({ data, products, onEdit, onDelete }: Props) {
       actions={actions}
     />
   );
-}
-
-function statusKey(status: ReturnType<typeof normalizeOrderStatus>): string {
-  switch (status) {
-    case 'OPEN': return 'open';
-    case 'IN_PREPARATION': return 'inPreparation';
-    case 'DELIVERING': return 'delivering';
-    case 'CLOSED': return 'closed';
-  }
 }
 
 export default PedidoItem;

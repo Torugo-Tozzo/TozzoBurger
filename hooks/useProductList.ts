@@ -20,7 +20,7 @@ function isProductsEqual(a: Product[], b: Product[]): boolean {
 export function useProductList() {
   const [search, setSearch] = useState("")
   const [products, setProducts] = useState<Product[]>([])
-  const [productTypes, setProductTypes] = useState<{ id: number; description: string }[]>([])
+  const [productTypes, setProductTypes] = useState<{ id: string; description: string }[]>([])
   const [productTypeId, setProductTypeId] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
@@ -57,10 +57,10 @@ export function useProductList() {
   }
 
   // Função para filtrar produtos por tipo (página 1)
-  const filterByProductType = async (typeId: number | null) => {
+  const filterByProductType = async (typeId: string | null) => {
     if (typeId) {
       requestIdRef.current += 1
-      setProductTypeId(String(typeId))
+      setProductTypeId(typeId)
       setIsLoading(true)
       try {
         const filtered = await productDatabase.filterByProductType(typeId, PAGE_SIZE, 0)
@@ -87,7 +87,7 @@ export function useProductList() {
       const nextPage = page + 1
       const offset = (nextPage - 1) * PAGE_SIZE
       const more = productTypeId
-        ? await productDatabase.filterByProductType(Number(productTypeId), PAGE_SIZE, offset)
+        ? await productDatabase.filterByProductType(productTypeId, PAGE_SIZE, offset)
         : await productDatabase.searchByName(search, PAGE_SIZE, offset)
       if (requestId !== requestIdRef.current) return
       setProducts((prev) => [...prev, ...more])

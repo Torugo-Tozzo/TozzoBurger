@@ -1,0 +1,412 @@
+6fd6bf6 fix: guard direct category onboarding route
+
+ app/__tests__/onboarding.test.tsx     | 42 +++++++++++++++++
+ app/onboarding.tsx                    | 24 +++++++++-
+ components/CategoryOnboardingGate.tsx | 60 +++++-------------------
+ hooks/useCategoryOnboardingAccess.ts  | 87 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 163 insertions(+), 50 deletions(-)
+
+diff --git a/app/__tests__/onboarding.test.tsx b/app/__tests__/onboarding.test.tsx
+index 2229f86..1ab1763 100644
+--- a/app/__tests__/onboarding.test.tsx
++++ b/app/__tests__/onboarding.test.tsx
+@@ -6,20 +6,25 @@ import OnboardingScreen from '@/app/onboarding';
+ import CategoryOnboardingGate from '@/components/CategoryOnboardingGate';
+ import {
+   createProductType,
+   getEstablishment,
+   updateEstablishmentCategory,
+ } from '@/services/api';
+ import { runWithLock } from '@/database/syncGuard';
+ import { synchronizeWithServer } from '@/database/watermelon/sync';
+ 
+ const mockUseAuth = jest.fn();
++const mockRouterReplace = jest.fn();
++
++jest.mock('expo-router', () => ({
++  useRouter: () => ({ replace: mockRouterReplace }),
++}));
+ 
+ jest.mock('@/context/AuthContext', () => ({
+   useAuth: () => mockUseAuth(),
+ }));
+ 
+ jest.mock('@/services/api', () => ({
+   createProductType: jest.fn(),
+   getEstablishment: jest.fn(),
+   updateEstablishmentCategory: jest.fn(),
+ }));
+@@ -54,30 +59,32 @@ function flushPromises() {
+ 
+ describe('category onboarding screen', () => {
+   beforeEach(() => {
+     jest.clearAllMocks();
+     mockUseAuth.mockReturnValue({
+       token: 'token-123',
+       user: { role: 'OWNER', establishmentId: 'establishment-1' },
+     });
+     mockUpdateEstablishmentCategory.mockResolvedValue({ id: 'establishment-1', category: 'HAMBURGUERIA' });
+     mockCreateProductType.mockResolvedValue({ id: 'type-1' });
++    mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: null });
+     mockSynchronizeWithServer.mockResolvedValue(undefined);
+     mockRunWithLock.mockImplementation(async (callback) => callback());
+   });
+ 
+   it('uses the edited list when confirming a category', async () => {
+     let renderer: ReturnType<typeof create>;
+     await act(async () => {
+       renderer = create(
+         <OnboardingScreen token="token-123" establishmentId="establishment-1" />,
+       );
++      await flushPromises();
+     });
+ 
+     await act(async () => {
+       findByAccessibilityLabel(renderer!, 'HAMBURGUERIA').props.onPress();
+     });
+ 
+     const input = findByAccessibilityLabel(renderer!, 'onboarding.typeInput');
+     await act(async () => {
+       input.props.onChangeText('Combos');
+     });
+@@ -104,20 +111,55 @@ describe('category onboarding screen', () => {
+       ['token-123', { description: 'Sobremesas', color: '#9E9E9E' }],
+       ['token-123', { description: 'Combos', color: '#9E9E9E' }],
+     ]);
+     expect(mockCreateProductType).not.toHaveBeenCalledWith(
+       'token-123',
+       { description: 'Lanches', color: '#9E9E9E' },
+     );
+     expect(mockRunWithLock).toHaveBeenCalledTimes(1);
+     expect(mockSynchronizeWithServer).toHaveBeenCalledWith('token-123', 'establishment-1');
+   });
++
++  it('redirects a MANAGER opening onboarding directly without rendering or mutating', async () => {
++    mockUseAuth.mockReturnValue({
++      token: 'token-123',
++      user: { role: 'MANAGER', establishmentId: 'establishment-1' },
++    });
++    let renderer: ReturnType<typeof create>;
++
++    await act(async () => {
++      renderer = create(<OnboardingScreen />);
++      await flushPromises();
++    });
++
++    expect(mockRouterReplace).toHaveBeenCalledWith('/(tabs)');
++    expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
++    expect(mockGetEstablishment).not.toHaveBeenCalled();
++    expect(mockUpdateEstablishmentCategory).not.toHaveBeenCalled();
++    expect(mockCreateProductType).not.toHaveBeenCalled();
++  });
++
++  it('redirects an OWNER opening onboarding directly when the category is already configured', async () => {
++    mockGetEstablishment.mockResolvedValue({ id: 'establishment-1', category: 'PIZZARIA' });
++    let renderer: ReturnType<typeof create>;
++
++    await act(async () => {
++      renderer = create(<OnboardingScreen />);
++      await flushPromises();
++    });
++
++    expect(mockGetEstablishment).toHaveBeenCalledWith('token-123');
++    expect(mockRouterReplace).toHaveBeenCalledWith('/(tabs)');
++    expect(renderer!.root.findAll((node) => node.props.accessibilityLabel === 'HAMBURGUERIA')).toHaveLength(0);
++    expect(mockUpdateEstablishmentCategory).not.toHaveBeenCalled();
++    expect(mockCreateProductType).not.toHaveBeenCalled();
++  });
+ });
+ 
+ describe('category onboarding gate', () => {
+   beforeEach(() => {
+     jest.clearAllMocks();
+     mockUseAuth.mockReturnValue({
+       token: 'token-123',
+       user: { role: 'OWNER', establishmentId: 'establishment-1' },
+     });
+   });
+diff --git a/app/onboarding.tsx b/app/onboarding.tsx
+index c4457f8..f4a3df0 100644
+--- a/app/onboarding.tsx
++++ b/app/onboarding.tsx
+@@ -1,55 +1,75 @@
+-import React, { useState } from 'react';
++import React, { useEffect, useRef, useState } from 'react';
+ import {
+   Pressable,
+   ScrollView,
+   StyleSheet,
+   Text,
+   TextInput,
+   View,
+ } from 'react-native';
+ import { useTranslation } from 'react-i18next';
++import { useRouter } from 'expo-router';
+ 
+ import { useAuth } from '@/context/AuthContext';
+ import {
+   CATEGORY_OPTIONS,
+   type EstablishmentCategory,
+   getCategorySeed,
+ } from '@/database/watermelon/categorySeeds';
+ import {
+   completeCategoryOnboarding,
+ } from '@/services/categoryOnboarding';
+ import { Button } from '@/components/ui/Button';
++import { useCategoryOnboardingAccess } from '@/hooks/useCategoryOnboardingAccess';
++import type { Establishment } from '@/services/api';
+ 
+ type EstablishmentId = string | number;
+ 
+ export type OnboardingScreenProps = {
+   token?: string | null;
+   establishmentId?: EstablishmentId | null;
++  knownEstablishment?: Establishment | null;
+   onCompleted?: (category: EstablishmentCategory) => void;
+ };
+ 
+ export default function OnboardingScreen({
+   token: tokenOverride,
+   establishmentId: establishmentIdOverride,
++  knownEstablishment,
+   onCompleted,
+ }: OnboardingScreenProps = {}) {
+   const { token: authToken, user } = useAuth();
+   const { t } = useTranslation();
++  const router = useRouter();
+   const token = tokenOverride ?? authToken;
+   const establishmentId = establishmentIdOverride ?? user?.establishmentId;
++  const access = useCategoryOnboardingAccess({
++    token,
++    role: user?.role,
++    establishmentId,
++    knownEstablishment,
++  });
++  const redirected = useRef(false);
+   const [category, setCategory] = useState<EstablishmentCategory | null>(null);
+   const [productTypeDescriptions, setProductTypeDescriptions] = useState<string[]>([]);
+   const [newDescription, setNewDescription] = useState('');
+   const [saving, setSaving] = useState(false);
+   const [error, setError] = useState<string | null>(null);
+ 
++  useEffect(() => {
++    if (!access.shouldRedirect || redirected.current) return;
++
++    redirected.current = true;
++    router.replace('/(tabs)');
++  }, [access.shouldRedirect, router]);
++
+   const chooseCategory = (nextCategory: EstablishmentCategory) => {
+     setCategory(nextCategory);
+     setProductTypeDescriptions(getCategorySeed(nextCategory));
+     setNewDescription('');
+     setError(null);
+   };
+ 
+   const addDescription = () => {
+     const description = newDescription.trim();
+     if (description.length === 0) return;
+@@ -81,20 +101,22 @@ export default function OnboardingScreen({
+       });
+       onCompleted?.(category);
+     } catch (confirmationError) {
+       console.warn('Category onboarding failed', confirmationError);
+       setError(t('common.onboardingSaveError'));
+     } finally {
+       setSaving(false);
+     }
+   };
+ 
++  if (!access.allowed) return null;
++
+   return (
+     <ScrollView contentContainerStyle={styles.container}>
+       <Text style={styles.title}>{t('common.onboardingTitle')}</Text>
+       <Text style={styles.subtitle}>{t('common.onboardingChooseCategory')}</Text>
+ 
+       <View style={styles.categories}>
+         {CATEGORY_OPTIONS.map((option) => {
+           const selected = category === option;
+           return (
+             <Pressable
+diff --git a/components/CategoryOnboardingGate.tsx b/components/CategoryOnboardingGate.tsx
+index cc46ec3..067198f 100644
+--- a/components/CategoryOnboardingGate.tsx
++++ b/components/CategoryOnboardingGate.tsx
+@@ -1,72 +1,34 @@
+-import React, { useEffect, useState } from 'react';
++import React from 'react';
+ 
+ import OnboardingScreen from '@/app/onboarding';
+ import { useAuth } from '@/context/AuthContext';
+-import { getEstablishment, type Establishment } from '@/services/api';
++import { useCategoryOnboardingAccess } from '@/hooks/useCategoryOnboardingAccess';
+ import type { EstablishmentCategory } from '@/database/watermelon/categorySeeds';
+ 
+ type Props = {
+   children: React.ReactNode;
+ };
+ 
+ export default function CategoryOnboardingGate({ children }: Props) {
+   const { token, user } = useAuth();
+-  const role = user?.role;
+-  const establishmentId = user?.establishmentId;
+-  const isOwner = role === 'OWNER';
+-  const eligible = Boolean(token && isOwner && establishmentId !== null && establishmentId !== undefined);
+-  const [establishment, setEstablishment] = useState<Establishment | null>(null);
+-  const [checking, setChecking] = useState(false);
++  const access = useCategoryOnboardingAccess({
++    token,
++    role: user?.role,
++    establishmentId: user?.establishmentId,
++  });
+ 
+-  useEffect(() => {
+-    let mounted = true;
+-
+-    if (!eligible || !token) {
+-      setEstablishment(null);
+-      setChecking(false);
+-      return () => {
+-        mounted = false;
+-      };
+-    }
+-
+-    setChecking(true);
+-    setEstablishment(null);
+-    getEstablishment(token)
+-      .then((nextEstablishment) => {
+-        if (mounted) setEstablishment(nextEstablishment);
+-      })
+-      .catch((error) => {
+-        if (mounted) {
+-          console.warn('Could not load establishment category', error);
+-          setEstablishment(null);
+-        }
+-      })
+-      .finally(() => {
+-        if (mounted) setChecking(false);
+-      });
+-
+-    return () => {
+-      mounted = false;
+-    };
+-  }, [eligible, establishmentId, token]);
+-
+-  if (
+-    eligible
+-    && !checking
+-    && establishment?.category === null
+-    && establishment.id !== null
+-    && establishment.id !== undefined
+-  ) {
++  if (access.allowed && access.establishment) {
+     return (
+       <OnboardingScreen
+         token={token}
+-        establishmentId={establishment.id}
++        establishmentId={access.establishment.id}
++        knownEstablishment={access.establishment}
+         onCompleted={(category: EstablishmentCategory) => {
+-          setEstablishment((current) => current ? { ...current, category } : current);
++          access.markCategoryConfigured(category);
+         }}
+       />
+     );
+   }
+ 
+   return <>{children}</>;
+ }
+diff --git a/hooks/useCategoryOnboardingAccess.ts b/hooks/useCategoryOnboardingAccess.ts
+new file mode 100644
+index 0000000..7e93bbe
+--- /dev/null
++++ b/hooks/useCategoryOnboardingAccess.ts
+@@ -0,0 +1,87 @@
++import { useEffect, useState } from 'react';
++
++import { getEstablishment, type Establishment } from '@/services/api';
++
++type EstablishmentId = string | number;
++
++type Options = {
++  token: string | null | undefined;
++  role: string | null | undefined;
++  establishmentId: EstablishmentId | null | undefined;
++  knownEstablishment?: Establishment | null;
++};
++
++export type CategoryOnboardingAccess = {
++  establishment: Establishment | null;
++  checking: boolean;
++  allowed: boolean;
++  shouldRedirect: boolean;
++  markCategoryConfigured: (category: Establishment['category']) => void;
++};
++
++export function useCategoryOnboardingAccess({
++  token,
++  role,
++  establishmentId,
++  knownEstablishment,
++}: Options): CategoryOnboardingAccess {
++  const isOwner = role === 'OWNER';
++  const eligible = Boolean(token && isOwner && establishmentId !== null && establishmentId !== undefined);
++  const hasKnownEstablishment = knownEstablishment !== undefined;
++  const [establishment, setEstablishment] = useState<Establishment | null>(knownEstablishment ?? null);
++  const [checking, setChecking] = useState(eligible && !hasKnownEstablishment);
++
++  useEffect(() => {
++    let mounted = true;
++
++    if (hasKnownEstablishment) {
++      setEstablishment(knownEstablishment ?? null);
++      setChecking(false);
++      return () => {
++        mounted = false;
++      };
++    }
++
++    if (!eligible || !token) {
++      setEstablishment(null);
++      setChecking(false);
++      return () => {
++        mounted = false;
++      };
++    }
++
++    setChecking(true);
++    setEstablishment(null);
++    getEstablishment(token)
++      .then((nextEstablishment) => {
++        if (mounted) setEstablishment(nextEstablishment);
++      })
++      .catch((error) => {
++        if (mounted) {
++          console.warn('Could not load establishment category', error);
++          setEstablishment(null);
++        }
++      })
++      .finally(() => {
++        if (mounted) setChecking(false);
++      });
++
++    return () => {
++      mounted = false;
++    };
++  }, [eligible, establishmentId, hasKnownEstablishment, knownEstablishment, token]);
++
++  const hasEstablishmentId = establishment?.id !== null && establishment?.id !== undefined;
++  const allowed = eligible && !checking && establishment?.category === null && hasEstablishmentId;
++  const markCategoryConfigured = (category: Establishment['category']) => {
++    setEstablishment((current) => current ? { ...current, category } : current);
++  };
++
++  return {
++    establishment,
++    checking,
++    allowed,
++    shouldRedirect: !checking && !allowed,
++    markCategoryConfigured,
++  };
++}

@@ -1,200 +1,209 @@
-import { useSQLiteContext } from "expo-sqlite"
-import { Product } from "./types/Product"
-import { generateUUID } from "./utils/uuid"
-import { markChanged } from "./tableWatermark"
+import { Q } from '@nozbe/watermelondb';
+import type { Clause } from '@nozbe/watermelondb/QueryDescription';
+
+import { useAuth } from '../context/AuthContext';
+import type { Product as ProductData } from './types/Product';
+import { markChanged } from './tableWatermark';
+import { database } from './watermelon/database';
+import ProductModel from './watermelon/models/Product';
+import ProductTypeModel from './watermelon/models/ProductType';
+
+type ProductInput = ProductData & {
+  establishmentId?: string | number | null;
+};
+
+function toProductData(product: ProductModel): ProductData {
+  return {
+    id: product.id,
+    name: product.name,
+    price: product.price,
+    productTypeId: product.productTypeId,
+    sourceProductId: product.sourceProductId,
+    ingredients: product.ingredients,
+    updated_at: product.updatedAt.getTime(),
+    deleted_at: null,
+    sync_status: product.syncStatus === 'synced' ? 'synced' : 'pending',
+  };
+}
+
+function productCollection() {
+  return database.get<ProductModel>('products');
+}
+
+function activeProductTypeClause() {
+  return Q.on('product_types', Q.where('is_active', true));
+}
+
+function asEstablishmentId(value: string | number | null | undefined): string {
+  return value == null || value === '' ? '' : String(value);
+}
+
+function normalizeEstablishmentId(value: string | number | null | undefined): string | null {
+  const normalized = asEstablishmentId(value);
+  return normalized === '' ? null : normalized;
+}
+
+async function findProduct(id: string, establishmentId: string | null): Promise<ProductModel | null> {
+  if (!establishmentId) return null;
+
+  const [product] = await productCollection()
+    .query(Q.where('id', id), Q.where('establishment_id', establishmentId))
+    .fetch();
+  return product ?? null;
+}
 
 export function useProductDatabase() {
-  const database = useSQLiteContext()
+  const { user } = useAuth();
+  const currentEstablishmentId = normalizeEstablishmentId(user?.establishmentId);
 
-  async function create(data: Omit<Product, "id" | "updated_at">) {
-    const statement = await database.prepareAsync(
-      "INSERT INTO TB_PRODUCTS (id, name, price, productTypeId, sourceProductId, ingredients, updated_at, sync_status) VALUES ($id, $name, $price, $productTypeId, $sourceProductId, $ingredients, $updated_at, $sync_status)"
-    )
-
-    try {
-      const id = generateUUID()
-      const result = await statement.executeAsync({
-        $id: id,
-        $name: data.name,
-        $price: data.price,
-        $productTypeId: data.productTypeId,
-        $sourceProductId: data.sourceProductId ?? null,
-        $ingredients: data.ingredients ?? null,
-        $updated_at: Date.now(),
-        $sync_status: 'pending',
-      })
-
-        console.log('[db] produto criado', { id })
-
-        markChanged('products')
-
-        return { id }
-    } catch (error) {
-      throw error
-    } finally {
-      await statement.finalizeAsync()
+  async function create(data: Omit<ProductData, 'id' | 'updated_at'>) {
+    const input = data as ProductInput;
+    if (!currentEstablishmentId) {
+      throw new Error('Cannot create a product without an authenticated establishment');
     }
+
+    const now = new Date();
+    const product = await database.write(() => productCollection().create((record) => {
+      record.name = input.name;
+      record.price = input.price;
+      record.productTypeId = input.productTypeId == null ? null : String(input.productTypeId);
+      record.sourceProductId = input.sourceProductId ?? null;
+      record.ingredients = input.ingredients ?? null;
+      record.establishmentId = currentEstablishmentId;
+      record.createdAt = now;
+      record.updatedAt = now;
+    }));
+
+    markChanged('products');
+    return { id: product.id };
   }
 
-  async function createFromSync(data: Product) {
-    const statement = await database.prepareAsync(
-      "INSERT INTO TB_PRODUCTS (id, name, price, productTypeId, sourceProductId, ingredients, updated_at, sync_status) VALUES ($id, $name, $price, $productTypeId, $sourceProductId, $ingredients, $updated_at, $sync_status)"
-    )
+  async function createFromSync(data: ProductData) {
+    const input = data as ProductInput & { created_at?: number };
+    const updatedAt = Number.isFinite(input.updated_at) ? input.updated_at : Date.now();
+    const createdAt = Number.isFinite(input.created_at) ? input.created_at : updatedAt;
+    const products = productCollection();
+    const preparedProduct = products.prepareCreateFromDirtyRaw({
+      id: input.id,
+      _status: 'synced',
+      _changed: '',
+      name: input.name,
+      price: input.price,
+      product_type_id: input.productTypeId == null ? null : String(input.productTypeId),
+      source_product_id: input.sourceProductId ?? null,
+      ingredients: input.ingredients ?? null,
+      establishment_id: asEstablishmentId(input.establishmentId) || currentEstablishmentId || '',
+      created_at: createdAt,
+      updated_at: updatedAt,
+    });
 
-    try {
-      await statement.executeAsync({
-        $id: data.id,
-        $name: data.name,
-        $price: data.price,
-        $productTypeId: data.productTypeId,
-        $sourceProductId: data.sourceProductId ?? null,
-        $ingredients: data.ingredients ?? null,
-        $updated_at: (data as any).updated_at ?? Date.now(),
-        $sync_status: 'synced',
-      })
-
-      markChanged('products')
-
-      return { id: data.id }
-    } catch (error) {
-      throw error
-    } finally {
-      await statement.finalizeAsync()
-    }
+    await database.write(() => database.batch(preparedProduct));
+    markChanged('products');
+    return { id: input.id };
   }
 
   async function searchByName(name: string, limit?: number, offset?: number) {
-    try {
-      if (limit !== undefined) {
-        const query = `SELECT P.* FROM TB_PRODUCTS P JOIN TB_PRODUCT_TYPES T ON P.productTypeId = T.id WHERE P.deleted_at IS NULL AND T.isActive = 1 AND P.name LIKE ? ORDER BY P.name ASC, P.id ASC LIMIT ? OFFSET ?`
+    if (!currentEstablishmentId) return [];
 
-        const response = await database.getAllAsync<Product>(query, [`%${name}%`, limit, offset ?? 0])
+    const clauses: Clause[] = [
+      Q.where('establishment_id', currentEstablishmentId),
+      activeProductTypeClause(),
+      Q.where('name', Q.like(`%${Q.sanitizeLikeString(name)}%`)),
+    ];
 
-        return response
-      }
-
-      const query = `SELECT P.* FROM TB_PRODUCTS P JOIN TB_PRODUCT_TYPES T ON P.productTypeId = T.id WHERE P.deleted_at IS NULL AND T.isActive = 1 AND P.name LIKE ?`
-
-      const response = await database.getAllAsync<Product>(query, `%${name}%`)
-
-      return response
-    } catch (error) {
-      throw error
+    if (limit !== undefined) {
+      clauses.push(Q.sortBy('name', Q.asc), Q.sortBy('id', Q.asc), Q.take(limit), Q.skip(offset ?? 0));
     }
+
+    const products = await productCollection().query(...clauses).fetch();
+    return products.map(toProductData);
   }
 
-  async function update(data: Omit<Product, "updated_at">) {
-    const statement = await database.prepareAsync(
-      "UPDATE TB_PRODUCTS SET name = $name, price = $price, productTypeId = $productTypeId, ingredients = $ingredients, updated_at = $updated_at, sync_status = $sync_status WHERE id = $id"
-    )
+  async function update(data: Omit<ProductData, 'updated_at'>) {
+    const product = await findProduct(data.id, currentEstablishmentId);
 
-    try {
-      await statement.executeAsync({
-        $id: data.id,
-        $name: data.name,
-        $price: data.price,
-        $productTypeId: data.productTypeId,
-        $ingredients: data.ingredients ?? null,
-        $updated_at: Date.now(),
-        $sync_status: 'pending',
-      })
-
-      markChanged('products')
-    } catch (error) {
-      throw error
-    } finally {
-      await statement.finalizeAsync()
+    if (product) {
+      await database.write(() => product.update((record) => {
+        record.name = data.name;
+        record.price = data.price;
+        record.productTypeId = data.productTypeId == null ? null : String(data.productTypeId);
+        record.ingredients = data.ingredients ?? null;
+      }));
     }
+
+    markChanged('products');
   }
 
   async function remove(id: string) {
-    try {
-      const now = Date.now();
-      await database.runAsync(
-        'UPDATE TB_PRODUCTS SET deleted_at = ?, updated_at = ?, sync_status = ? WHERE id = ?',
-        [now, now, 'pending', id]
-      );
+    const product = await findProduct(id, currentEstablishmentId);
 
-      markChanged('products')
-    } catch (error) {
-      throw error
+    if (product) {
+      await database.write(() => product.markAsDeleted());
     }
+
+    markChanged('products');
   }
 
   async function show(id: string) {
-    try {
-      const query = "SELECT * FROM TB_PRODUCTS WHERE id = ? AND deleted_at IS NULL"
-
-      const response = await database.getFirstAsync<Product>(query, [
-        id,
-      ])
-
-      return response
-    } catch (error) {
-      throw error
-    }
+    const product = await findProduct(id, currentEstablishmentId);
+    return product ? toProductData(product) : null;
   }
 
   async function showAdd(id: string) {
-    try {
-      const query = "SELECT * FROM TB_PRODUCTS WHERE id = ? AND deleted_at IS NULL"
-
-      const response = await database.getFirstAsync<Product>(query, [
-        id,
-      ])
-
-      return response
-    } catch (error) {
-      throw error
-    }
+    return show(id);
   }
 
   async function getProductTypes() {
-    try {
-      const query = "SELECT id, description FROM TB_PRODUCT_TYPES WHERE deleted_at IS NULL AND isActive = 1"
+    const productTypes = await database
+      .get<ProductTypeModel>('product_types')
+      .query(Q.where('is_active', true), Q.sortBy('description', Q.asc))
+      .fetch();
 
-      const response = await database.getAllAsync<{ id: number; description: string }>(
-        query
+    return productTypes.map((productType) => ({
+      id: productType.id,
+      description: productType.description,
+    }));
+  }
+
+  async function filterByProductType(productTypeId: string, limit: number, offset: number): Promise<ProductData[]> {
+    if (!currentEstablishmentId) return [];
+
+    const products = await productCollection()
+      .query(
+        Q.where('establishment_id', currentEstablishmentId),
+        activeProductTypeClause(),
+        Q.where('product_type_id', productTypeId),
+        Q.sortBy('name', Q.asc),
+        Q.sortBy('id', Q.asc),
+        Q.take(limit),
+        Q.skip(offset),
       )
+      .fetch();
 
-      return response
-    } catch (error) {
-      throw error
-    }
+    return products.map(toProductData);
   }
 
-  async function filterByProductType(productTypeId: number, limit: number, offset: number): Promise<Product[]> {
-    try {
-      const query = `SELECT P.* FROM TB_PRODUCTS P JOIN TB_PRODUCT_TYPES T ON P.productTypeId = T.id WHERE P.deleted_at IS NULL AND T.isActive = 1 AND P.productTypeId = ? ORDER BY P.name ASC, P.id ASC LIMIT ? OFFSET ?`
+  async function searchBySourceProductId(productId: string): Promise<ProductData[]> {
+    if (!currentEstablishmentId) return [];
 
-      const response = await database.getAllAsync<Product>(query, [productTypeId, limit, offset])
+    const products = await productCollection()
+      .query(
+        Q.where('establishment_id', currentEstablishmentId),
+        activeProductTypeClause(),
+        Q.where('source_product_id', productId),
+      )
+      .fetch();
 
-      return response
-    } catch (error) {
-      throw error
-    }
+    return products.map(toProductData);
   }
 
-  async function searchBySourceProductId(productId: string): Promise<Product[]> {
-    try {
-      const query = `SELECT P.* FROM TB_PRODUCTS P JOIN TB_PRODUCT_TYPES T ON P.productTypeId = T.id WHERE P.sourceProductId = ? AND P.deleted_at IS NULL AND T.isActive = 1`
-
-      const response = await database.getAllAsync<Product>(query, [productId])
-
-      return response
-    } catch (error) {
-      console.error("Erro ao buscar produtos de origem:", error)
-      throw error
-    }
-  }
-
-  return { 
-    create, 
-    createFromSync, 
-    searchByName, 
-    update, 
-    remove, 
-    show, 
+  return {
+    create,
+    createFromSync,
+    searchByName,
+    update,
+    remove,
+    show,
     getProductTypes,
     filterByProductType,
     searchBySourceProductId,
@@ -204,6 +213,6 @@ export function useProductDatabase() {
     filterByTipo: filterByProductType,
     /** @deprecated Use searchBySourceProductId. */
     searchOrigemProdutoId: searchBySourceProductId,
-    showAdd 
-  }
+    showAdd,
+  };
 }

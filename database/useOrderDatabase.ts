@@ -1,423 +1,516 @@
-import { useSQLiteContext } from "expo-sqlite";
-import { OrderItem, Order, ORDER_STATUS } from "./types/Order";
-import { generateUUID } from "./utils/uuid";
-import { markChanged } from "./tableWatermark";
+import { Q } from '@nozbe/watermelondb';
+import type { Clause } from '@nozbe/watermelondb/QueryDescription';
 
-type OrderStatus = typeof ORDER_STATUS[keyof typeof ORDER_STATUS];
+import { useAuth } from '../context/AuthContext';
+import type {
+  Order as OrderData,
+  OrderItem as OrderItemData,
+  OrderItemStatus,
+} from './types/Order';
+import { ORDER_ITEM_STATUS } from './types/Order';
+import { markChanged } from './tableWatermark';
+import { generateUUID } from './utils/uuid';
+import { database } from './watermelon/database';
+import OrderModel from './watermelon/models/Order';
+import OrderItemModel from './watermelon/models/OrderItem';
+import ProductModel from './watermelon/models/Product';
 
-function isValidStatus(value: any): value is OrderStatus {
+type OrderWithProducts = OrderData & { products: string[] };
+type OrderSyncInput = OrderData & {
+  items?: OrderItemData[];
+  created_at?: number;
+  updatedAt?: number;
+  opened_at?: number | string;
+  customer_name?: string | null;
+  is_open?: boolean;
+  establishment_id?: string | number | null;
+  seller_id?: string | number | null;
+};
+type OrderItemSyncInput = OrderItemData & {
+  product_id?: string;
+  unit_price_at_order?: number;
+  created_at?: number;
+  updated_at?: number;
+};
+
+function asEstablishmentId(value: string | number | null | undefined): string {
+  return value == null || value === '' ? '' : String(value);
+}
+
+function normalizeEstablishmentId(value: string | number | null | undefined): string | null {
+  const normalized = asEstablishmentId(value);
+  return normalized === '' ? null : normalized;
+}
+
+function isOrderItemStatus(value: unknown): value is OrderItemStatus {
   return (
-    value === ORDER_STATUS.OPEN ||
-    value === ORDER_STATUS.IN_PREPARATION ||
-    value === ORDER_STATUS.DELIVERING ||
-    value === ORDER_STATUS.CLOSED
+    value === ORDER_ITEM_STATUS.REQUESTED ||
+    value === ORDER_ITEM_STATUS.IN_PREPARATION ||
+    value === ORDER_ITEM_STATUS.DELIVERED
   );
 }
 
-export function useOrderDatabase() {
-  const database = useSQLiteContext();
+function orderItemStatus(value: unknown): OrderItemStatus {
+  if (value == null) return ORDER_ITEM_STATUS.REQUESTED;
+  if (!isOrderItemStatus(value)) throw new Error('Status de item inválido');
+  return value;
+}
 
-  async function calculateTotal(items: OrderItem[]): Promise<number> {
-    let total = 0;
-
-    for (const { productId, quantity } of items) {
-      const product = await database.getFirstAsync<{ price: number }>(
-        "SELECT price FROM TB_PRODUCTS WHERE id = ?",
-        [productId]
-      );
-
-      if (product) {
-        total += product.price * quantity;
-      }
-    }
-
-    return total;
+function epoch(value: unknown, fallback: number): number {
+  if (value instanceof Date) {
+    const timestamp = value.getTime();
+    return Number.isFinite(timestamp) ? timestamp : fallback;
   }
+
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+
+  if (typeof value === 'string') {
+    const timestamp = Date.parse(value);
+    if (Number.isFinite(timestamp)) return timestamp;
+  }
+
+  return fallback;
+}
+
+function orderCollection() {
+  return database.get<OrderModel>('orders');
+}
+
+function orderItemCollection() {
+  return database.get<OrderItemModel>('order_items');
+}
+
+function productCollection() {
+  return database.get<ProductModel>('products');
+}
+
+function toOrderData(order: OrderModel): OrderData {
+  return {
+    id: order.id,
+    total: order.total,
+    openedAt: order.openedAt.toISOString(),
+    customerName: order.customerName,
+    isOpen: order.isOpen,
+    establishmentId: order.establishmentId,
+    sellerId: order.sellerId || null,
+    updated_at: order.updatedAt.getTime(),
+    deleted_at: null,
+    sync_status: order.syncStatus === 'synced' ? 'synced' : 'pending',
+    createdBy: order.sellerId || null,
+    createdByName: null,
+  };
+}
+
+function toOrderItemData(item: OrderItemModel): OrderItemData {
+  return {
+    id: item.id,
+    orderId: item.orderId,
+    productId: item.productId,
+    quantity: item.quantity,
+    status: orderItemStatus(item.status),
+    unitPriceAtOrder: item.unitPriceAtOrder,
+  };
+}
+
+async function findOrder(id: string, establishmentId: string | null): Promise<OrderModel | null> {
+  if (!establishmentId) return null;
+
+  const [order] = await orderCollection()
+    .query(Q.where('id', id), Q.where('establishment_id', establishmentId))
+    .fetch();
+  return order ?? null;
+}
+
+async function findProduct(id: string, establishmentId: string): Promise<ProductModel | null> {
+  const [product] = await productCollection()
+    .query(Q.where('id', id), Q.where('establishment_id', establishmentId))
+    .fetch();
+  return product ?? null;
+}
+
+async function productPrice(productId: string, establishmentId: string): Promise<number> {
+  const product = await findProduct(productId, establishmentId);
+  return product?.price ?? 0;
+}
+
+async function calculateTotal(items: OrderItemData[], establishmentId: string): Promise<number> {
+  const prices = await Promise.all(
+    items.map((item) => productPrice(String(item.productId), establishmentId)),
+  );
+
+  return items.reduce(
+    (total, item, index) => total + prices[index] * Number(item.quantity),
+    0,
+  );
+}
+
+async function fetchOrderItems(orderId: string, establishmentId: string): Promise<OrderItemModel[]> {
+  return orderItemCollection()
+    .query(
+      Q.where('order_id', orderId),
+      Q.on('orders', Q.where('establishment_id', establishmentId)),
+    )
+    .fetch();
+}
+
+async function productNamesForItems(
+  items: OrderItemModel[],
+  establishmentId: string,
+): Promise<{ name: string; quantity: number }[]> {
+  const rows = await Promise.all(
+    items.map(async (item) => {
+      const product = await findProduct(item.productId, establishmentId);
+      return product ? { name: product.name, quantity: item.quantity } : null;
+    }),
+  );
+
+  return rows.filter((row): row is { name: string; quantity: number } => row !== null);
+}
+
+function displayedProducts(products: { name: string; quantity: number }[]): string[] {
+  const productNames = products.map((product) => `( ${product.quantity}x ) ${product.name}`);
+  return productNames.length > 3
+    ? [...productNames.slice(0, 3), '...']
+    : productNames;
+}
+
+async function toOrderWithProducts(
+  order: OrderModel,
+  establishmentId: string,
+): Promise<OrderWithProducts> {
+  const items = await fetchOrderItems(order.id, establishmentId);
+  const products = await productNamesForItems(items, establishmentId);
+  return { ...toOrderData(order), products: displayedProducts(products) };
+}
+
+function groupOrdersByDate(orders: OrderWithProducts[]): Record<string, OrderWithProducts[]> {
+  const ordersByDate: Record<string, OrderWithProducts[]> = {};
+
+  for (const order of orders) {
+    const date = new Date(order.openedAt).toLocaleDateString();
+    if (!ordersByDate[date]) ordersByDate[date] = [];
+    ordersByDate[date].push(order);
+  }
+
+  return ordersByDate;
+}
+
+export function useOrderDatabase() {
+  const { user } = useAuth();
+  const currentEstablishmentId = normalizeEstablishmentId(user?.establishmentId);
 
   async function createOrder(
-    items: OrderItem[],
+    items: OrderItemData[],
     customerName?: string,
-    status: OrderStatus = ORDER_STATUS.OPEN,
+    isOpen = true,
     createdBy?: string | number | null,
-    createdByName?: string | null
+    createdByName?: string | null,
   ) {
-    const stmt = await database.prepareAsync(
-      "INSERT INTO TB_ORDERS (id, total, openedAt, customerName, status, updated_at, sync_status, createdBy, createdByName) VALUES ($id, $total, $openedAt, $customerName, $status, $updated_at, $sync_status, $createdBy, $createdByName)"
+    if (!currentEstablishmentId) {
+      throw new Error('Cannot create an order without an authenticated establishment');
+    }
+    if (typeof isOpen !== 'boolean') throw new Error('isOpen inválido');
+
+    // Keep the positional argument for createdByName for public compatibility.
+    void createdByName;
+
+    const now = new Date();
+    const total = await calculateTotal(items, currentEstablishmentId);
+    const prices = await Promise.all(
+      items.map((item) => productPrice(String(item.productId), currentEstablishmentId)),
     );
+    const sellerId = createdBy == null ? '' : String(createdBy);
 
-    try {
-      const total = await calculateTotal(items);
-      const openedAt = new Date().toISOString();
-
-      if (!isValidStatus(status)) throw new Error('Status inválido');
-
-      const orderId = generateUUID();
-      const updatedAt = Date.now();
-
-      await stmt.executeAsync({
-        $id: orderId,
-        $total: total,
-        $openedAt: openedAt,
-        $customerName: customerName ?? null,
-        $status: status,
-        $updated_at: updatedAt,
-        $sync_status: 'pending',
-        $createdBy: createdBy != null ? String(createdBy) : null,
-        $createdByName: createdByName ?? null,
+    const order = await database.write(async () => {
+      const createdOrder = await orderCollection().create((record) => {
+        record.total = total;
+        record.openedAt = now;
+        record.customerName = customerName ?? null;
+        record.isOpen = isOpen;
+        record.establishmentId = currentEstablishmentId;
+        record.sellerId = sellerId;
+        record.createdAt = now;
+        record.updatedAt = now;
       });
 
-      for (const { productId, quantity } of items) {
-        const relId = generateUUID();
-        const relStmt = await database.prepareAsync(
-          'INSERT INTO RL_ORDER_PRODUCT (id, orderId, productId, quantity) VALUES ($id, $orderId, $productId, $quantity)'
-        );
-        try {
-          await relStmt.executeAsync({ $id: relId, $orderId: orderId, $productId: productId, $quantity: quantity });
-        } finally {
-          await relStmt.finalizeAsync();
-        }
+      const itemsCollection = orderItemCollection();
+      for (const [index, item] of items.entries()) {
+        await itemsCollection.create((record) => {
+          record.quantity = Number(item.quantity);
+          record.status = ORDER_ITEM_STATUS.REQUESTED;
+          record.orderId = createdOrder.id;
+          record.order.set(createdOrder);
+          record.productId = String(item.productId);
+          record.unitPriceAtOrder = prices[index];
+          record.createdAt = now;
+          record.updatedAt = now;
+        });
       }
 
-      markChanged('orders')
+      return createdOrder;
+    });
 
-      return { orderId };
-    } finally {
-      await stmt.finalizeAsync();
-    }
+    markChanged('orders');
+    return { orderId: order.id };
   }
 
-  async function createFromSync(data: Order & { items?: OrderItem[] }) {
-    const stmt = await database.prepareAsync(
-      "INSERT INTO TB_ORDERS (id, total, openedAt, customerName, status, updated_at, sync_status) VALUES ($id, $total, $openedAt, $customerName, $status, $updated_at, $sync_status)"
-    );
-
-    try {
-      if (!isValidStatus(data.status)) throw new Error('Status inválido');
-
-      await stmt.executeAsync({
-        $id: data.id,
-        $total: data.total,
-        $openedAt: data.openedAt,
-        $customerName: data.customerName ?? null,
-        $status: data.status,
-        $updated_at: (data as any).updated_at ?? Date.now(),
-        $sync_status: 'synced',
-      });
-
-      if (Array.isArray(data.items)) {
-        for (const { productId, quantity } of data.items) {
-          const relId = generateUUID();
-          const relStmt = await database.prepareAsync(
-            'INSERT INTO RL_ORDER_PRODUCT (id, orderId, productId, quantity) VALUES ($id, $orderId, $productId, $quantity)'
-          );
-          try {
-            await relStmt.executeAsync({ $id: relId, $orderId: data.id, $productId: productId, $quantity: quantity });
-          } finally {
-            await relStmt.finalizeAsync();
-          }
-        }
-      }
-
-      markChanged('orders')
-
-      return { orderId: data.id };
-    } finally {
-      await stmt.finalizeAsync();
+  async function createFromSync(data: OrderData & { items?: OrderItemData[] }) {
+    if (!currentEstablishmentId) {
+      throw new Error('Cannot sync an order without an authenticated establishment');
     }
+
+    const raw = data as unknown as OrderSyncInput;
+    const incomingEstablishmentId = normalizeEstablishmentId(
+      raw.establishmentId ?? raw.establishment_id,
+    );
+    if (incomingEstablishmentId && incomingEstablishmentId !== currentEstablishmentId) {
+      throw new Error('Cannot sync an order from another establishment');
+    }
+
+    const id = String(raw.id ?? '');
+    if (!id) throw new Error('ID inválido');
+
+    const now = Date.now();
+    const updatedAt = epoch(raw.updated_at ?? raw.updatedAt, now);
+    const createdAt = epoch(raw.created_at, updatedAt);
+    const openedAt = epoch(raw.openedAt ?? raw.opened_at, createdAt);
+    const isOpen = typeof raw.isOpen === 'boolean'
+      ? raw.isOpen
+      : typeof raw.is_open === 'boolean'
+        ? raw.is_open
+        : true;
+    const total = Number(raw.total ?? 0);
+    const customer = raw.customerName ?? raw.customer_name ?? null;
+    const seller = raw.sellerId ?? raw.seller_id ?? raw.createdBy ?? '';
+    const items = Array.isArray(raw.items) ? raw.items : [];
+
+    const preparedOrder = orderCollection().prepareCreateFromDirtyRaw({
+      id,
+      _status: 'synced',
+      _changed: '',
+      total,
+      opened_at: openedAt,
+      customer_name: customer,
+      is_open: isOpen,
+      establishment_id: currentEstablishmentId,
+      seller_id: seller == null ? '' : String(seller),
+      created_at: createdAt,
+      updated_at: updatedAt,
+    });
+
+    const preparedItems = items.map((item) => {
+      const rawItem = item as OrderItemSyncInput;
+      const itemId = rawItem.id ? String(rawItem.id) : generateUUID();
+      const itemCreatedAt = epoch(rawItem.created_at, createdAt);
+      const itemUpdatedAt = epoch(rawItem.updated_at, updatedAt);
+
+      return orderItemCollection().prepareCreateFromDirtyRaw({
+        id: itemId,
+        _status: 'synced',
+        _changed: '',
+        quantity: Number(rawItem.quantity),
+        status: orderItemStatus(rawItem.status),
+        order_id: id,
+        product_id: String(rawItem.productId ?? rawItem.product_id ?? ''),
+        unit_price_at_order: Number(rawItem.unitPriceAtOrder ?? rawItem.unit_price_at_order ?? 0),
+        created_at: itemCreatedAt,
+        updated_at: itemUpdatedAt,
+      });
+    });
+
+    await database.write(() => database.batch(preparedOrder, ...preparedItems));
+    markChanged('orders');
+    return { orderId: id };
   }
 
   async function getOrderById(orderId: string) {
-    try {
-      const order = await database.getFirstAsync<Order>(
-        "SELECT * FROM TB_ORDERS WHERE id = ?",
-        [orderId]
-      );
+    const order = await findOrder(String(orderId), currentEstablishmentId);
 
-      if (!order) throw new Error(`Pedido com ID ${orderId} não encontrado.`);
+    if (!order) throw new Error(`Pedido com ID ${orderId} não encontrado.`);
 
-      const items = await database.getAllAsync<OrderItem>(
-        "SELECT productId, quantity FROM RL_ORDER_PRODUCT WHERE orderId = ?",
-        [orderId]
-      );
-
-      return { ...order, items };
-    } catch (error) {
-      throw error;
-    }
+    const items = await fetchOrderItems(order.id, currentEstablishmentId!);
+    return {
+      ...toOrderData(order),
+      items: items.map(toOrderItemData),
+    };
   }
 
   async function updateOrder(
     orderId: string,
-    items?: OrderItem[],
+    items?: OrderItemData[],
     customerName?: string,
-    status?: OrderStatus
+    isOpen?: boolean,
   ) {
-    try {
-      if (Array.isArray(items)) {
-        const existing = await database.getAllAsync<{ id: string; productId: string; quantity: number }>(
-          `SELECT id, productId, quantity FROM RL_ORDER_PRODUCT WHERE orderId = ?`,
-          [orderId]
-        );
-
-        const existingMap = new Map<string, string[]>();
-        for (const row of existing || []) {
-          const key = String(row.productId);
-          if (!existingMap.has(key)) existingMap.set(key, []);
-          existingMap.get(key)!.push(row.id);
-        }
-
-        const usedIds = new Set<string>();
-
-        for (const { productId, quantity } of items) {
-          const prodKey = String(productId);
-          let relId: string | undefined;
-
-          const list = existingMap.get(prodKey);
-          if (list && list.length) {
-            relId = list.shift()!;
-            const updateRelStmt = await database.prepareAsync(
-              'UPDATE RL_ORDER_PRODUCT SET quantity = $quantity WHERE id = $id'
-            );
-            try {
-              await updateRelStmt.executeAsync({ $quantity: Number(quantity), $id: relId });
-            } finally {
-              await updateRelStmt.finalizeAsync();
-            }
-          } else {
-            relId = generateUUID();
-            const insertRelStmt = await database.prepareAsync(
-              'INSERT INTO RL_ORDER_PRODUCT (id, orderId, productId, quantity) VALUES ($id, $orderId, $productId, $quantity)'
-            );
-            try {
-              await insertRelStmt.executeAsync({ $id: relId, $orderId: orderId, $productId: productId, $quantity: Number(quantity) });
-            } finally {
-              await insertRelStmt.finalizeAsync();
-            }
-          }
-
-          if (relId) usedIds.add(relId);
-        }
-
-        // remove leftover relations
-        try {
-          const toDelete = (existing || []).filter(r => !usedIds.has(r.id));
-          for (const row of toDelete) {
-            const delStmt = await database.prepareAsync('DELETE FROM RL_ORDER_PRODUCT WHERE id = $id');
-            try {
-              await delStmt.executeAsync({ $id: row.id });
-            } finally {
-              await delStmt.finalizeAsync();
-            }
-          }
-        } catch (errDel) {
-          // if delete fails, ignore silently
-        }
-
-        const total = await calculateTotal(items);
-        const updateTotalStmt = await database.prepareAsync(
-          'UPDATE TB_ORDERS SET total = $total, updated_at = $updatedAt, sync_status = $syncStatus WHERE id = $id'
-        );
-        try {
-          await updateTotalStmt.executeAsync({ $total: total, $updatedAt: Date.now(), $syncStatus: 'pending', $id: orderId });
-        } finally {
-          await updateTotalStmt.finalizeAsync();
-        }
-      }
-
-      if (typeof customerName !== 'undefined') {
-        const updateClienteStmt = await database.prepareAsync(
-          'UPDATE TB_ORDERS SET customerName = $customerName, updated_at = $updatedAt, sync_status = $syncStatus WHERE id = $id'
-        );
-        try {
-          await updateClienteStmt.executeAsync({ $customerName: customerName ?? null, $updatedAt: Date.now(), $syncStatus: 'pending', $id: orderId });
-        } finally {
-          await updateClienteStmt.finalizeAsync();
-        }
-      }
-
-      if (typeof status !== 'undefined') {
-        if (status !== null && !isValidStatus(status)) throw new Error('Status inválido');
-        const updateStatusStmt = await database.prepareAsync(
-          'UPDATE TB_ORDERS SET status = $status, updated_at = $updatedAt, sync_status = $syncStatus WHERE id = $id'
-        );
-        try {
-          await updateStatusStmt.executeAsync({ $status: status ?? null, $updatedAt: Date.now(), $syncStatus: 'pending', $id: orderId });
-        } finally {
-          await updateStatusStmt.finalizeAsync();
-        }
-      }
-
-      markChanged('orders')
-    } catch (error) {
-      throw error;
+    if (typeof isOpen !== 'undefined' && typeof isOpen !== 'boolean') {
+      throw new Error('isOpen inválido');
     }
+
+    const order = await findOrder(String(orderId), currentEstablishmentId);
+    if (!order) {
+      // Keep the old no-op behavior for an unknown ID while ensuring an ID
+      // from another establishment cannot be mutated.
+      markChanged('orders');
+      return;
+    }
+
+    const hasItemsUpdate = Array.isArray(items);
+    const existingItems = hasItemsUpdate
+      ? await fetchOrderItems(order.id, currentEstablishmentId!)
+      : [];
+    const prices = hasItemsUpdate
+      ? await Promise.all(items!.map((item) => productPrice(String(item.productId), currentEstablishmentId!)))
+      : [];
+    const total = hasItemsUpdate
+      ? items!.reduce((sum, item, index) => sum + prices[index] * Number(item.quantity), 0)
+      : order.total;
+    const existingByProduct = new Map<string, OrderItemModel[]>();
+
+    for (const existingItem of existingItems) {
+      const key = String(existingItem.productId);
+      const group = existingByProduct.get(key) ?? [];
+      group.push(existingItem);
+      existingByProduct.set(key, group);
+    }
+
+    const usedItems = new Set<string>();
+    const now = new Date();
+
+    await database.write(async () => {
+      if (hasItemsUpdate) {
+        const itemsCollection = orderItemCollection();
+
+        for (const [index, item] of items!.entries()) {
+          const key = String(item.productId);
+          const existingItem = existingByProduct.get(key)?.shift();
+          const nextStatus = item.status == null ? undefined : orderItemStatus(item.status);
+
+          if (existingItem) {
+            usedItems.add(existingItem.id);
+            await existingItem.update((record) => {
+              record.quantity = Number(item.quantity);
+              if (nextStatus) record.status = nextStatus;
+              record.updatedAt = now;
+            });
+          } else {
+            await itemsCollection.create((record) => {
+              record.quantity = Number(item.quantity);
+              record.status = nextStatus ?? ORDER_ITEM_STATUS.REQUESTED;
+              record.orderId = order.id;
+              record.order.set(order);
+              record.productId = key;
+              record.unitPriceAtOrder = prices[index];
+              record.createdAt = now;
+              record.updatedAt = now;
+            });
+          }
+        }
+
+        for (const existingItem of existingItems) {
+          if (!usedItems.has(existingItem.id)) await existingItem.markAsDeleted();
+        }
+      }
+
+      if (hasItemsUpdate || typeof customerName !== 'undefined' || typeof isOpen !== 'undefined') {
+        await order.update((record) => {
+          if (hasItemsUpdate) record.total = total;
+          if (typeof customerName !== 'undefined') record.customerName = customerName ?? null;
+          if (typeof isOpen !== 'undefined') record.isOpen = isOpen;
+          record.updatedAt = now;
+        });
+      }
+    });
+
+    markChanged('orders');
   }
 
   async function removeOrder(orderId: string) {
-    try {
-      const now = Date.now();
-      const stmt = await database.prepareAsync(
-        'UPDATE TB_ORDERS SET deleted_at = $deletedAt, updated_at = $updatedAt, sync_status = $syncStatus WHERE id = $id'
-      );
-      try {
-        await stmt.executeAsync({ $deletedAt: now, $updatedAt: now, $syncStatus: 'pending', $id: orderId });
-      } finally {
-        await stmt.finalizeAsync();
-      }
+    const order = await findOrder(String(orderId), currentEstablishmentId);
 
-      markChanged('orders')
-    } catch (error) {
-      throw error;
-    }
+    if (order) await database.write(() => order.markAsDeleted());
+    markChanged('orders');
   }
 
-  async function listRecentOrders() {
-    try {
-      const tresDiasAtras = new Date();
-      tresDiasAtras.setDate(tresDiasAtras.getDate() - 3);
-      const iso = tresDiasAtras.toISOString();
+  async function listRecentOrders(): Promise<Record<string, OrderWithProducts[]>> {
+    if (!currentEstablishmentId) return {};
 
-      const orders = await database.getAllAsync<Order>(
-        `SELECT * FROM TB_ORDERS WHERE (deleted_at IS NULL) AND openedAt >= ? ORDER BY openedAt DESC LIMIT 500`,
-        [iso]
-      );
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
-      const ordersWithProducts = await Promise.all(
-        orders.map(async (order) => {
-          const products = await database.getAllAsync<{ name: string; quantity: number }>(
-            `SELECT P.name, PP.quantity
-             FROM RL_ORDER_PRODUCT PP
-             JOIN TB_PRODUCTS P ON PP.productId = P.id
-             WHERE PP.orderId = ?`,
-            [order.id]
-          );
+    const orders = await orderCollection()
+      .query(
+        Q.where('establishment_id', currentEstablishmentId),
+        Q.where('is_open', true),
+        Q.where('opened_at', Q.gte(threeDaysAgo.getTime())),
+        Q.sortBy('opened_at', Q.desc),
+        Q.sortBy('id', Q.desc),
+        Q.take(500),
+      )
+      .fetch();
 
-          const productNames = products.map(p => `( ${p.quantity}x ) ${p.name}`);
-
-          const displayedProducts = productNames.length > 3 ? [...productNames.slice(0, 3), "..."] : productNames;
-
-          return { ...order, products: displayedProducts };
-        })
-      );
-
-      const ordersByDate: Record<string, (Order & { products: string[] })[]> = {};
-
-      for (const order of ordersWithProducts) {
-        const date = new Date(order.openedAt).toLocaleDateString();
-        if (!ordersByDate[date]) ordersByDate[date] = [];
-        ordersByDate[date].push(order);
-      }
-
-      return ordersByDate;
-    } catch (error) {
-      throw error;
-    }
+    return groupOrdersByDate(
+      await Promise.all(orders.map((order) => toOrderWithProducts(order, currentEstablishmentId!))),
+    );
   }
 
-  async function listOrdersByDay(data: string) {
-    try {
-      const inicioDoDia = `${data}T00:00:00.000Z`;
-      const fimDoDia = `${data}T23:59:59.999Z`;
+  async function listOrdersByDay(data: string): Promise<OrderWithProducts[]> {
+    if (!currentEstablishmentId) return [];
 
-      const orders = await database.getAllAsync<Order>(
-        "SELECT * FROM TB_ORDERS WHERE openedAt BETWEEN ? AND ? AND (deleted_at IS NULL)",
-        [inicioDoDia, fimDoDia]
-      );
+    const startOfDay = new Date(`${data}T00:00:00.000Z`).getTime();
+    const endOfDay = new Date(`${data}T23:59:59.999Z`).getTime();
+    const orders = await orderCollection()
+      .query(
+        Q.where('establishment_id', currentEstablishmentId),
+        Q.where('is_open', true),
+        Q.where('opened_at', Q.gte(startOfDay)),
+        Q.where('opened_at', Q.lte(endOfDay)),
+        Q.sortBy('opened_at', Q.desc),
+        Q.sortBy('id', Q.desc),
+      )
+      .fetch();
 
-      const ordersWithProducts = await Promise.all(
-        orders.map(async (order) => {
-          const products = await database.getAllAsync<{ name: string; quantity: number }>(
-            `SELECT P.name, PP.quantity
-             FROM RL_ORDER_PRODUCT PP
-             JOIN TB_PRODUCTS P ON PP.productId = P.id
-             WHERE PP.orderId = ?`,
-            [order.id]
-          );
-
-          const productNames = products.map(p => `( ${p.quantity}x ) ${p.name}`);
-
-          const displayedProducts = productNames.length > 3 ? [...productNames.slice(0, 3), "..."] : productNames;
-
-          return { ...order, products: displayedProducts };
-        })
-      );
-
-      return ordersWithProducts;
-    } catch (error) {
-      throw error;
-    }
+    return Promise.all(orders.map((order) => toOrderWithProducts(order, currentEstablishmentId!)));
   }
 
   async function getProductsByOrderId(orderId: string) {
-    try {
-      const products = await database.getAllAsync<{ name: string; quantity: number }>(
-        `SELECT P.name, PP.quantity
-         FROM RL_ORDER_PRODUCT PP
-         JOIN TB_PRODUCTS P ON PP.productId = P.id
-         WHERE PP.orderId = ?`,
-        [orderId]
-      );
+    const order = await findOrder(String(orderId), currentEstablishmentId);
 
-      return products;
-    } catch (err) {
-      throw err;
-    }
+    if (!order) throw new Error(`Pedido com ID ${orderId} não encontrado.`);
+
+    const items = await fetchOrderItems(order.id, currentEstablishmentId!);
+    return productNamesForItems(items, currentEstablishmentId!);
   }
 
-  async function listRecentOrdersByUser(userId: string | number) {
-    try {
-      const tresDiasAtras = new Date();
-      tresDiasAtras.setDate(tresDiasAtras.getDate() - 3);
-      const iso = tresDiasAtras.toISOString();
+  async function listRecentOrdersByUser(userId: string | number): Promise<Record<string, OrderWithProducts[]>> {
+    if (!currentEstablishmentId) return {};
 
-      const orders = await database.getAllAsync<Order>(
-        `SELECT * FROM TB_ORDERS WHERE (deleted_at IS NULL) AND openedAt >= ? AND createdBy = ? AND status IN (?, ?) ORDER BY openedAt DESC`,
-        [iso, String(userId), ORDER_STATUS.OPEN, ORDER_STATUS.IN_PREPARATION]
-      );
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    const orders = await orderCollection()
+      .query(
+        Q.where('establishment_id', currentEstablishmentId),
+        Q.where('is_open', true),
+        Q.where('seller_id', String(userId)),
+        Q.where('opened_at', Q.gte(threeDaysAgo.getTime())),
+        Q.sortBy('opened_at', Q.desc),
+        Q.sortBy('id', Q.desc),
+      )
+      .fetch();
 
-      const ordersWithProducts = await Promise.all(
-        orders.map(async (order) => {
-          const products = await database.getAllAsync<{ name: string; quantity: number }>(
-            `SELECT P.name, PP.quantity
-             FROM RL_ORDER_PRODUCT PP
-             JOIN TB_PRODUCTS P ON PP.productId = P.id
-             WHERE PP.orderId = ?`,
-            [order.id]
-          );
-
-          const productNames = products.map(p => `( ${p.quantity}x ) ${p.name}`);
-          const displayedProducts = productNames.length > 3 ? [...productNames.slice(0, 3), "..."] : productNames;
-
-          return { ...order, products: displayedProducts };
-        })
-      );
-
-      const ordersByDate: Record<string, (Order & { products: string[] })[]> = {};
-      for (const order of ordersWithProducts) {
-        const date = new Date(order.openedAt).toLocaleDateString();
-        if (!ordersByDate[date]) ordersByDate[date] = [];
-        ordersByDate[date].push(order);
-      }
-
-      return ordersByDate;
-    } catch (error) {
-      throw error;
-    }
+    return groupOrdersByDate(
+      await Promise.all(orders.map((order) => toOrderWithProducts(order, currentEstablishmentId!))),
+    );
   }
 
   async function countOpenOrders(userId?: string | number | null): Promise<number> {
-    if (userId) {
-      const row = await database.getFirstAsync<{ total: number }>(
-        `SELECT COUNT(*) as total FROM TB_ORDERS WHERE status = ? AND deleted_at IS NULL AND createdBy = ?`,
-        [ORDER_STATUS.OPEN, String(userId)]
-      );
-      return row?.total ?? 0;
-    }
-    const row = await database.getFirstAsync<{ total: number }>(
-      `SELECT COUNT(*) as total FROM TB_ORDERS WHERE status = ? AND deleted_at IS NULL`,
-      [ORDER_STATUS.OPEN]
-    );
-    return row?.total ?? 0;
+    if (!currentEstablishmentId) return 0;
+
+    const clauses: Clause[] = [
+      Q.where('establishment_id', currentEstablishmentId),
+      Q.where('is_open', true),
+    ];
+    if (userId !== undefined && userId !== null) clauses.push(Q.where('seller_id', String(userId)));
+
+    return (await orderCollection().query(...clauses).fetch()).length;
   }
 
   return {

@@ -1,0 +1,288 @@
+a1c0f64 refactor(mobile): remove order status color indicators
+
+ components/PedidoItem.tsx                   |  6 +--
+ components/VendaItem.tsx                    |  4 +-
+ components/__tests__/task7c1Status.test.tsx | 63 -----------------------------
+ components/__tests__/task7cI18n.test.tsx    |  4 +-
+ constants/__tests__/status.test.ts          | 24 -----------
+ constants/status.ts                         | 37 -----------------
+ 6 files changed, 5 insertions(+), 133 deletions(-)
+
+diff --git a/components/PedidoItem.tsx b/components/PedidoItem.tsx
+index 5c4f411..b065e4d 100644
+--- a/components/PedidoItem.tsx
++++ b/components/PedidoItem.tsx
+@@ -6,38 +6,34 @@ import { useTranslation } from 'react-i18next';
+ 
+ type Props = {
+   data: Order;
+   products: string[];
+   onEdit: () => void;
+   onDelete?: () => void;
+ };
+ 
+ export function PedidoItem({ data, products, onEdit, onDelete }: Props) {
+   const { t, i18n } = useTranslation();
+-  const isOpen = data.isOpen !== false;
+-  const statusLabel = isOpen ? t('status.open') : t('status.closed');
+-  const statusColor = isOpen ? Colors.status.info : Colors.status.danger;
+ 
+   const horaFormatada = new Date(data.openedAt).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
+   const autorTrecho = data.createdByName ? t('common.createdBy', { name: data.createdByName }) : '';
+ 
+   const actions: RecordCardAction[] = [
+     { icon: 'pencil', label: t('common.editOrder'), onPress: onEdit },
+   ];
+   if (onDelete) {
+     actions.push({ icon: 'trash', label: t('common.deleteOrder'), onPress: onDelete, destructive: true });
+   }
+ 
+   return (
+     <RecordCard
+-      accentColor={statusColor}
+-      badge={{ label: statusLabel, color: statusColor }}
++      accentColor={Colors.light.textMuted}
+       title={(data.customerName && String(data.customerName).trim().length > 0) ? data.customerName : t('common.customerUnknown')}
+       subtitle={products.length > 0 ? products.join(', ') : undefined}
+       meta={`${autorTrecho}${horaFormatada}`}
+       total={data.total ?? 0}
+       actions={actions}
+     />
+   );
+ }
+ 
+ export default PedidoItem;
+diff --git a/components/VendaItem.tsx b/components/VendaItem.tsx
+index 16161df..36decdd 100644
+--- a/components/VendaItem.tsx
++++ b/components/VendaItem.tsx
+@@ -1,13 +1,13 @@
+ import React from 'react';
+ import { RecordCard, RecordCardAction } from '@/components/ui/RecordCard';
+-import { getStatusColor } from '@/constants/status';
++import Colors from '@/constants/Colors';
+ import type { VendaRenderizavel } from '@/services/sales';
+ import { useTranslation } from 'react-i18next';
+ 
+ type Props = {
+   data: VendaRenderizavel;
+   index: number;
+   onPress?: () => void;
+   onView?: () => void;
+   onPrint?: () => void;
+   onDelete?: () => void;
+@@ -22,21 +22,21 @@ export function VendaItem({ data, index, onPress, onView, onPrint, onDelete, pri
+   const autorTrecho = data.createdByName ? t('common.createdBy', { name: data.createdByName }) : '';
+ 
+   const actions: RecordCardAction[] = readOnly ? [] : [
+     ...(onView ? [{ icon: 'eye' as const, label: t('common.viewDetails'), onPress: onView, disabled: isCancelled }] : []),
+     ...(onPrint ? [{ icon: 'print' as const, label: t('common.print'), onPress: onPrint, disabled: isCancelled, loading: printing }] : []),
+     ...(onDelete ? [{ icon: 'trash' as const, label: t('common.deleteSale'), onPress: onDelete, disabled: isCancelled, destructive: true }] : []),
+   ];
+ 
+   return (
+     <RecordCard
+-      accentColor={getStatusColor('FECHADO')}
++      accentColor={Colors.light.textMuted}
+       title={(data.customerName && String(data.customerName).trim().length > 0) ? data.customerName : t('common.customerUnknown')}
+       subtitle={data.products.length > 0 ? data.products.join(', ') : undefined}
+       meta={`${t('sales.saleNumber', { number: index + 1 })} · ${autorTrecho}${horaFormatada}`}
+       total={data.total ?? 0}
+       strikethrough={isCancelled}
+       actions={actions}
+       onPress={onPress}
+     />
+   );
+ }
+diff --git a/components/__tests__/task7c1Status.test.tsx b/components/__tests__/task7c1Status.test.tsx
+deleted file mode 100644
+index 19a3306..0000000
+--- a/components/__tests__/task7c1Status.test.tsx
++++ /dev/null
+@@ -1,63 +0,0 @@
+-import React from 'react';
+-import { act, create } from 'react-test-renderer';
+-import { I18nextProvider } from 'react-i18next';
+-
+-import PedidoItem from '@/components/PedidoItem';
+-import { i18n } from '@/i18n';
+-
+-jest.mock('expo-localization', () => ({
+-  getLocales: jest.fn(() => [{ languageTag: 'en-US' }]),
+-}));
+-
+-jest.mock('@react-native-async-storage/async-storage', () => ({
+-  __esModule: true,
+-  default: {
+-    getItem: jest.fn(async () => null),
+-    setItem: jest.fn(async () => undefined),
+-  },
+-}));
+-
+-jest.mock('@expo/vector-icons/FontAwesome', () => {
+-  const FontAwesome = () => null;
+-  FontAwesome.font = {};
+-  return { __esModule: true, default: FontAwesome };
+-});
+-
+-const renderedText = (value: unknown): string => {
+-  if (typeof value === 'string' || typeof value === 'number') return String(value);
+-  if (Array.isArray(value)) return value.map(renderedText).join('');
+-  if (value && typeof value === 'object' && 'children' in value) {
+-    return renderedText((value as { children?: unknown }).children);
+-  }
+-  return '';
+-};
+-
+-describe('shared order status translations', () => {
+-  it('translates machine statuses while leaving the order data untouched', async () => {
+-    await act(async () => {
+-      await i18n.changeLanguage('pt-BR');
+-    });
+-
+-    const renderer = create(
+-      <I18nextProvider i18n={i18n}>
+-        <PedidoItem
+-          data={{
+-            id: 'order-1',
+-            total: 25,
+-            openedAt: '2026-08-25T15:04:05.000Z',
+-            customerName: 'Cliente persistido',
+-            isOpen: true,
+-            updated_at: 1,
+-          }}
+-          products={['Produto persistido']}
+-          onEdit={jest.fn()}
+-        />
+-      </I18nextProvider>,
+-    );
+-
+-    const text = renderedText(renderer.toJSON());
+-    expect(text).toContain('Aberto');
+-    expect(text).toContain('Cliente persistido');
+-    expect(text).toContain('Produto persistido');
+-  });
+-});
+diff --git a/components/__tests__/task7cI18n.test.tsx b/components/__tests__/task7cI18n.test.tsx
+index 8c35f1f..f2bdf6f 100644
+--- a/components/__tests__/task7cI18n.test.tsx
++++ b/components/__tests__/task7cI18n.test.tsx
+@@ -97,21 +97,21 @@ describe('Task 7C presentation i18n', () => {
+         />
+       </I18nextProvider>,
+     );
+ 
+     const text = renderedText(renderer.toJSON());
+     expect(text).toContain('Burger');
+     expect(text).toContain('Custom family recipe');
+     expect(text).not.toContain('Hambúrguer');
+   });
+ 
+-  it('translates machine order statuses in order cards', async () => {
++  it('does not render an order status badge in order cards', async () => {
+     await act(async () => {
+       await i18n.changeLanguage('pt-BR');
+     });
+ 
+     const renderer = create(
+       <I18nextProvider i18n={i18n}>
+         <PedidoItem
+           data={{
+             id: 'order-1',
+             total: 25,
+@@ -119,21 +119,21 @@ describe('Task 7C presentation i18n', () => {
+             customerName: null,
+             isOpen: true,
+             updated_at: 1,
+           }}
+           products={[]}
+           onEdit={jest.fn()}
+         />
+       </I18nextProvider>,
+     );
+ 
+-    expect(renderedText(renderer.toJSON())).toContain('Aberto');
++    expect(renderedText(renderer.toJSON())).not.toContain('Aberto');
+   });
+ 
+   it('localizes receipt labels and numbers without translating business content or printer controls', async () => {
+     await act(async () => {
+       await i18n.changeLanguage('pt-BR');
+     });
+ 
+     const receipt = await formatarVendaParaImpressao(
+       {
+         id: 'sale-1',
+diff --git a/constants/__tests__/status.test.ts b/constants/__tests__/status.test.ts
+deleted file mode 100644
+index 4740e57..0000000
+--- a/constants/__tests__/status.test.ts
++++ /dev/null
+@@ -1,24 +0,0 @@
+-import { getStatusColor, getStatusLabel } from '@/constants/status';
+-
+-describe('getStatusColor', () => {
+-  it('returns correct color for each known status', () => {
+-    expect(getStatusColor('OPEN')).toBe('#dc2626');
+-    expect(getStatusColor('IN_PREPARATION')).toBe('#d97706');
+-    expect(getStatusColor('DELIVERING')).toBe('#2563eb');
+-    expect(getStatusColor('CLOSED')).toBe('#6b7280');
+-  });
+-
+-  it('falls back to OPEN color for unknown status', () => {
+-    expect(getStatusColor('UNKNOWN')).toBe('#dc2626');
+-  });
+-});
+-
+-describe('getStatusLabel', () => {
+-  it('returns correct label for known status', () => {
+-    expect(getStatusLabel('IN_PREPARATION')).toBe('In preparation');
+-  });
+-
+-  it('returns the raw value for unknown status', () => {
+-    expect(getStatusLabel('XYZ')).toBe('Open');
+-  });
+-});
+diff --git a/constants/status.ts b/constants/status.ts
+deleted file mode 100644
+index 5d97233..0000000
+--- a/constants/status.ts
++++ /dev/null
+@@ -1,37 +0,0 @@
+-export type OrderStatus = 'OPEN' | 'IN_PREPARATION' | 'DELIVERING' | 'CLOSED';
+-
+-export function normalizeOrderStatus(status: unknown): OrderStatus {
+-  switch (String(status ?? '').toUpperCase()) {
+-    case 'ABERTO':
+-    case 'OPEN': return 'OPEN';
+-    case 'EM_PREPARO':
+-    case 'IN_PREPARATION': return 'IN_PREPARATION';
+-    case 'ENTREGANDO':
+-    case 'DELIVERING': return 'DELIVERING';
+-    case 'FECHADO':
+-    case 'CLOSED': return 'CLOSED';
+-    default: return 'OPEN';
+-  }
+-}
+-
+-const STATUS_COLORS: Record<OrderStatus, string> = {
+-  OPEN: '#dc2626',
+-  IN_PREPARATION: '#d97706',
+-  DELIVERING: '#2563eb',
+-  CLOSED: '#6b7280',
+-};
+-
+-const STATUS_LABELS: Record<OrderStatus, string> = {
+-  OPEN: 'Open',
+-  IN_PREPARATION: 'In preparation',
+-  DELIVERING: 'Delivering',
+-  CLOSED: 'Closed',
+-};
+-
+-export function getStatusColor(status: string): string {
+-  return STATUS_COLORS[normalizeOrderStatus(status)] ?? STATUS_COLORS.CLOSED;
+-}
+-
+-export function getStatusLabel(status: string): string {
+-  return STATUS_LABELS[normalizeOrderStatus(status)] ?? status;
+-}

@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/Colors';
 import { useTranslation } from 'react-i18next';
 import { getProductTypeLabel } from '@/components/productTypeLabel';
-import { buildReportChartData, type RelatorioProduto } from '@/app/modais/reportChartData';
+import { buildReportChartData, type RelatorioProduto } from '@/hooks/reportChartData';
 
 type TipoGrafico = 'pizza' | 'progresso';
 
@@ -30,14 +30,14 @@ export default function RelatorioModal() {
     params.dataFinal ? new Date(params.dataFinal as string) : new Date()
   );
   
-  const [productTypeId, setTipoProdutoId] = useState<number | null>(
+  const [productTypeId, setTipoProdutoId] = useState<string | null>(
     params.productTypeId && params.productTypeId !== ''
-      ? Number(params.productTypeId)
-      : 100
+      ? String(params.productTypeId)
+      : null
   );
-  
+
   const [tipoGrafico, setTipoGrafico] = useState<TipoGrafico>('pizza');
-  const [tiposProdutos, setTiposProdutos] = useState<{ id: number; description: string }[]>([]);
+  const [tiposProdutos, setTiposProdutos] = useState<{ id: string; description: string }[]>([]);
   
   const dataInicialFormatada = dataInicial.toLocaleDateString(i18n.language);
   const dataFinalFormatada = dataFinal.toLocaleDateString(i18n.language);
@@ -62,7 +62,7 @@ export default function RelatorioModal() {
   
   useEffect(() => {
     async function fetchTipoDescricao() {
-      if (productTypeId && productTypeId !== 100) {
+      if (productTypeId) {
         try {
           const types = await getProductTypes();
           const productType = types.find(t => t.id === productTypeId);
@@ -84,16 +84,8 @@ export default function RelatorioModal() {
     async function carregarDadosRelatorio() {
       setLoading(true);
       try {
-        let tipoIdParam = '';
-        
-        if (productTypeId) {
-          if (productTypeId === 100) {
-            tipoIdParam = '';
-          } else {
-            tipoIdParam = productTypeId.toString();
-          }
-        }
-        
+        const tipoIdParam = productTypeId ?? '';
+
         const report = await getSalesReportByPeriod(
           dataInicial.toISOString(),
           dataFinal.toISOString(),
@@ -213,7 +205,7 @@ export default function RelatorioModal() {
                 dropdownIconColor={colors.text}
                 accessibilityLabel={t('products.productType')}
               >
-                <Picker.Item label={t('charts.allTypes')} value={100} />
+                <Picker.Item label={t('charts.allTypes')} value={null} />
                 {tiposProdutos.map((tipo) => (
                   <Picker.Item key={tipo.id} label={getProductTypeLabel(tipo.id, tipo.description, t)} value={tipo.id} />
                 ))}

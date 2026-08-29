@@ -4,6 +4,9 @@ export type Sale = {
     soldAt: string;
     customerName?: string | null;
     isCancelled: boolean;
+    establishmentId?: string | null;
+    sellerId?: string | null;
+    orderId?: string | null;
     updated_at: number;
     deleted_at?: number | null;
     sync_status?: string | null;
@@ -16,4 +19,5 @@ export type SaleItem = {
     saleId: string;
     productId: string;
     quantity: number;
+    unitPriceAtSale?: number;
 };

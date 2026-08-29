@@ -9,6 +9,7 @@ import SyncIndicator from '@/components/SyncIndicator';
 import { formatarVendaParaImpressao } from '@/hooks/formatarVendaImpressao';
 import { connectToDevice, sendMessageToDevice } from '@/useBLE';
 import { i18n } from '@/i18n';
+import { ProductTypeId } from '@/constants/productTypeIds';
 
 const mockUseAutoSync = jest.fn();
 
@@ -89,8 +90,8 @@ describe('Task 7C presentation i18n', () => {
       <I18nextProvider i18n={i18n}>
         <FiltroTipos
           data={[
-            { id: 1, description: 'Hambúrguer' },
-            { id: 99, description: 'Custom family recipe' },
+            { id: ProductTypeId.BURGER, description: 'Hambúrguer' },
+            { id: 'custom-type-id', description: 'Custom family recipe' },
           ]}
           selectedId={null}
           onSelect={jest.fn()}
@@ -104,7 +105,7 @@ describe('Task 7C presentation i18n', () => {
     expect(text).not.toContain('Hambúrguer');
   });
 
-  it('translates machine order statuses in order cards', async () => {
+  it('does not render an order status badge in order cards', async () => {
     await act(async () => {
       await i18n.changeLanguage('pt-BR');
     });
@@ -117,7 +118,7 @@ describe('Task 7C presentation i18n', () => {
             total: 25,
             openedAt: '2026-08-25T15:04:05.000Z',
             customerName: null,
-            status: 'OPEN',
+            isOpen: true,
             updated_at: 1,
           }}
           products={[]}
@@ -126,7 +127,7 @@ describe('Task 7C presentation i18n', () => {
       </I18nextProvider>,
     );
 
-    expect(renderedText(renderer.toJSON())).toContain('Aberto');
+    expect(renderedText(renderer.toJSON())).not.toContain('Aberto');
   });
 
   it('localizes receipt labels and numbers without translating business content or printer controls', async () => {

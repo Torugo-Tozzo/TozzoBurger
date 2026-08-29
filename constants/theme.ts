@@ -1,3 +1,5 @@
+import { ProductTypeId } from './productTypeIds';
+
 export const spacing = {
   xs: 4,
   sm: 8,
@@ -24,13 +26,13 @@ export const type = {
   heading: 24,
 };
 
-export const tipoColors: Record<number, string> = {
-  1: '#ef4444',
-  2: '#f59e0b',
-  3: '#10b981',
-  4: '#3b82f6',
-  5: '#8b5cf6',
-  6: '#ec4899',
-  7: '#14b8a6',
-  8: '#06b6d4',
+export const tipoColors: Record<string, string> = {
+  [ProductTypeId.BURGER]: '#ef4444',
+  [ProductTypeId.ARTISAN_BURGER]: '#f59e0b',
+  [ProductTypeId.CHICKEN]: '#10b981',
+  [ProductTypeId.HOT_DOG]: '#3b82f6',
+  [ProductTypeId.DRINK]: '#8b5cf6',
+  [ProductTypeId.FRENCH_FRIES]: '#ec4899',
+  [ProductTypeId.ADD_ON]: '#14b8a6',
+  [ProductTypeId.OTHER]: '#06b6d4',
 };

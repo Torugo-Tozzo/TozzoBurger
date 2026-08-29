@@ -1,6 +1,8 @@
 {
   "open": "Open",
+  "requested": "Requested",
   "inPreparation": "In preparation",
+  "delivered": "Delivered",
   "delivering": "Delivering",
   "closed": "Closed",
   "cancelled": "Cancelled",

@@ -1,0 +1,15 @@
+Relatório gravado em [2026-08-27-fase-7-t7-rereview2.md](C:/RN/TozzoBurger/docs/superpowers/sdd/2026-08-27-fase-7-t7-rereview2.md). Não houve commit/push.
+
+# Task 7 — Re-review (fix round 2)
+
+## Findings da rodada anterior
+- [Important] Paginação com filtro de horário: ADDRESSED — filtro aplicado antes do `slice` (`database/useSaleDatabase.ts:594-600`).
+- [Important] Total inconsistente: ADDRESSED — total e itens usam os mesmos preços históricos (`database/useSaleDatabase.ts:402-438`).
+
+## Quebras novas no diff de correção
+
+Nenhuma
+
+## Veredito
+
+Todos endereçados

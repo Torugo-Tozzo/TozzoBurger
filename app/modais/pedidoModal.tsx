@@ -6,25 +6,40 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useOrderDatabase } from '@/database/useOrderDatabase';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { useSaleDatabase } from '@/database/useSaleDatabase';
-import { ORDER_STATUS } from '@/database/types/Order';
+import { ORDER_ITEM_STATUS, type OrderItemStatus } from '@/database/types/Order';
 import { useAuth } from '@/context/AuthContext';
 import { useAutoSync } from '@/context/AutoSyncContext';
 import Colors from '@/constants/Colors';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import { ListItem } from '@/components/ui/ListItem';
 import { spacing } from '@/constants/theme';
 import { useTranslation } from 'react-i18next';
 
-type OrderStatus = typeof ORDER_STATUS[keyof typeof ORDER_STATUS];
+const ORDER_ITEM_STATUSES = [
+  ORDER_ITEM_STATUS.REQUESTED,
+  ORDER_ITEM_STATUS.IN_PREPARATION,
+  ORDER_ITEM_STATUS.DELIVERED,
+] as const;
 
-function translateStatus(status: OrderStatus, t: (key: string) => string): string {
+function isOrderItemStatus(value: unknown): value is OrderItemStatus {
+  return ORDER_ITEM_STATUSES.includes(value as OrderItemStatus);
+}
+
+function translateItemStatus(status: OrderItemStatus, t: (key: string) => string): string {
   switch (status) {
-    case ORDER_STATUS.OPEN: return t('status.open');
-    case ORDER_STATUS.IN_PREPARATION: return t('status.inPreparation');
-    case ORDER_STATUS.DELIVERING: return t('status.delivering');
-    case ORDER_STATUS.CLOSED: return t('status.closed');
+    case ORDER_ITEM_STATUS.REQUESTED: return t('status.requested');
+    case ORDER_ITEM_STATUS.IN_PREPARATION: return t('status.inPreparation');
+    case ORDER_ITEM_STATUS.DELIVERED: return t('status.delivered');
   }
-  return t('status.open');
+}
+
+function itemStatusColor(status: OrderItemStatus): string {
+  switch (status) {
+    case ORDER_ITEM_STATUS.REQUESTED: return Colors.status.info;
+    case ORDER_ITEM_STATUS.IN_PREPARATION: return Colors.status.warning;
+    case ORDER_ITEM_STATUS.DELIVERED: return Colors.status.success;
+  }
 }
 
 export default function PedidoModal() {
@@ -32,11 +47,10 @@ export default function PedidoModal() {
   const orderId = String((params as any)?.orderId ?? '');
   const { getOrderById, updateOrder, removeOrder } = useOrderDatabase();
   const { showAdd, show: showProduto, searchByName } = useProductDatabase();
-  const { createSale } = useSaleDatabase();
+  const { createSaleFromOrder } = useSaleDatabase();
 
   const [pedido, setPedido] = useState<any | null>(null);
   const [customerName, setCliente] = useState('');
-  const [status, setStatus] = useState<OrderStatus>(ORDER_STATUS.OPEN);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -48,9 +62,13 @@ export default function PedidoModal() {
   const colors = Colors[colorScheme];
   const { t, i18n } = useTranslation();
   const formatCurrency = (value: number) => new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'BRL' }).format(value);
+  const currentItemsPayload = () => (pedido?.items || []).map((item: any) => ({
+    productId: item.productId,
+    quantity: item.quantity,
+    status: isOrderItemStatus(item.status) ? item.status : ORDER_ITEM_STATUS.REQUESTED,
+  }));
 
-  const orderAccepted = status !== ORDER_STATUS.OPEN;
-  const clienteBloqueado = isCliente;
+  const isReadOnly = isCliente || pedido?.isOpen === false;
 
   const surface = colors.surface;
   const textColor = colors.text;
@@ -76,8 +94,6 @@ export default function PedidoModal() {
 
         setPedido({ ...order, items: enrichedItems });
         setCliente(order.customerName ?? '');
-        const isValidStatus = (v: any): v is OrderStatus => Object.values(ORDER_STATUS).includes(v);
-        setStatus(isValidStatus(order.status) ? order.status : ORDER_STATUS.OPEN);
       } catch (err) {
         console.error('Erro ao carregar pedido:', err);
       }
@@ -95,10 +111,9 @@ export default function PedidoModal() {
   }
 
   const handleSave = async () => {
-    if (!pedido) return;
+    if (!pedido || isReadOnly) return;
     try {
-      const itemsPayload = (pedido.items || []).map((item: any) => ({ productId: item.productId, quantity: item.quantity }));
-      await updateOrder(pedido.id, itemsPayload, customerName, status);
+      await updateOrder(pedido.id, currentItemsPayload(), customerName);
       triggerSync().catch((e) => console.warn('[sync] trigger failed', e));
       Alert.alert(t('common.success'), t('orders.updated'));
       router.back();
@@ -125,11 +140,15 @@ export default function PedidoModal() {
   };
 
   const handleGerarVenda = async () => {
-    if (!pedido) return;
+    if (!pedido || isReadOnly) return;
     try {
-      const items = (pedido.items || []).map((item: any) => ({ productId: item.productId, quantity: item.quantity }));
-      const { saleId } = await createSale(items, customerName ?? '', user?.id, user?.name ?? null);
-      await updateOrder(pedido.id, undefined, undefined, ORDER_STATUS.CLOSED);
+      await updateOrder(pedido.id, currentItemsPayload(), customerName);
+      const { saleId } = await createSaleFromOrder(
+        pedido.id,
+        customerName ?? '',
+        user?.id,
+        user?.name ?? null,
+      );
       Alert.alert(t('orders.generatedSaleTitle'), t('orders.generatedSaleMessage', { id: saleId }));
       router.back();
     } catch (err) {
@@ -138,37 +157,76 @@ export default function PedidoModal() {
     }
   };
 
-  const renderProduto = ({ item }: { item: any }) => (
+  const changeItemStatus = (index: number, nextStatus: OrderItemStatus) => {
+    if (!pedido || isReadOnly) return;
+    const items = Array.isArray(pedido.items) ? [...pedido.items] : [];
+    if (!items[index]) return;
+    items[index] = { ...items[index], status: nextStatus };
+    setPedido({ ...pedido, items });
+  };
+
+  const renderProduto = ({ item, index }: { item: any; index: number }) => {
+    const currentStatus: OrderItemStatus = isOrderItemStatus(item.status)
+      ? item.status
+      : ORDER_ITEM_STATUS.REQUESTED;
+
+    return (
     <ListItem
       title={item.name ?? item.productId}
       subtitle={`${formatCurrency(Number(item.price ?? 0))} / ${t('charts.units')}`}
       trailing={
-        clienteBloqueado ? (
-          <Text style={[styles.qtyText, { color: textColor }]}>{item.quantity}</Text>
-        ) : (
-          <RNView style={styles.quantityRow}>
-            <TouchableOpacity
-              onPress={() => changeQuantidade(item.productId, -1)}
-              style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.decreaseQuantity')}
-            >
-              <Text style={[styles.qtyBtnText, { color: colors.background }]}>-</Text>
-            </TouchableOpacity>
-            <Text style={[styles.qtyText, { color: textColor }]}>{item.quantity}</Text>
-            <TouchableOpacity
-              onPress={() => changeQuantidade(item.productId, 1)}
-              style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.increaseQuantity')}
-            >
-              <Text style={[styles.qtyBtnText, { color: colors.background }]}>+</Text>
-            </TouchableOpacity>
+        <RNView style={styles.itemTrailing}>
+          <RNView style={styles.statusActions}>
+            {isReadOnly ? (
+              <Badge label={translateItemStatus(currentStatus, t)} color={itemStatusColor(currentStatus)} />
+            ) : (
+              ORDER_ITEM_STATUSES.map((itemStatus) => {
+                const active = currentStatus === itemStatus;
+                return (
+                  <TouchableOpacity
+                    key={itemStatus}
+                    onPress={() => changeItemStatus(index, itemStatus)}
+                    accessibilityRole="button"
+                    accessibilityLabel={translateItemStatus(itemStatus, t)}
+                    accessibilityState={{ selected: active }}
+                  >
+                    <Badge
+                      label={translateItemStatus(itemStatus, t)}
+                      color={active ? itemStatusColor(itemStatus) : colors.textMuted}
+                    />
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </RNView>
-        )
+          {isReadOnly ? (
+            <Text style={[styles.qtyText, { color: textColor }]}>{item.quantity}</Text>
+          ) : (
+            <RNView style={styles.quantityRow}>
+              <TouchableOpacity
+                onPress={() => changeQuantidade(item.productId, -1)}
+                style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.decreaseQuantity')}
+              >
+                <Text style={[styles.qtyBtnText, { color: colors.background }]}>-</Text>
+              </TouchableOpacity>
+              <Text style={[styles.qtyText, { color: textColor }]}>{item.quantity}</Text>
+              <TouchableOpacity
+                onPress={() => changeQuantidade(item.productId, 1)}
+                style={[styles.qtyBtn, { backgroundColor: colors.primary, borderColor: colors.text }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.increaseQuantity')}
+              >
+                <Text style={[styles.qtyBtnText, { color: colors.background }]}>+</Text>
+              </TouchableOpacity>
+            </RNView>
+          )}
+        </RNView>
       }
     />
-  );
+    );
+  };
 
   const itensTotal = (() => {
     if (!pedido || !Array.isArray(pedido.items)) return 0;
@@ -180,7 +238,7 @@ export default function PedidoModal() {
   })();
 
   function changeQuantidade(productId: string, delta: number) {
-    if (!pedido) return;
+    if (!pedido || isReadOnly) return;
     const items = Array.isArray(pedido.items) ? [...pedido.items] : [];
     const idx = items.findIndex((item: any) => item.productId === productId);
     if (idx === -1) return;
@@ -199,7 +257,7 @@ export default function PedidoModal() {
     const items = Array.isArray(pedido.items) ? [...pedido.items] : [];
     const idx = items.findIndex((item: any) => item.productId === prod.id);
     if (idx === -1) {
-      items.push({ productId: prod.id, quantity: 1, name: prod.name, price: prod.price ?? 0 });
+      items.push({ productId: prod.id, quantity: 1, status: ORDER_ITEM_STATUS.REQUESTED, name: prod.name, price: prod.price ?? 0 });
     } else {
       items[idx] = { ...items[idx], quantity: (items[idx].quantity || 0) + 1 };
     }
@@ -212,34 +270,7 @@ export default function PedidoModal() {
       <Text style={[styles.title, { color: textColor }]}>{t('orders.title')}</Text>
 
       <Text style={[styles.label, { color: textColor }]}>{t('orders.customer')}</Text>
-      <TextInput style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} value={customerName} onChangeText={setCliente} placeholder={t('sales.customer')} accessibilityLabel={t('sales.customer')} placeholderTextColor={subText} editable={!clienteBloqueado} />
-
-      <Text style={[styles.label, { color: textColor }]}>{t('orders.status')}</Text>
-      {isCliente ? (
-        <RNView style={styles.statusRow}>
-          <RNView style={[styles.statusBtn, { borderColor: inputBorder, backgroundColor: colors.primary }]}>
-            <Text style={{ color: colors.background }}>{translateStatus(status, t)}</Text>
-          </RNView>
-        </RNView>
-      ) : (
-        <RNView style={styles.statusRow}>
-          {([ORDER_STATUS.OPEN, ORDER_STATUS.IN_PREPARATION, ORDER_STATUS.DELIVERING, ORDER_STATUS.CLOSED] as const).map((s) => {
-            const active = status === s;
-            return (
-              <TouchableOpacity
-                key={s}
-                onPress={() => setStatus(s)}
-                style={[styles.statusBtn, { borderColor: inputBorder }, active && { backgroundColor: colors.primary }]}
-                accessibilityRole="button"
-                accessibilityLabel={translateStatus(s, t)}
-                accessibilityState={{ selected: active }}
-              >
-                <Text style={{ color: active ? colors.background : textColor }}>{translateStatus(s, t)}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </RNView>
-      )}
+      <TextInput style={[styles.input, { borderColor: inputBorder, backgroundColor: surface, color: textColor }]} value={customerName} onChangeText={setCliente} placeholder={t('sales.customer')} accessibilityLabel={t('sales.customer')} placeholderTextColor={subText} editable={!isReadOnly} />
 
       <Text style={[styles.label, { color: textColor }]}>{t('orders.items')}</Text>
       <FlatList
@@ -254,7 +285,7 @@ export default function PedidoModal() {
         <Text style={[styles.totalValue, { color: textColor }]}>{formatCurrency(itensTotal)}</Text>
       </RNView>
 
-      {!clienteBloqueado && (
+      {!isReadOnly && (
         <RNView style={styles.buttonsRow}>
           <Button title={t('orders.addItem')} onPress={handleEditInConta} variant="outline" style={styles.btnSpacing} />
           {!isCliente && <Button title={t('orders.generateSale')} onPress={handleGerarVenda} style={{ flex: 1 }} />}
@@ -278,7 +309,7 @@ export default function PedidoModal() {
         </RNView>
       </Modal>
 
-      {clienteBloqueado ? (
+      {isReadOnly ? (
         <RNView style={[styles.totalRow, { backgroundColor: 'transparent', marginTop: 12 }]}>
           <Text style={{ color: subText, fontStyle: 'italic' }}>{t('orders.readOnly')}</Text>
         </RNView>
@@ -306,8 +337,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
   label: { marginTop: 8, fontWeight: '600' },
   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 8, marginTop: 6 },
-  statusRow: { flexDirection: 'row', marginTop: 8, flexWrap: 'wrap' },
-  statusBtn: { padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#ccc', marginRight: 8, marginBottom: 8 },
+  itemTrailing: { alignItems: 'flex-end', gap: 8, maxWidth: '70%' },
+  statusActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 4 },
   quantityRow: { flexDirection: 'row', alignItems: 'center' },
   qtyBtn: { paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#1976D2', borderRadius: 8, marginHorizontal: 8, backgroundColor: '#2196F3', alignItems: 'center', justifyContent: 'center' },
   qtyBtnText: { color: '#fff', fontWeight: '900', fontSize: 16, textAlign: 'center' },

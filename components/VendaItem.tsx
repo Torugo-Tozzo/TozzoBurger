@@ -1,6 +1,6 @@
 import React from 'react';
 import { RecordCard, RecordCardAction } from '@/components/ui/RecordCard';
-import { getStatusColor } from '@/constants/status';
+import Colors from '@/constants/Colors';
 import type { VendaRenderizavel } from '@/services/sales';
 import { useTranslation } from 'react-i18next';
 
@@ -29,7 +29,7 @@ export function VendaItem({ data, index, onPress, onView, onPrint, onDelete, pri
 
   return (
     <RecordCard
-      accentColor={getStatusColor('FECHADO')}
+      accentColor={Colors.light.textMuted}
       title={(data.customerName && String(data.customerName).trim().length > 0) ? data.customerName : t('common.customerUnknown')}
       subtitle={data.products.length > 0 ? data.products.join(', ') : undefined}
       meta={`${t('sales.saleNumber', { number: index + 1 })} · ${autorTrecho}${horaFormatada}`}

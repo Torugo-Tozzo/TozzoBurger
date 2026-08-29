@@ -39,5 +39,14 @@
   "clearCartConfirm": "Voulez-vous vraiment vider le panier ?",
   "notFoundTitle": "Oups !",
   "notFoundMessage": "Cet écran n’existe pas.",
-  "goHome": "Retour à l’accueil !"
+  "goHome": "Retour à l’accueil !",
+  "onboardingTitle": "Configurez votre établissement",
+  "onboardingChooseCategory": "Choisissez la catégorie de votre établissement",
+  "onboardingSuggestedTypes": "Types de produits suggérés",
+  "onboardingTypePlaceholder": "Nouveau type de produit",
+  "onboardingAddType": "Ajouter",
+  "onboardingConfirm": "Confirmer la catégorie",
+  "onboardingChangeCategory": "Choisir une autre catégorie",
+  "onboardingSaving": "Enregistrement…",
+  "onboardingSaveError": "Impossible d’enregistrer la catégorie. Réessayez."
 }
