@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Alert, ActivityIndicator, TextInput, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { Alert, ActivityIndicator, TextInput, StyleSheet, ScrollView, RefreshControl, Linking, TouchableOpacity } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -293,6 +293,18 @@ const BluetoothScreen = () => {
           </View>
         ))
       ))}
+
+      <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.sectionHeader, styles.sectionHeaderRow, { backgroundColor: colors.surfaceHeader }]}>
+          <FontAwesome name="life-ring" size={16} color={colors.text} />
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.support')}</Text>
+        </View>
+        <View style={styles.sectionContent}>
+          <TouchableOpacity onPress={() => Linking.openURL('mailto:suporte@tozzo.uk')}>
+            <Text style={{ color: colors.text, textDecorationLine: 'underline' }}>suporte@tozzo.uk</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={[styles.sectionHeader, styles.sectionHeaderRow, { backgroundColor: colors.surfaceHeader }]}>
