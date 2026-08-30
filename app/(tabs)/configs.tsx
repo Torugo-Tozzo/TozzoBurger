@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Alert, ActivityIndicator, TextInput, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
@@ -292,6 +293,25 @@ const BluetoothScreen = () => {
           </View>
         ))
       ))}
+
+      <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.sectionHeader, styles.sectionHeaderRow, { backgroundColor: colors.surfaceHeader }]}>
+          <FontAwesome name="file-text-o" size={16} color={colors.text} />
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.legal')}</Text>
+        </View>
+        <View style={styles.sectionContent}>
+          <View style={{ marginBottom: 8 }}>
+            <Button
+              title={t('settings.privacyPolicy')}
+              onPress={() => WebBrowser.openBrowserAsync('https://tozzo.uk/privacidade')}
+            />
+          </View>
+          <Button
+            title={t('settings.termsOfUse')}
+            onPress={() => WebBrowser.openBrowserAsync('https://tozzo.uk/termos')}
+          />
+        </View>
+      </View>
 
       <Text style={{ textAlign: 'center', color: colors.textMuted, fontSize: 12, marginTop: 16 }}>
         v{Constants.expoConfig?.version ?? '?'}
