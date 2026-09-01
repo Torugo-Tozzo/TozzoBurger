@@ -1,7 +1,9 @@
 # Fase 2 — Sub-item: Recuperação de senha + 2FA TOTP + verificação de email — Design
 
 Data: 2026-08-31
-Status: aprovado pelo usuário via brainstorm, pronto para plano de implementação.
+Status: **SUPERSEDED em 2026-09-01** — substituído por
+`2026-09-01-fase-2-auth-supabase-selfhosted-design.md` (pivot pra GoTrue self-hosted em vez de
+implementação custom). Mantido só como histórico da decisão original.
 
 ## Objetivo
 

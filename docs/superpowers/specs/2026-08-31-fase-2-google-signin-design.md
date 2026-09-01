@@ -1,7 +1,10 @@
 # Fase 2 — Sub-item: Google Sign-In — Design
 
 Data: 2026-08-31
-Status: aprovado pelo usuário via brainstorm, pronto para plano de implementação.
+Status: **SUPERSEDED em 2026-09-01** — substituído por
+`2026-09-01-fase-2-auth-supabase-selfhosted-design.md` (Google Sign-In dobrado no pivot pra
+GoTrue self-hosted, que já faz OAuth Google nativo). Mantido só como histórico da decisão
+original.
 
 ## Objetivo
 
