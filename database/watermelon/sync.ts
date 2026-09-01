@@ -17,6 +17,7 @@ const SYNC_TABLES = [
   'order_items',
   'sales',
   'sale_items',
+  'print_logs',
 ] as const;
 
 type SyncTableName = typeof SYNC_TABLES[number];

@@ -54,13 +54,14 @@ import Order from '../watermelon/models/Order';
 import OrderItem from '../watermelon/models/OrderItem';
 import Product from '../watermelon/models/Product';
 import ProductType from '../watermelon/models/ProductType';
+import PrintLog from '../watermelon/models/PrintLog';
 import Sale from '../watermelon/models/Sale';
 import SaleItem from '../watermelon/models/SaleItem';
 import User from '../watermelon/models/User';
 import Printer from '../watermelon/models/Printer';
 import schema from '../watermelon/schema';
 
-const modelClasses = [Product, ProductType, Order, OrderItem, Sale, SaleItem, User, Printer];
+const modelClasses = [Product, ProductType, Order, OrderItem, Sale, SaleItem, User, Printer, PrintLog];
 const mockPullChanges = api.pullChanges as jest.Mock;
 const mockPushChanges = api.pushChanges as jest.Mock;
 const consoleLog = jest.spyOn(console, 'log').mockImplementation(() => undefined);
@@ -79,6 +80,7 @@ type TestChangeSet = {
   order_items: TestTableChanges;
   sales: TestTableChanges;
   sale_items: TestTableChanges;
+  print_logs: TestTableChanges;
 };
 
 function makeDatabase() {
@@ -103,6 +105,7 @@ function emptyChanges(): TestChangeSet {
     order_items: { created: [], updated: [], deleted: [] },
     sales: { created: [], updated: [], deleted: [] },
     sale_items: { created: [], updated: [], deleted: [] },
+    print_logs: { created: [], updated: [], deleted: [] },
   };
 }
 
@@ -149,7 +152,7 @@ describe('Watermelon sync transport', () => {
     });
   });
 
-  it('posts only the six sync tables, strips Watermelon internals, and reports ignored items', async () => {
+  it('posts apenas as sete tabelas sincronizadas, remove internos do Watermelon e relata itens ignorados', async () => {
     consoleWarn.mockClear();
     const changes = emptyChanges();
     changes.products.created.push({
