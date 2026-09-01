@@ -3,6 +3,7 @@ import { StyleSheet, FlatList, Alert, ActivityIndicator } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSaleDatabase } from '@/database/useSaleDatabase';
+import { usePrintLogDatabase } from '@/database/usePrintLogDatabase';
 import { Sale } from '@/database/types/Sale';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { sendMessageToDevice } from '@/useBLE';
@@ -18,6 +19,9 @@ import { ListItem } from '@/components/ui/ListItem';
 import { ListFrame } from '@/components/ui/ListFrame';
 import { getVendaDetalhes } from '@/services/salesDetails';
 import type { VendaRenderizavel } from '@/services/sales';
+import { getOrCreateDeviceId } from '@/services/deviceId';
+import { getCachedPlan } from '@/services/planCache';
+import { PRINT_DAILY_LIMIT } from '@/constants/planLimits';
 import { spacing, type } from '@/constants/theme';
 import { useTranslation } from 'react-i18next';
 
@@ -41,6 +45,7 @@ export default function ContaHistoricoModal() {
   const colors = Colors[colorScheme];
   const { saleId, origem } = useLocalSearchParams<{ saleId?: string; origem?: string }>();
   const { getSaleById } = useSaleDatabase();
+  const { countPrintsToday, recordPrintLog } = usePrintLogDatabase();
   const { showAdd: getProductById } = useProductDatabase();
   const { getPrinter } = usePrinterDatabase();
   const router = useRouter();
@@ -132,11 +137,19 @@ export default function ContaHistoricoModal() {
     if (!venda) return;
 
     setLoadingPrint(venda?.id);
-
-    let printContent = await formatarVendaParaImpressao(venda, produtos);
-
     try {
+      const plan = await getCachedPlan();
+      if (plan === null || plan === 'FREE') {
+        const usedToday = await countPrintsToday();
+        if (usedToday >= PRINT_DAILY_LIMIT) {
+          Alert.alert(t('sales.printLimitReachedTitle'), t('sales.printLimitReachedMessage'));
+          return;
+        }
+      }
+
+      const printContent = await formatarVendaParaImpressao(venda, produtos);
       await sendMessageToDevice(printContent, await getPrinter());
+      await recordPrintLog(await getOrCreateDeviceId());
     } catch (error) {
       Alert.alert(t('common.error'), t('printer.printFailed'));
       return;

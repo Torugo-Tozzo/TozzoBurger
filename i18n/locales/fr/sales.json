@@ -23,6 +23,8 @@
   "printSuccessMessage": "Vente envoyée à l’imprimante.",
   "printErrorTitle": "Erreur",
   "printErrorMessage": "Impossible d’imprimer la vente.",
+  "printLimitReachedTitle": "Limite d’impression atteinte",
+  "printLimitReachedMessage": "Votre forfait Free permet jusqu’à 30 impressions par jour. Passez à une offre supérieure dans les paramètres pour imprimer sans limite.",
   "deleteConfirmTitle": "Confirmer la suppression",
   "deleteConfirmMessage": "Voulez-vous vraiment supprimer cette vente ?",
   "deleteErrorMessage": "Impossible de supprimer la vente.",

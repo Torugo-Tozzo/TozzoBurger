@@ -23,6 +23,8 @@
   "printSuccessMessage": "बिक्री प्रिंटर को भेज दी गई।",
   "printErrorTitle": "त्रुटि",
   "printErrorMessage": "बिक्री प्रिंट नहीं हो सकी।",
+  "printLimitReachedTitle": "प्रिंट सीमा पूरी हो गई",
+  "printLimitReachedMessage": "आपकी Free योजना प्रति दिन 30 प्रिंट की अनुमति देती है। बिना सीमा प्रिंट करने के लिए सेटिंग्स में अपग्रेड करें।",
   "deleteConfirmTitle": "हटाने की पुष्टि करें",
   "deleteConfirmMessage": "क्या आप वाकई यह बिक्री हटाना चाहते हैं?",
   "deleteErrorMessage": "बिक्री हटाई नहीं जा सकी।",

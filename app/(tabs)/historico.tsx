@@ -12,6 +12,7 @@ import VendasFilterModal from '@/components/VendasFilterModal';
 import { useSaleDatabase } from '@/database/useSaleDatabase';
 import { useProductDatabase } from '@/database/useProductDatabase';
 import { usePrinterDatabase } from '@/database/usePrinterDatabase';
+import { usePrintLogDatabase } from '@/database/usePrintLogDatabase';
 import { useAuth } from '@/context/AuthContext';
 import { useAutoSync } from '@/context/AutoSyncContext';
 import { useSyncRefresh } from '@/hooks/useSyncRefresh';
@@ -28,7 +29,10 @@ import {
   type SalesPageState,
 } from '@/services/sales';
 import { setVendaDetalhes } from '@/services/salesDetails';
+import { getOrCreateDeviceId } from '@/services/deviceId';
+import { getCachedPlan } from '@/services/planCache';
 import Colors from '@/constants/Colors';
+import { PRINT_DAILY_LIMIT } from '@/constants/planLimits';
 import { spacing, type } from '@/constants/theme';
 import { useTranslation } from 'react-i18next';
 
@@ -129,6 +133,7 @@ export default function HistoricoScreen() {
   const { listRecentSales, removeSale, getSaleById } = useSaleDatabase();
   const { showAdd } = useProductDatabase();
   const { getPrinter } = usePrinterDatabase();
+  const { countPrintsToday, recordPrintLog } = usePrintLogDatabase();
 
   const [section, setSection] = useState<SalesSection>('device');
   const [localState, setLocalState] = useState<SalesState>(() => createSalesState(true));
@@ -358,6 +363,15 @@ export default function HistoricoScreen() {
   const handlePrint = async (saleId: string) => {
     setLoadingPrint(saleId);
     try {
+      const plan = await getCachedPlan();
+      if (plan === null || plan === 'FREE') {
+        const usedToday = await countPrintsToday();
+        if (usedToday >= PRINT_DAILY_LIMIT) {
+          Alert.alert(t('sales.printLimitReachedTitle'), t('sales.printLimitReachedMessage'));
+          return;
+        }
+      }
+
       const sale = await getSaleById(saleId);
       if (!sale) return;
       const products: Produto[] = await Promise.all((sale.items ?? []).map(async (item) => {
@@ -365,6 +379,7 @@ export default function HistoricoScreen() {
         return { name: product?.name ?? t('sales.unknownProduct'), quantity: item.quantity, price: product?.price ?? 0 };
       }));
       await sendMessageToDevice(await formatarVendaParaImpressao(sale, products), await getPrinter());
+      await recordPrintLog(await getOrCreateDeviceId());
       Alert.alert(t('sales.printSuccessTitle'), t('sales.printSuccessMessage'));
     } catch (error) {
       console.error('Erro ao imprimir venda:', error);

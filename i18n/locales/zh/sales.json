@@ -23,6 +23,8 @@
   "printSuccessMessage": "销售已发送到打印机。",
   "printErrorTitle": "错误",
   "printErrorMessage": "无法打印销售记录。",
+  "printLimitReachedTitle": "已达到打印上限",
+  "printLimitReachedMessage": "您的 Free 方案每天最多打印 30 次。请在设置中升级以无限打印。",
   "deleteConfirmTitle": "确认删除",
   "deleteConfirmMessage": "确定要删除此销售记录吗？",
   "deleteErrorMessage": "无法删除销售记录。",

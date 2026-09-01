@@ -23,6 +23,8 @@
   "printSuccessMessage": "Conta enviada para impressão.",
   "printErrorTitle": "Erro",
   "printErrorMessage": "Não foi possível imprimir a venda.",
+  "printLimitReachedTitle": "Limite de impressão atingido",
+  "printLimitReachedMessage": "Seu plano Free permite até 30 impressões por dia. Faça upgrade nas Configurações para imprimir sem limite.",
   "deleteConfirmTitle": "Confirmar exclusão",
   "deleteConfirmMessage": "Tem certeza de que deseja excluir esta venda?",
   "deleteErrorMessage": "Não foi possível excluir a venda.",
