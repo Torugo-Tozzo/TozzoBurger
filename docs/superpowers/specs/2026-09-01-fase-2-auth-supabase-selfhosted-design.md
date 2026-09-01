@@ -166,8 +166,13 @@ do GoTrue (`auth.mfa_factors`, `auth.refresh_tokens`, etc.), fora do controle do
   `signUp()`/OAuth Google bem-sucedido via GoTrue, autenticado com o token que o GoTrue acabou de
   emitir) — idempotente: se já existe `TB_USERS` pra esse `id`, só devolve os dados (usuário
   Google linkando conta já existente, ou retry). Se não existe, recebe `tradeName`/nome do
-  estabelecimento do corpo da requisição, cria `Establishment` (`plan: FREE`) + `TB_USERS`
-  (`role: OWNER`, `establishmentId` do `Establishment` recém-criado) na mesma transação. Front e
+  estabelecimento + `registrationKey` opcional do corpo da requisição, cria `Establishment` +
+  `TB_USERS` (`role: OWNER`, `establishmentId` do `Establishment` recém-criado) na mesma
+  transação — **mesma lógica de status que `register()` já tem hoje** (linha 136-139 do
+  `auth.controller.ts` atual): `registrationKey` bate com `process.env.REGISTRATION_KEY` →
+  `status: ACTIVE, isLifetime: true`; senão → `status: PENDING_PAYMENT`. Sem campo `plan` —
+  não existe no schema ainda (é da Fase 2 sub-item 2, tiers, branch separada não mergeada; se
+  mergear antes deste plano, o plano de implementação ajusta). Front e
   mobile chamam esse endpoint sempre logo depois de qualquer signup (senha ou Google) antes de
   navegar pro resto do app — enquanto ele não roda, `authenticateBearer` não acha `User` nenhum
   pra esse id (`404`/`401`, mesmo comportamento de hoje pra usuário inexistente), então rotas
