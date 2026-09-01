@@ -15,5 +15,19 @@
   "support": "सहायता",
   "legal": "कानूनी",
   "privacyPolicy": "गोपनीयता नीति",
-  "termsOfUse": "उपयोग की शर्तें"
+  "termsOfUse": "उपयोग की शर्तें",
+  "plan": {
+    "title": "प्लान",
+    "tiers": {
+      "FREE": "मुफ़्त",
+      "PAGO": "पेड",
+      "PAGO_LEGADO": "लीगेसी पेड",
+      "ENTERPRISE": "एंटरप्राइज़"
+    },
+    "printsToday": "आज {{count}}/{{limit}} प्रिंट",
+    "reportsThisMonth": "इस महीने {{count}}/{{limit}} रिपोर्ट",
+    "unlimited": "असीमित",
+    "devices": "{{count}} डिवाइस",
+    "upgradeButton": "प्लान अपग्रेड करें"
+  }
 }

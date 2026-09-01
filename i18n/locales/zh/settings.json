@@ -15,5 +15,19 @@
   "support": "支持",
   "legal": "法律信息",
   "privacyPolicy": "隐私政策",
-  "termsOfUse": "使用条款"
+  "termsOfUse": "使用条款",
+  "plan": {
+    "title": "套餐",
+    "tiers": {
+      "FREE": "免费",
+      "PAGO": "付费",
+      "PAGO_LEGADO": "旧版付费",
+      "ENTERPRISE": "企业版"
+    },
+    "printsToday": "今日打印 {{count}}/{{limit}} 次",
+    "reportsThisMonth": "本月报告 {{count}}/{{limit}} 次",
+    "unlimited": "无限制",
+    "devices": "{{count}} 台设备",
+    "upgradeButton": "升级套餐"
+  }
 }

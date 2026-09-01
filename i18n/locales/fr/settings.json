@@ -15,5 +15,19 @@
   "support": "Assistance",
   "legal": "Mentions légales",
   "privacyPolicy": "Politique de confidentialité",
-  "termsOfUse": "Conditions d'utilisation"
+  "termsOfUse": "Conditions d'utilisation",
+  "plan": {
+    "title": "Forfait",
+    "tiers": {
+      "FREE": "Gratuit",
+      "PAGO": "Payant",
+      "PAGO_LEGADO": "Payant legacy",
+      "ENTERPRISE": "Entreprise"
+    },
+    "printsToday": "{{count}}/{{limit}} impressions aujourd'hui",
+    "reportsThisMonth": "{{count}}/{{limit}} rapports ce mois-ci",
+    "unlimited": "Illimité",
+    "devices": "{{count}} appareils",
+    "upgradeButton": "Améliorer le forfait"
+  }
 }

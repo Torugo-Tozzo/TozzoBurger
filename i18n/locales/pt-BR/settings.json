@@ -15,5 +15,19 @@
   "support": "Suporte",
   "legal": "Legal",
   "privacyPolicy": "Política de Privacidade",
-  "termsOfUse": "Termos de Uso"
+  "termsOfUse": "Termos de Uso",
+  "plan": {
+    "title": "Plano",
+    "tiers": {
+      "FREE": "Gratuito",
+      "PAGO": "Pago",
+      "PAGO_LEGADO": "Pago legado",
+      "ENTERPRISE": "Enterprise"
+    },
+    "printsToday": "{{count}}/{{limit}} impressões hoje",
+    "reportsThisMonth": "{{count}}/{{limit}} relatórios este mês",
+    "unlimited": "Ilimitado",
+    "devices": "{{count}} dispositivos",
+    "upgradeButton": "Fazer upgrade"
+  }
 }
