@@ -313,6 +313,37 @@ describe('Watermelon sync transport', () => {
     } as any)).rejects.toThrow(/another establishment/i);
   });
 
+  it('rejects a pulled print_logs row whose local id belongs to another establishment', async () => {
+    const foreignPrintLog = mockDatabase.get<PrintLog>('print_logs').prepareCreateFromDirtyRaw({
+      id: 'foreign-print-log',
+      _status: 'synced',
+      _changed: '',
+      device_id: 'device-b',
+      printed_at: 1_700_000_000_000,
+      establishment_id: 'establishment-b',
+      created_at: 1_700_000_000_000,
+      updated_at: 1_700_000_000_000,
+    });
+    await mockDatabase.write(() => mockDatabase.batch(foreignPrintLog));
+
+    const changes = emptyChanges();
+    changes.print_logs.updated.push({
+      id: 'foreign-print-log',
+      device_id: 'device-a',
+      printed_at: 1_700_000_000_010,
+      establishment_id: 'establishment-a',
+      created_at: 1_700_000_000_000,
+      updated_at: 1_700_000_000_010,
+    });
+    mockPullChanges.mockResolvedValue({ changes, timestamp: 1_700_000_000_020 });
+
+    await expect(pullChanges('token-123', 'establishment-a')({
+      lastPulledAt: 1_700_000_000_000,
+      schemaVersion: 2,
+      migration: null,
+    } as any)).rejects.toThrow(/another establishment/i);
+  });
+
   it('applies remote is_open before pushing a new local order item', async () => {
     const now = 1_700_000_000_000;
     const products = mockDatabase.get<Product>('products');

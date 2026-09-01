@@ -21,6 +21,7 @@ import { getVendaDetalhes } from '@/services/salesDetails';
 import type { VendaRenderizavel } from '@/services/sales';
 import { getOrCreateDeviceId } from '@/services/deviceId';
 import { getCachedPlan } from '@/services/planCache';
+import { useAuth } from '@/context/AuthContext';
 import { PRINT_DAILY_LIMIT } from '@/constants/planLimits';
 import { spacing, type } from '@/constants/theme';
 import { useTranslation } from 'react-i18next';
@@ -41,6 +42,7 @@ function toSale(venda: VendaRenderizavel): Sale {
 }
 
 export default function ContaHistoricoModal() {
+  const { user } = useAuth();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const { saleId, origem } = useLocalSearchParams<{ saleId?: string; origem?: string }>();
@@ -138,7 +140,7 @@ export default function ContaHistoricoModal() {
 
     setLoadingPrint(venda?.id);
     try {
-      const plan = await getCachedPlan();
+      const plan = user?.establishmentId != null ? await getCachedPlan(user.establishmentId) : null;
       if (plan === null || plan === 'FREE') {
         const usedToday = await countPrintsToday();
         if (usedToday >= PRINT_DAILY_LIMIT) {

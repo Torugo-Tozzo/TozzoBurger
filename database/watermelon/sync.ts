@@ -158,7 +158,7 @@ function ensureRecordBelongsToEstablishment(
 }
 
 async function ensureDeletedRootsBelongToEstablishment(
-  tableName: 'products' | 'orders' | 'sales',
+  tableName: 'products' | 'orders' | 'sales' | 'print_logs',
   ids: string[],
   establishmentId: string,
 ): Promise<void> {
@@ -170,7 +170,7 @@ async function ensureDeletedRootsBelongToEstablishment(
 
 async function ensureRootChangesBelongToEstablishment(
   changes: SyncChangeSet,
-  tableName: 'products' | 'orders' | 'sales',
+  tableName: 'products' | 'orders' | 'sales' | 'print_logs',
   establishmentId: string,
 ): Promise<void> {
   const records = rawRecords(changes, tableName);
@@ -311,6 +311,19 @@ async function ensureTenantScope(changes: SyncChangeSet, establishmentId: Establ
   await ensureDeletedRootsBelongToEstablishment(
     'sales',
     changes.sales.deleted,
+    normalizedEstablishmentId,
+  );
+  // print_logs é tabela raiz com establishment_id próprio igual products/orders/sales — sem esse
+  // guard, um registro puxado com id colidindo com um print_log local de outro estabelecimento
+  // seria aplicado sem checagem, sobrescrevendo dado de outro tenant silenciosamente.
+  await ensureRootChangesBelongToEstablishment(
+    changes,
+    'print_logs',
+    normalizedEstablishmentId,
+  );
+  await ensureDeletedRootsBelongToEstablishment(
+    'print_logs',
+    changes.print_logs.deleted,
     normalizedEstablishmentId,
   );
   await ensureChildReferencesBelongToEstablishment(

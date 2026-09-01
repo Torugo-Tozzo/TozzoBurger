@@ -3,7 +3,8 @@ import { Platform } from 'react-native';
 import * as api from '@/services/api';
 import * as SecureStore from 'expo-secure-store';
 import { getOrCreateDeviceId } from '@/services/deviceId';
-import { cachePlan } from '@/services/planCache';
+import { cachePlan, clearCachedPlan } from '@/services/planCache';
+import { clearReportQuota } from '@/services/reportQuota';
 import { synchronizeWithServer } from '@/database/watermelon/sync';
 import { runWithLock } from '@/database/syncGuard';
 import { resetWatermelonLocalData } from '@/database/watermelon/database';
@@ -144,8 +145,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           try {
             const establishment = await api.getEstablishment(t);
-            if (establishment && typeof establishment.plan === 'string') {
-              await cachePlan(establishment.plan);
+            if (establishment && typeof establishment.plan === 'string' && meEstab != null) {
+              await cachePlan(establishment.plan, meEstab);
             }
           } catch (err) {
             console.warn('[auth] failed to prime plan cache (non-blocking)', err);
@@ -175,10 +176,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
+    const establishmentId = user?.establishmentId;
     setToken(null);
     setUser(null);
     SecureStore.deleteItemAsync(TOKEN_KEY).catch((err) => console.warn('Failed to delete token', err));
     SecureStore.deleteItemAsync(USER_CACHE_KEY).catch((err) => console.warn('Failed to delete user cache', err));
+    // Cache de plano/quota já é escopado por estabelecimento (não vaza pra outra conta que logar
+    // depois neste dispositivo), mas ainda vale limpar a entrada da conta que está saindo.
+    if (establishmentId != null) {
+      void clearCachedPlan(establishmentId).catch((err) => console.warn('Failed to clear cached plan on logout', err));
+      void clearReportQuota(establishmentId).catch((err) => console.warn('Failed to clear report quota on logout', err));
+    }
   };
 
   return (

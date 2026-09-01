@@ -67,13 +67,14 @@ const BluetoothScreen = () => {
       return;
     }
 
+    const establishmentId = user.establishmentId;
     let cancelled = false;
     (async () => {
       try {
         const [establishment, prints, reports] = await Promise.all([
           api.getEstablishment(token),
           countPrintsToday(),
-          getReportCountThisMonth(),
+          getReportCountThisMonth(establishmentId),
         ]);
         if (cancelled) return;
 

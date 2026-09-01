@@ -14,10 +14,12 @@ import { buildReportChartData, type RelatorioProduto } from '@/hooks/reportChart
 import { getCachedPlan } from '@/services/planCache';
 import { getReportCountThisMonth, recordReportGenerated } from '@/services/reportQuota';
 import { REPORT_MONTHLY_LIMIT } from '@/constants/planLimits';
+import { useAuth } from '@/context/AuthContext';
 
 type TipoGrafico = 'pizza' | 'progresso';
 
 export default function RelatorioModal() {
+  const { user } = useAuth();
   const params = useLocalSearchParams();
   const { getProductTypes } = useProductDatabase();
   const { getSalesReportByPeriod } = useSaleDatabase();
@@ -86,11 +88,12 @@ export default function RelatorioModal() {
   
   useEffect(() => {
     async function carregarDadosRelatorio() {
+      const establishmentId = user?.establishmentId;
       setLoading(true);
       try {
-        const plan = await getCachedPlan();
+        const plan = establishmentId != null ? await getCachedPlan(establishmentId) : null;
         if (plan === null || plan === 'FREE') {
-          const used = await getReportCountThisMonth();
+          const used = establishmentId != null ? await getReportCountThisMonth(establishmentId) : 0;
           if (used >= REPORT_MONTHLY_LIMIT) {
             setQuotaBlocked(true);
             setRelatorioData([]);
@@ -107,8 +110,8 @@ export default function RelatorioModal() {
           tipoIdParam
         );
         setRelatorioData(report);
-        if (plan === null || plan === 'FREE') {
-          await recordReportGenerated();
+        if ((plan === null || plan === 'FREE') && establishmentId != null) {
+          await recordReportGenerated(establishmentId);
         }
       } catch (error) {
         console.error('Failed to load sales report:', error);
@@ -117,9 +120,9 @@ export default function RelatorioModal() {
         setLoading(false);
       }
     }
-    
+
     carregarDadosRelatorio();
-  }, [dataInicial, dataFinal, productTypeId]);
+  }, [dataInicial, dataFinal, productTypeId, user?.establishmentId]);
 
   const ListHeader = () => (
     <View style={[styles.listHeaderContainer, { backgroundColor: colors.text, borderBottomColor: colors.border }]}>

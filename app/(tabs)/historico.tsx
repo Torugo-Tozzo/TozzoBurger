@@ -127,7 +127,7 @@ export default function HistoricoScreen() {
   const colors = Colors[colorScheme];
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { lastSync } = useAutoSync();
   const { refreshing, onRefresh } = useSyncRefresh();
   const { listRecentSales, removeSale, getSaleById } = useSaleDatabase();
@@ -363,7 +363,7 @@ export default function HistoricoScreen() {
   const handlePrint = async (saleId: string) => {
     setLoadingPrint(saleId);
     try {
-      const plan = await getCachedPlan();
+      const plan = user?.establishmentId != null ? await getCachedPlan(user.establishmentId) : null;
       if (plan === null || plan === 'FREE') {
         const usedToday = await countPrintsToday();
         if (usedToday >= PRINT_DAILY_LIMIT) {
