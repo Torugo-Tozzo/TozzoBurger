@@ -21,5 +21,6 @@
   "share": "Partager le rapport",
   "reportTitle": "Rapport des ventes",
   "reportQuotaExceeded": "La limite mensuelle de rapports de l’offre Free est atteinte. Passez à une offre supérieure dans les paramètres pour générer des rapports illimités.",
-  "until": "au"
+  "until": "au",
+  "generateReport": "Générer le rapport"
 }

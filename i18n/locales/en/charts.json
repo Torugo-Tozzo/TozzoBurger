@@ -21,5 +21,6 @@
   "share": "Share report",
   "reportTitle": "Sales report",
   "reportQuotaExceeded": "Monthly report limit reached on the Free plan. Upgrade in Settings to generate unlimited reports.",
-  "until": "to"
+  "until": "to",
+  "generateReport": "Generate report"
 }

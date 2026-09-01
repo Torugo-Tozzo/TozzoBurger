@@ -20,9 +20,7 @@ import { ListFrame } from '@/components/ui/ListFrame';
 import { getVendaDetalhes } from '@/services/salesDetails';
 import type { VendaRenderizavel } from '@/services/sales';
 import { getOrCreateDeviceId } from '@/services/deviceId';
-import { getCachedPlan } from '@/services/planCache';
-import { useAuth } from '@/context/AuthContext';
-import { PRINT_DAILY_LIMIT } from '@/constants/planLimits';
+import { usePrintQuotaGuard } from '@/hooks/usePrintQuotaGuard';
 import { spacing, type } from '@/constants/theme';
 import { useTranslation } from 'react-i18next';
 
@@ -42,12 +40,12 @@ function toSale(venda: VendaRenderizavel): Sale {
 }
 
 export default function ContaHistoricoModal() {
-  const { user } = useAuth();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const { saleId, origem } = useLocalSearchParams<{ saleId?: string; origem?: string }>();
   const { getSaleById } = useSaleDatabase();
-  const { countPrintsToday, recordPrintLog } = usePrintLogDatabase();
+  const { recordPrintLog } = usePrintLogDatabase();
+  const { checkPrintAllowed } = usePrintQuotaGuard();
   const { showAdd: getProductById } = useProductDatabase();
   const { getPrinter } = usePrinterDatabase();
   const router = useRouter();
@@ -140,21 +138,23 @@ export default function ContaHistoricoModal() {
 
     setLoadingPrint(venda?.id);
     try {
-      const plan = user?.establishmentId != null ? await getCachedPlan(user.establishmentId) : null;
-      if (plan === null || plan === 'FREE') {
-        const usedToday = await countPrintsToday();
-        if (usedToday >= PRINT_DAILY_LIMIT) {
-          Alert.alert(t('sales.printLimitReachedTitle'), t('sales.printLimitReachedMessage'));
-          return;
-        }
+      if (!await checkPrintAllowed()) {
+        setLoadingPrint(null);
+        return;
       }
 
       const printContent = await formatarVendaParaImpressao(venda, produtos);
       await sendMessageToDevice(printContent, await getPrinter());
-      await recordPrintLog(await getOrCreateDeviceId());
     } catch (error) {
       Alert.alert(t('common.error'), t('printer.printFailed'));
+      setLoadingPrint(null);
       return;
+    }
+
+    try {
+      await recordPrintLog(await getOrCreateDeviceId());
+    } catch (error) {
+      console.warn('[print] impressão física enviada, mas não foi possível registrar o log', error);
     } finally {
       setLoadingPrint(null); // Desativar carregamento ao finalizar
     }

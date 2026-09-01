@@ -136,7 +136,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const deviceId = await getOrCreateDeviceId();
             await api.registerDevice(t, deviceId, { platform: Platform.OS });
           } catch (err: any) {
-            if (err?.code === 'DEVICE_LIMIT_REACHED') {
+            // Workaround while the API returns only a localized message rather than a structured
+            // DEVICE_LIMIT_REACHED code for this endpoint.
+            if (/limite de dispositivos atingido/i.test(String(err?.message ?? ''))) {
               console.warn('[auth] device limit reached, printing/report gates will use fail-closed cache defaults');
             } else {
               console.warn('[auth] device registration failed (non-blocking)', err);

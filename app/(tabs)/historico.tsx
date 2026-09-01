@@ -30,9 +30,8 @@ import {
 } from '@/services/sales';
 import { setVendaDetalhes } from '@/services/salesDetails';
 import { getOrCreateDeviceId } from '@/services/deviceId';
-import { getCachedPlan } from '@/services/planCache';
 import Colors from '@/constants/Colors';
-import { PRINT_DAILY_LIMIT } from '@/constants/planLimits';
+import { usePrintQuotaGuard } from '@/hooks/usePrintQuotaGuard';
 import { spacing, type } from '@/constants/theme';
 import { useTranslation } from 'react-i18next';
 
@@ -133,7 +132,8 @@ export default function HistoricoScreen() {
   const { listRecentSales, removeSale, getSaleById } = useSaleDatabase();
   const { showAdd } = useProductDatabase();
   const { getPrinter } = usePrinterDatabase();
-  const { countPrintsToday, recordPrintLog } = usePrintLogDatabase();
+  const { recordPrintLog } = usePrintLogDatabase();
+  const { checkPrintAllowed } = usePrintQuotaGuard();
 
   const [section, setSection] = useState<SalesSection>('device');
   const [localState, setLocalState] = useState<SalesState>(() => createSalesState(true));
@@ -363,30 +363,36 @@ export default function HistoricoScreen() {
   const handlePrint = async (saleId: string) => {
     setLoadingPrint(saleId);
     try {
-      const plan = user?.establishmentId != null ? await getCachedPlan(user.establishmentId) : null;
-      if (plan === null || plan === 'FREE') {
-        const usedToday = await countPrintsToday();
-        if (usedToday >= PRINT_DAILY_LIMIT) {
-          Alert.alert(t('sales.printLimitReachedTitle'), t('sales.printLimitReachedMessage'));
-          return;
-        }
+      if (!await checkPrintAllowed()) {
+        setLoadingPrint(null);
+        return;
       }
 
       const sale = await getSaleById(saleId);
-      if (!sale) return;
+      if (!sale) {
+        setLoadingPrint(null);
+        return;
+      }
       const products: Produto[] = await Promise.all((sale.items ?? []).map(async (item) => {
         const product = await showAdd(item.productId);
         return { name: product?.name ?? t('sales.unknownProduct'), quantity: item.quantity, price: product?.price ?? 0 };
       }));
       await sendMessageToDevice(await formatarVendaParaImpressao(sale, products), await getPrinter());
-      await recordPrintLog(await getOrCreateDeviceId());
-      Alert.alert(t('sales.printSuccessTitle'), t('sales.printSuccessMessage'));
     } catch (error) {
       console.error('Erro ao imprimir venda:', error);
       Alert.alert(t('sales.printErrorTitle'), t('sales.printErrorMessage'));
+      setLoadingPrint(null);
+      return;
+    }
+
+    try {
+      await recordPrintLog(await getOrCreateDeviceId());
+    } catch (error) {
+      console.warn('[print] impressão física enviada, mas não foi possível registrar o log', error);
     } finally {
       setLoadingPrint(null);
     }
+    Alert.alert(t('sales.printSuccessTitle'), t('sales.printSuccessMessage'));
   };
 
   const handleDelete = (saleId: string) => {
