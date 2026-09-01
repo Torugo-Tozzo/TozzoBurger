@@ -125,6 +125,7 @@ describe('Settings plan section', () => {
     mockUseAuth.mockReturnValue({
       user: { id: 'user-1', establishmentId: 'estab-1', role: 'DONO' } as any,
       token: 'token-1',
+      loading: false,
       login: jest.fn(async () => true),
       logout: jest.fn(async () => undefined),
     } as ReturnType<typeof useAuth>);
