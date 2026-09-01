@@ -89,7 +89,8 @@ Google) com configuração, não código novo — ver comparação completa na c
                     │        Oracle VM              │
                     │                               │
   Cliente ──HTTPS──▶│ nginx (Cloudflare Full strict)│
- (front/mobile)     │  ├─ /auth/*  ──▶ gotrue:9999  │
+ (front/mobile)     │  ├─ /gotrue/* ──▶ gotrue:9999 │
+                    │  ├─ /auth/*  ──▶ api (existente)│
                     │  ├─ /events  ──▶ api (SSE)    │
                     │  └─ /        ──▶ api / front  │
                     │                               │
@@ -103,8 +104,11 @@ Google) com configuração, não código novo — ver comparação completa na c
   `GOTRUE_JWT_SECRET` = mesmo valor de `JWT_SECRET` que a api já usa (api valida token do GoTrue
   sem trocar de lib, `jsonwebtoken` continua), `GOTRUE_SITE_URL`, `GOTRUE_SMTP_*` (Brevo SMTP),
   `GOTRUE_EXTERNAL_GOOGLE_*` (OAuth). Sem `GOTRUE_HOOK_*` (hook descartado, ver Decisão nº6).
-- **nginx**: novo bloco `location /auth/` (em `api.tozzo.uk` e `dev-api.tozzo.uk`) proxiando pro
-  `gotrue:9999` — reaproveita domínio/cert existente, sem subdomínio novo.
+- **nginx**: novo bloco `location /gotrue/` (em `api.tozzo.uk` e `dev-api.tozzo.uk`, `proxy_pass
+  http://gotrue:9999/;` com barra final pra remover o prefixo antes de chegar no GoTrue) —
+  reaproveita domínio/cert existente, sem subdomínio novo. **Não** usa `/auth/*`: esse prefixo já
+  é da API hoje (`/auth/sse-token`, `/auth/delete-account`, `/auth/export-data` continuam nela,
+  ver seção API) — usar o mesmo prefixo pro GoTrue quebraria essas 3 rotas.
 - **Postgres**: GoTrue cria e gerencia seu próprio schema `auth` no boot (não mexe no schema
   `public` do Prisma) — **nenhuma migration manual em SQL é necessária** (sem hook, sem trigger).
   `establishmentId` continua `NOT NULL` em `TB_USERS` (`prisma/schema.prisma:39`) sem mudança —
@@ -173,7 +177,8 @@ do GoTrue (`auth.mfa_factors`, `auth.refresh_tokens`, etc.), fora do controle do
 ### Front (`front-tozzo.uk`)
 
 - Nova dependência: `@supabase/auth-js` (cliente só-de-auth, sem precisar de Kong/PostgREST —
-  aponta direto pra `VITE_AUTH_URL=https://api.tozzo.uk/auth`).
+  aponta direto pra `VITE_AUTH_URL=https://api.tozzo.uk/gotrue`, dev usa
+  `https://dev-api.tozzo.uk/gotrue`).
 - `src/services/api.ts` — interceptor troca `localStorage.getItem('tozzo_token')` por
   `authClient.getSession()` (auth-js já gerencia storage/refresh automático).
 - `AuthContext` reescrito em cima de `authClient.onAuthStateChange` em vez de estado próprio de
@@ -193,7 +198,8 @@ do GoTrue (`auth.mfa_factors`, `auth.refresh_tokens`, etc.), fora do controle do
 
 - Nova dependência: `@supabase/auth-js` (mesma lib do front, cliente RN-compatível — usa
   `expo-secure-store` como storage adapter customizado, não o `AsyncStorage` default, pra manter
-  o padrão de segurança já usado hoje).
+  o padrão de segurança já usado hoje). Aponta pra `EXPO_PUBLIC_AUTH_URL` (novo, mesmo padrão de
+  `EXPO_PUBLIC_API_URL` já existente em `.env`/`.env.example`) = `<EXPO_PUBLIC_API_URL>/gotrue`.
 - `context/AuthContext.tsx` reescrito em cima do mesmo client, `onAuthStateChange` substitui a
   rehidratação manual (linha ~53-97 hoje).
 - `login.tsx` — `authClient.signInWithPassword`, tratamento de erro `mfa_challenge` (prompt de
