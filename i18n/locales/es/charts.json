@@ -20,5 +20,6 @@
   "grandTotal": "Total general",
   "share": "Compartir informe",
   "reportTitle": "Informe de ventas",
+  "reportQuotaExceeded": "Se alcanzó el límite mensual de informes del plan Free. Actualiza el plan en Configuración para generar informes ilimitados.",
   "until": "hasta"
 }

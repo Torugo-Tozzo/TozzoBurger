@@ -11,6 +11,9 @@ import Colors from '@/constants/Colors';
 import { useTranslation } from 'react-i18next';
 import { getProductTypeLabel } from '@/components/productTypeLabel';
 import { buildReportChartData, type RelatorioProduto } from '@/hooks/reportChartData';
+import { getCachedPlan } from '@/services/planCache';
+import { getReportCountThisMonth, recordReportGenerated } from '@/services/reportQuota';
+import { REPORT_MONTHLY_LIMIT } from '@/constants/planLimits';
 
 type TipoGrafico = 'pizza' | 'progresso';
 
@@ -46,6 +49,7 @@ export default function RelatorioModal() {
   const [tipoDescricao, setTipoDescricao] = useState<string>(t('charts.allTypes'));
   const [relatorioData, setRelatorioData] = useState<RelatorioProduto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [quotaBlocked, setQuotaBlocked] = useState(false);
   
   useEffect(() => {
     async function fetchTiposProdutos() {
@@ -84,6 +88,17 @@ export default function RelatorioModal() {
     async function carregarDadosRelatorio() {
       setLoading(true);
       try {
+        const plan = await getCachedPlan();
+        if (plan === null || plan === 'FREE') {
+          const used = await getReportCountThisMonth();
+          if (used >= REPORT_MONTHLY_LIMIT) {
+            setQuotaBlocked(true);
+            setRelatorioData([]);
+            return;
+          }
+        }
+        setQuotaBlocked(false);
+
         const tipoIdParam = productTypeId ?? '';
 
         const report = await getSalesReportByPeriod(
@@ -92,6 +107,9 @@ export default function RelatorioModal() {
           tipoIdParam
         );
         setRelatorioData(report);
+        if (plan === null || plan === 'FREE') {
+          await recordReportGenerated();
+        }
       } catch (error) {
         console.error('Failed to load sales report:', error);
         Alert.alert(t('common.error'), t('errors.loadFailed'));
@@ -222,6 +240,10 @@ export default function RelatorioModal() {
               <ActivityIndicator size="large" color={colors.primary} />
               <Text style={styles.loadingText}>{t('charts.loading')}</Text>
             </View>
+          ) : quotaBlocked ? (
+            <Text style={styles.emptyText}>
+              {t('charts.reportQuotaExceeded')}
+            </Text>
           ) : relatorioData.length === 0 ? (
             <Text style={styles.emptyText}>
               {t('charts.emptyPeriod')}
