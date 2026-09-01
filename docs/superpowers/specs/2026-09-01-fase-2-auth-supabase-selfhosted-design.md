@@ -32,11 +32,15 @@ Google) com configuração, não código novo — ver comparação completa na c
   `NOT NULL` (linha 35), `role` é `String` livre (`OWNER`/`MANAGER`/`EMPLOYEE`/`CUSTOMER` via
   `normalizeUserRole`/`toLegacyUserRole`), `establishmentId` é FK obrigatória.
 - `modules/auth/auth.controller.ts:60-74` — `tokenForUser()` emite 1 único JWT (`expiresIn:
-  '30d'`) já com `role`/`estabelecimentoId`/`establishmentId` como claims — **o padrão de "claims
-  ricos direto no JWT" já existe hoje**, GoTrue com Custom Access Token Hook reproduz o mesmo
-  padrão, não é conceito novo pro projeto.
+  '30d'`) com `role`/`estabelecimentoId`/`establishmentId` como claims.
 - `register()` (linha 76+) e `login()` (linha ~194+) são os 2 únicos fluxos de emissão de token
   hoje — nenhum refresh token, nenhuma revogação.
+- `middlewares/elysiaAuth.ts:27-69` (`authenticateBearer`) — **correção feita durante o
+  planejamento**: apesar do JWT carregar `role`/`establishmentId`, o middleware **já consulta o
+  banco em toda request** (`prisma.user.findUnique`, linha 49) pra pegar `establishment.status`
+  fresco — o gate de pagamento (`activeGuard`, linha 111-128) não pode esperar o token expirar
+  pra refletir suspensão/exclusão de conta. Não dá pra economizar essa query trocando de emissor
+  de JWT; ver Decisão nº6 revisada.
 - `modules/users/users.controller.ts` `criarUsuario()` — endpoint que o DONO usa pra criar
   funcionário (senha escolhida pelo dono no corpo da requisição).
 - Front (`front-tozzo.uk/src/services/api.ts:5,17,19,41`) — `baseURL` via `VITE_API_URL`, token
@@ -69,10 +73,14 @@ Google) com configuração, não código novo — ver comparação completa na c
 5. **Usuários existentes: forçar reset de senha no corte**, não importar hash bcrypt direto —
    zero risco de incompatibilidade de formato silenciosa; troca é 1 email "redefina sua senha"
    por conta ativa.
-6. **Claims ricos via Custom Access Token Hook** — `role`/`estabelecimentoId`/`plano` embutidos
-   no JWT do GoTrue no momento do login (função Postgres), API mantém middleware quase idêntico
-   ao de hoje (só valida assinatura + lê claim, sem lookup no banco por request). Trade-off
-   aceito: mudança de role só vale no próximo refresh do access token (~15min).
+6. **Sem Custom Access Token Hook — revisado durante o planejamento**. Decisão original (hook
+   embutindo claims no JWT) partia de uma premissa errada: que o middleware hoje só lê claim do
+   JWT sem tocar o banco. Não é o caso — `authenticateBearer` já faz `prisma.user.findUnique` em
+   toda request pra checar `establishment.status` (gate de pagamento precisa ser fresco, não pode
+   esperar refresh de token). Como essa query já é obrigatória, buscar `role`/`establishmentId`
+   na mesma query não custa nada a mais — o hook só adicionaria 1 função Postgres pra manter sem
+   ganho real. Middleware novo: extrai `sub` (id do usuário) do JWT do GoTrue, busca `User` no
+   Postgres por esse id — mesmo padrão de hoje, só troca a fonte da assinatura do token.
 
 ## Arquitetura
 
@@ -94,28 +102,19 @@ Google) com configuração, não código novo — ver comparação completa na c
   variáveis principais: `GOTRUE_DB_DRIVER=postgres`, `GOTRUE_DB_DATABASE_URL` (mesmo Postgres),
   `GOTRUE_JWT_SECRET` = mesmo valor de `JWT_SECRET` que a api já usa (api valida token do GoTrue
   sem trocar de lib, `jsonwebtoken` continua), `GOTRUE_SITE_URL`, `GOTRUE_SMTP_*` (Brevo SMTP),
-  `GOTRUE_EXTERNAL_GOOGLE_*` (OAuth), `GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_ENABLED=true` +
-  `GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_URI` apontando pra função Postgres.
+  `GOTRUE_EXTERNAL_GOOGLE_*` (OAuth). Sem `GOTRUE_HOOK_*` (hook descartado, ver Decisão nº6).
 - **nginx**: novo bloco `location /auth/` (em `api.tozzo.uk` e `dev-api.tozzo.uk`) proxiando pro
   `gotrue:9999` — reaproveita domínio/cert existente, sem subdomínio novo.
 - **Postgres**: GoTrue cria e gerencia seu próprio schema `auth` no boot (não mexe no schema
-  `public` do Prisma). 1 objeto novo criado via migration manual (não Prisma, é SQL puro porque
-  vive fora do schema que o Prisma controla):
-  - Função `custom_access_token_hook(event jsonb) RETURNS jsonb` — lê `TB_USERS` pelo
-    `event->>'user_id'`, injeta `role`/`estabelecimentoId`/`plano` em `event->'claims'` (se não
-    achar linha em `TB_USERS` ainda — janela entre `auth.users` criado e `/auth/complete-signup`
-    rodar — devolve claims sem esses 3 campos; API trata JWT sem `estabelecimentoId` como
-    "cadastro incompleto", ver seção API).
-  - **Sem trigger em `auth.users`**: `establishmentId` é `NOT NULL` em `TB_USERS`
-    (`prisma/schema.prisma:39`) — criar a linha automaticamente no insert de `auth.users` exigiria
-    ou relaxar essa constraint (mais mudança de schema) ou inserir com FK inválida. Mais simples:
-    a API cria a linha `TB_USERS` explicitamente nos 2 fluxos que hoje criam usuário (ver
-    `/auth/complete-signup` e `criarUsuario()` na seção API), sempre com `establishmentId` já
-    resolvido na hora do insert.
+  `public` do Prisma) — **nenhuma migration manual em SQL é necessária** (sem hook, sem trigger).
+  `establishmentId` continua `NOT NULL` em `TB_USERS` (`prisma/schema.prisma:39`) sem mudança —
+  a API cria a linha `TB_USERS` explicitamente nos 2 fluxos que hoje criam usuário (ver
+  `/auth/complete-signup` e `criarUsuario()` na seção API), sempre com `establishmentId` já
+  resolvido na hora do insert.
 
 ## Escopo técnico
 
-### Banco de dados (compartilhado, migration manual em SQL + migration Prisma)
+### Banco de dados (compartilhado, migration Prisma)
 
 **Prisma (`prisma/schema.prisma`)**:
 
@@ -130,14 +129,6 @@ model User {
 
 Nenhum campo novo de 2FA/token entra no Prisma — tudo isso passa a viver dentro do schema `auth`
 do GoTrue (`auth.mfa_factors`, `auth.refresh_tokens`, etc.), fora do controle do Prisma.
-
-**SQL manual** (`prisma/migrations/<timestamp>_gotrue_custom_claims_hook/migration.sql`, aplicada
-via `prisma migrate resolve` como já-aplicada ou script separado, já que mexe em schema `auth`
-gerenciado pelo GoTrue):
-
-- `custom_access_token_hook(event jsonb)`.
-- Permissão `GRANT EXECUTE ON FUNCTION custom_access_token_hook TO supabase_auth_admin` (papel
-  que o GoTrue usa pra rodar o hook — confirmar nome exato do role na versão instalada).
 
 ### API (`api/api-tozzo.uk`)
 
@@ -155,10 +146,12 @@ gerenciado pelo GoTrue):
 
 **Mantido/adaptado**:
 
-- Middleware de autenticação (`authenticate`, nome atual a confirmar no código) — troca de
-  "verificar JWT assinado pela própria api" pra "verificar JWT assinado pelo GoTrue" — mesma lib
-  (`jsonwebtoken`), mesmo `JWT_SECRET` (compartilhado via env var com o GoTrue), claims lidos
-  igual (`role`, `estabelecimentoId` já vêm prontos via hook).
+- `middlewares/elysiaAuth.ts` (`authenticateBearer`) — troca de "verificar JWT assinado pela
+  própria api" pra "verificar JWT assinado pelo GoTrue" — mesma lib (`jsonwebtoken`), mesmo
+  `JWT_SECRET` (compartilhado via env var com o GoTrue). Único ajuste real: GoTrue usa `sub`
+  (padrão JWT) pro id do usuário, não `id` como o token atual — troca `decoded.id` por
+  `decoded.sub` na busca do `prisma.user.findUnique`. O resto do middleware (query completa,
+  `establishment.status`, `activeGuard`) fica exatamente igual.
 - `criarUsuario()` (`modules/users/users.controller.ts`) — DONO cria funcionário → API já sabe o
   `establishmentId` (é o do DONO autenticado fazendo a chamada). Chama a **Admin API do GoTrue**
   (`POST /admin/users`, autenticada com `service_role` key) passando email + senha temporária
@@ -172,9 +165,10 @@ gerenciado pelo GoTrue):
   estabelecimento do corpo da requisição, cria `Establishment` (`plan: FREE`) + `TB_USERS`
   (`role: OWNER`, `establishmentId` do `Establishment` recém-criado) na mesma transação. Front e
   mobile chamam esse endpoint sempre logo depois de qualquer signup (senha ou Google) antes de
-  navegar pro resto do app — enquanto ele não roda, o JWT do usuário não carrega
-  `estabelecimentoId` (hook não acha a linha), então rotas autenticadas normais devem tratar essa
-  ausência como "redirecionar pra completar cadastro", não como erro genérico.
+  navegar pro resto do app — enquanto ele não roda, `authenticateBearer` não acha `User` nenhum
+  pra esse id (`404`/`401`, mesmo comportamento de hoje pra usuário inexistente), então rotas
+  autenticadas normais devem tratar essa ausência como "redirecionar pra completar cadastro", não
+  como erro genérico.
 
 ### Front (`front-tozzo.uk`)
 
@@ -243,14 +237,11 @@ Script 1x (`scripts/migrate-users-to-gotrue.ts` ou SQL direto), rodado manualmen
 
 - **API**: `POST /auth/complete-signup` (cria `Establishment`, idempotência se chamado 2x),
   `criarUsuario()` chamando Admin API do GoTrue (mock), middleware validando JWT assinado pelo
-  GoTrue (fixture de token com claims via hook).
-- **Banco**: teste de integração do `custom_access_token_hook` (chama a função direto via SQL —
-  caso com `TB_USERS` existente confere claims, caso sem linha confere que devolve sem
-  `estabelecimentoId`, sem erro).
+  GoTrue via `sub` (fixture de token GoTrue-shaped, usuário achado/não achado no Postgres).
 - **Front/Mobile**: `AuthContext`/`LoginPage`/`login.tsx` com `@supabase/auth-js` mockado
   (login sucesso, `mfa_challenge`, erro de credencial, fluxo Google mockado).
 - Sem cobertura de GoTrue em si (é serviço de terceiro, testado upstream) — só a integração
-  (hook, complete-signup, clients).
+  (middleware, complete-signup, clients).
 
 ## Fora de escopo
 
