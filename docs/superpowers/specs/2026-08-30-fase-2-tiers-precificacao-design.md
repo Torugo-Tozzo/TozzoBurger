@@ -275,6 +275,23 @@ model PrintLog {
   incluindo cenário offline simulado), teste do tratamento do erro
   `REPORT_QUOTA_EXCEEDED` no `relatorioModal`.
 
+## Addendum 2026-08-31 — limite de produtos no FREE
+
+Decisão do usuário, tomada na sessão em que os 3 planos de implementação (API/front/mobile)
+foram escritos: o plano **FREE** ganha limite de **60 produtos cadastrados** (contando só
+produto ativo, `deletedAt IS NULL`) — isso **revisa** a decisão nº1 da seção "Matriz de tiers"
+acima ("sem limite de produto/tipo de produto"), que passa a valer só pros tiers pagos
+(`PAGO`/`PAGO_LEGADO`/`ENTERPRISE` continuam ilimitados). Tipo de produto (`ProductType`)
+continua sem limite em todo tier.
+
+**Explicitamente fora desta mudança**: 1 foto por produto. Perguntado ao usuário se a feature
+de upload de foto de produto (que não existe ainda — Fase 3.7 deixou de fora de propósito)
+deveria entrar junto nesta leva; resposta foi não — só o limite de quantidade entra agora,
+upload de foto fica pra uma fase própria futura, com brainstorm dedicado.
+
+Implementação: `api/api-tozzo.uk/docs/superpowers/plans/2026-08-31-fase-2-tiers-precificacao-api.md`,
+Task 5.
+
 ## Fora de escopo
 
 - **Google Sign-In** — cortado explicitamente pelo usuário desta spec,

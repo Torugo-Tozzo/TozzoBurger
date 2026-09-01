@@ -20,6 +20,12 @@ Este é 1 dos 3 sub-itens que compõem a Fase 2 do `plano.md` (recuperação de 
 própria a fazer). Provedor de email já decidido em sessão anterior: **Brevo**
 (free tier 300 emails/dia, sem cartão, sem cobrança automática ao bater limite).
 
+**Atualização 2026-08-31 (mesmo dia, antes da execução)**: conta Brevo criada
+(`suporte@tozzo.uk`) e domínio `tozzo.uk` já **autenticado** (DKIM via 2 CNAME,
+`brevo-code` e DMARC via TXT, adicionados na Cloudflare e confirmados pela API do Brevo).
+`BREVO_API_KEY`/`EMAIL_FROM` já estão no `.env` da api. Envio real de email já funciona —
+não é mais um pré-requisito pendente pra Task 4 do plano da API.
+
 ## Contexto confirmado no código antes do brainstorm
 
 - `modules/auth/auth.controller.ts` — `tokenForUser()` (linha 60-74) emite um único JWT com
