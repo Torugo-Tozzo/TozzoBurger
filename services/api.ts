@@ -196,6 +196,41 @@ export async function getEstablishment(token: string): Promise<Establishment> {
   }
 }
 
+export type DeviceRegistrationInfo = { platform?: string };
+
+export async function registerDevice(
+  token: string,
+  id?: string | null,
+  info: DeviceRegistrationInfo = {},
+): Promise<{ id: string; [key: string]: unknown }> {
+  const url = new URL('/dispositivos', BASE_URL);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        ...NGROK_HEADERS,
+      },
+      body: JSON.stringify({ id: id ?? undefined, info }),
+    });
+
+    if (!res.ok) {
+      const errBody = await handleJsonResponse(res).catch(() => null);
+      const error = new ApiHttpError(res.status, errBody);
+      console.error('API registerDevice error:', url.toString(), error.message);
+      throw error;
+    }
+
+    return await handleJsonResponse(res) as { id: string; [key: string]: unknown };
+  } catch (err: any) {
+    if (err instanceof ApiHttpError) throw err;
+    console.error('Network/registerDevice request failed', url.toString(), err?.message ?? err);
+    throw err;
+  }
+}
+
 export async function updateEstablishmentCategory(
   token: string,
   establishmentId: string | number,

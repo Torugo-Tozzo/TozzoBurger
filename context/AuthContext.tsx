@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { Platform } from 'react-native';
 import * as api from '@/services/api';
 import * as SecureStore from 'expo-secure-store';
+import { getOrCreateDeviceId } from '@/services/deviceId';
+import { cachePlan } from '@/services/planCache';
 import { synchronizeWithServer } from '@/database/watermelon/sync';
 import { runWithLock } from '@/database/syncGuard';
 import { resetWatermelonLocalData } from '@/database/watermelon/database';
@@ -127,6 +130,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await cacheUser(me);
 
         setToken(t);
+        void (async () => {
+          try {
+            const deviceId = await getOrCreateDeviceId();
+            await api.registerDevice(t, deviceId, { platform: Platform.OS });
+          } catch (err: any) {
+            if (err?.code === 'DEVICE_LIMIT_REACHED') {
+              console.warn('[auth] device limit reached, printing/report gates will use fail-closed cache defaults');
+            } else {
+              console.warn('[auth] device registration failed (non-blocking)', err);
+            }
+          }
+
+          try {
+            const establishment = await api.getEstablishment(t);
+            if (establishment && typeof establishment.plan === 'string') {
+              await cachePlan(establishment.plan);
+            }
+          } catch (err) {
+            console.warn('[auth] failed to prime plan cache (non-blocking)', err);
+          }
+        })();
+
         // The first sync must not block navigation. The list screens show their
         // skeletons while this background sync populates the local database.
         void runWithLock(() => synchronizeWithServer(t, (me as any)?.establishmentId))

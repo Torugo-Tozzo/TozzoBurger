@@ -2,6 +2,7 @@ import {
   createProductType,
   getEstablishment,
   listVendas,
+  registerDevice,
   updateEstablishmentCategory,
 } from '../api';
 
@@ -133,6 +134,27 @@ describe('listVendas', () => {
         'Content-Type': 'application/json',
       }),
       body: JSON.stringify({ description: 'Lanches', color: '#9E9E9E' }),
+    }));
+  });
+
+  it('registra o dispositivo autenticado com id persistente e plataforma', async () => {
+    const registered = { id: 'device-1', platform: 'ios' };
+    fetchMock.mockResolvedValue({
+      ok: true,
+      text: jest.fn(async () => JSON.stringify(registered)),
+    } as unknown as Response);
+
+    await expect(registerDevice('token-123', 'device-1', { platform: 'ios' })).resolves.toEqual(registered);
+
+    const [requestUrl, requestOptions] = fetchMock.mock.calls[0];
+    expect(new URL(String(requestUrl)).pathname).toBe('/dispositivos');
+    expect(requestOptions).toEqual(expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({
+        Authorization: 'Bearer token-123',
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify({ id: 'device-1', info: { platform: 'ios' } }),
     }));
   });
 });
