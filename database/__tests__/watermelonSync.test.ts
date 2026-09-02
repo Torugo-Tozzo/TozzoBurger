@@ -54,13 +54,14 @@ import Order from '../watermelon/models/Order';
 import OrderItem from '../watermelon/models/OrderItem';
 import Product from '../watermelon/models/Product';
 import ProductType from '../watermelon/models/ProductType';
+import PrintLog from '../watermelon/models/PrintLog';
 import Sale from '../watermelon/models/Sale';
 import SaleItem from '../watermelon/models/SaleItem';
 import User from '../watermelon/models/User';
 import Printer from '../watermelon/models/Printer';
 import schema from '../watermelon/schema';
 
-const modelClasses = [Product, ProductType, Order, OrderItem, Sale, SaleItem, User, Printer];
+const modelClasses = [Product, ProductType, Order, OrderItem, Sale, SaleItem, User, Printer, PrintLog];
 const mockPullChanges = api.pullChanges as jest.Mock;
 const mockPushChanges = api.pushChanges as jest.Mock;
 const consoleLog = jest.spyOn(console, 'log').mockImplementation(() => undefined);
@@ -79,6 +80,7 @@ type TestChangeSet = {
   order_items: TestTableChanges;
   sales: TestTableChanges;
   sale_items: TestTableChanges;
+  print_logs: TestTableChanges;
 };
 
 function makeDatabase() {
@@ -103,6 +105,7 @@ function emptyChanges(): TestChangeSet {
     order_items: { created: [], updated: [], deleted: [] },
     sales: { created: [], updated: [], deleted: [] },
     sale_items: { created: [], updated: [], deleted: [] },
+    print_logs: { created: [], updated: [], deleted: [] },
   };
 }
 
@@ -149,7 +152,7 @@ describe('Watermelon sync transport', () => {
     });
   });
 
-  it('posts only the six sync tables, strips Watermelon internals, and reports ignored items', async () => {
+  it('posts apenas as sete tabelas sincronizadas, remove internos do Watermelon e relata itens ignorados', async () => {
     consoleWarn.mockClear();
     const changes = emptyChanges();
     changes.products.created.push({
@@ -298,6 +301,37 @@ describe('Watermelon sync transport', () => {
       customer_name: null,
       is_open: false,
       seller_id: 'seller-b',
+      created_at: 1_700_000_000_000,
+      updated_at: 1_700_000_000_010,
+    });
+    mockPullChanges.mockResolvedValue({ changes, timestamp: 1_700_000_000_020 });
+
+    await expect(pullChanges('token-123', 'establishment-a')({
+      lastPulledAt: 1_700_000_000_000,
+      schemaVersion: 2,
+      migration: null,
+    } as any)).rejects.toThrow(/another establishment/i);
+  });
+
+  it('rejects a pulled print_logs row whose local id belongs to another establishment', async () => {
+    const foreignPrintLog = mockDatabase.get<PrintLog>('print_logs').prepareCreateFromDirtyRaw({
+      id: 'foreign-print-log',
+      _status: 'synced',
+      _changed: '',
+      device_id: 'device-b',
+      printed_at: 1_700_000_000_000,
+      establishment_id: 'establishment-b',
+      created_at: 1_700_000_000_000,
+      updated_at: 1_700_000_000_000,
+    });
+    await mockDatabase.write(() => mockDatabase.batch(foreignPrintLog));
+
+    const changes = emptyChanges();
+    changes.print_logs.updated.push({
+      id: 'foreign-print-log',
+      device_id: 'device-a',
+      printed_at: 1_700_000_000_010,
+      establishment_id: 'establishment-a',
       created_at: 1_700_000_000_000,
       updated_at: 1_700_000_000_010,
     });

@@ -28,6 +28,12 @@ jest.mock('@/database/usePrinterDatabase', () => ({
   }),
 }));
 
+jest.mock('@/database/usePrintLogDatabase', () => ({
+  usePrintLogDatabase: () => ({
+    countPrintsToday: jest.fn(async () => 0),
+  }),
+}));
+
 jest.mock('@/useBLE', () => ({
   listNearbyDevices: jest.fn(async () => []),
   connectToDevice: jest.fn(async () => null),

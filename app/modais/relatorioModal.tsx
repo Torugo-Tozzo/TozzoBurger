@@ -11,10 +11,15 @@ import Colors from '@/constants/Colors';
 import { useTranslation } from 'react-i18next';
 import { getProductTypeLabel } from '@/components/productTypeLabel';
 import { buildReportChartData, type RelatorioProduto } from '@/hooks/reportChartData';
+import { getCachedPlan } from '@/services/planCache';
+import { getReportCountThisMonth, recordReportGenerated } from '@/services/reportQuota';
+import { REPORT_MONTHLY_LIMIT } from '@/constants/planLimits';
+import { useAuth } from '@/context/AuthContext';
 
 type TipoGrafico = 'pizza' | 'progresso';
 
 export default function RelatorioModal() {
+  const { user } = useAuth();
   const params = useLocalSearchParams();
   const { getProductTypes } = useProductDatabase();
   const { getSalesReportByPeriod } = useSaleDatabase();
@@ -46,6 +51,11 @@ export default function RelatorioModal() {
   const [tipoDescricao, setTipoDescricao] = useState<string>(t('charts.allTypes'));
   const [relatorioData, setRelatorioData] = useState<RelatorioProduto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [quotaBlocked, setQuotaBlocked] = useState(false);
+  // A consulta só é contabilizada quando o usuário a solicita explicitamente. Ajustar filtros
+  // prepara o próximo relatório sem consumir a quota mensal do plano Free.
+  const [requestedReport, setRequestedReport] = useState<{ key: string; sequence: number } | null>(null);
+  const currentReportKey = `${dataInicial.toISOString()}:${dataFinal.toISOString()}:${productTypeId ?? ''}`;
   
   useEffect(() => {
     async function fetchTiposProdutos() {
@@ -81,9 +91,29 @@ export default function RelatorioModal() {
   }, [productTypeId, i18n.language]);
   
   useEffect(() => {
+    if (requestedReport?.key !== currentReportKey) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
     async function carregarDadosRelatorio() {
+      const establishmentId = user?.establishmentId;
       setLoading(true);
       try {
+        const plan = establishmentId != null ? await getCachedPlan(establishmentId) : null;
+        if (cancelled) return;
+        if (plan === null || plan === 'FREE') {
+          const used = establishmentId != null ? await getReportCountThisMonth(establishmentId) : 0;
+          if (cancelled) return;
+          if (used >= REPORT_MONTHLY_LIMIT) {
+            setQuotaBlocked(true);
+            setRelatorioData([]);
+            return;
+          }
+        }
+        setQuotaBlocked(false);
+
         const tipoIdParam = productTypeId ?? '';
 
         const report = await getSalesReportByPeriod(
@@ -91,17 +121,25 @@ export default function RelatorioModal() {
           dataFinal.toISOString(),
           tipoIdParam
         );
+        if (cancelled) return;
         setRelatorioData(report);
+        if ((plan === null || plan === 'FREE') && establishmentId != null) {
+          await recordReportGenerated(establishmentId);
+        }
       } catch (error) {
+        if (cancelled) return;
         console.error('Failed to load sales report:', error);
         Alert.alert(t('common.error'), t('errors.loadFailed'));
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
-    
+
     carregarDadosRelatorio();
-  }, [dataInicial, dataFinal, productTypeId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [currentReportKey, requestedReport, user?.establishmentId]);
 
   const ListHeader = () => (
     <View style={[styles.listHeaderContainer, { backgroundColor: colors.text, borderBottomColor: colors.border }]}>
@@ -212,6 +250,18 @@ export default function RelatorioModal() {
               </Picker>
             </View>
           </View>
+          <TouchableOpacity
+            style={[styles.generateButton, { backgroundColor: colors.text }]}
+            onPress={() => setRequestedReport((request) => ({
+              key: currentReportKey,
+              sequence: (request?.sequence ?? 0) + 1,
+            }))}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={t('charts.generateReport')}
+          >
+            <Text style={[styles.generateButtonText, { color: colors.background }]}>{t('charts.generateReport')}</Text>
+          </TouchableOpacity>
         </View>
         
         <View style={styles.chartContainer}>
@@ -222,6 +272,10 @@ export default function RelatorioModal() {
               <ActivityIndicator size="large" color={colors.primary} />
               <Text style={styles.loadingText}>{t('charts.loading')}</Text>
             </View>
+          ) : quotaBlocked ? (
+            <Text style={styles.emptyText}>
+              {t('charts.reportQuotaExceeded')}
+            </Text>
           ) : relatorioData.length === 0 ? (
             <Text style={styles.emptyText}>
               {t('charts.emptyPeriod')}
@@ -410,6 +464,16 @@ const styles = StyleSheet.create({
   chartContainer: {
     alignItems: 'center',
     marginBottom: 20,
+  },
+  generateButton: {
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 6,
+  },
+  generateButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   listHeaderContainer: {
     flexDirection: 'row',

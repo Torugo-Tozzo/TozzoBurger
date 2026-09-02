@@ -20,5 +20,7 @@
   "grandTotal": "总计",
   "share": "分享报告",
   "reportTitle": "销售报告",
-  "until": "至"
+  "reportQuotaExceeded": "已达到 Free 方案的月度报告上限。请在设置中升级以生成不限量报告。",
+  "until": "至",
+  "generateReport": "生成报告"
 }

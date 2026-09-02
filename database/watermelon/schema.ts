@@ -6,7 +6,7 @@ const syncTimestamps = [
 ];
 
 export default appSchema({
-  version: 2,
+  version: 3,
   tables: [
     tableSchema({
       name: 'products',
@@ -73,6 +73,15 @@ export default appSchema({
         { name: 'sale_id', type: 'string', isIndexed: true },
         { name: 'product_id', type: 'string', isIndexed: true },
         { name: 'unit_price_at_sale', type: 'number' },
+        ...syncTimestamps,
+      ],
+    }),
+    tableSchema({
+      name: 'print_logs',
+      columns: [
+        { name: 'device_id', type: 'string' },
+        { name: 'printed_at', type: 'number' },
+        { name: 'establishment_id', type: 'string', isIndexed: true },
         ...syncTimestamps,
       ],
     }),

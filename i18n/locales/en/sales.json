@@ -23,6 +23,8 @@
   "printSuccessMessage": "Sale sent to the printer.",
   "printErrorTitle": "Error",
   "printErrorMessage": "Could not print the sale.",
+  "printLimitReachedTitle": "Print limit reached",
+  "printLimitReachedMessage": "Your Free plan allows up to 30 prints per day. Upgrade in Settings to print without limits.",
   "deleteConfirmTitle": "Confirm deletion",
   "deleteConfirmMessage": "Are you sure you want to delete this sale?",
   "deleteErrorMessage": "Could not delete the sale.",

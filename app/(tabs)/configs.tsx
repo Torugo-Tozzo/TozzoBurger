@@ -23,6 +23,10 @@ import {
 } from '@/i18n';
 import { PRINTER_WIDTH_PRESETS, PrinterWidthPreset } from '@/constants/printerWidths';
 import { getPrinterWidth, setPrinterWidth } from '@/services/printerPreferences';
+import * as api from '@/services/api';
+import { usePrintLogDatabase } from '@/database/usePrintLogDatabase';
+import { getReportCountThisMonth } from '@/services/reportQuota';
+import { PRINT_DAILY_LIMIT, REPORT_MONTHLY_LIMIT } from '@/constants/planLimits';
 
 const BluetoothScreen = () => {
   const { setPrinter, getPrinter, removePrinter } = usePrinterDatabase(); // Métodos do banco de dados
@@ -44,6 +48,10 @@ const BluetoothScreen = () => {
   const [selectedPrinterWidth, setSelectedPrinterWidth] = useState<PrinterWidthPreset>('80mm');
   const [printerWidthChanging, setPrinterWidthChanging] = useState(false);
   const { refreshing, onRefresh } = useSyncRefresh();
+  const { countPrintsToday } = usePrintLogDatabase();
+  const [planInfo, setPlanInfo] = useState<{ plan: string; deviceCount: number } | null>(null);
+  const [printsToday, setPrintsToday] = useState(0);
+  const [reportsThisMonth, setReportsThisMonth] = useState(0);
 
   useEffect(() => {
     setSelectedLocale(normalizeLocale(i18n.language));
@@ -52,6 +60,42 @@ const BluetoothScreen = () => {
   useEffect(() => {
     getPrinterWidth().then(setSelectedPrinterWidth);
   }, []);
+
+  useEffect(() => {
+    if (!token || !user?.establishmentId) {
+      setPlanInfo(null);
+      return;
+    }
+
+    const establishmentId = user.establishmentId;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [establishment, prints, reports] = await Promise.all([
+          api.getEstablishment(token),
+          countPrintsToday(),
+          getReportCountThisMonth(establishmentId),
+        ]);
+        if (cancelled) return;
+
+        setPlanInfo({
+          plan: typeof establishment?.plan === 'string' ? establishment.plan : 'FREE',
+          deviceCount: typeof establishment?._count === 'object' && establishment._count !== null
+            && typeof (establishment._count as Record<string, unknown>).devices === 'number'
+            ? (establishment._count as Record<string, number>).devices
+            : 0,
+        });
+        setPrintsToday(prints);
+        setReportsThisMonth(reports);
+      } catch (err) {
+        console.warn('Failed to load plan info', err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user?.establishmentId]);
 
   const handlePrinterWidthChange = async (value: PrinterWidthPreset) => {
     setPrinterWidthChanging(true);
@@ -293,6 +337,35 @@ const BluetoothScreen = () => {
           </View>
         ))
       ))}
+
+      {planInfo && (
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.sectionHeader, styles.sectionHeaderRow, { backgroundColor: colors.surfaceHeader }]}>
+            <FontAwesome name="credit-card" size={16} color={colors.text} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.plan.title')}</Text>
+          </View>
+          <View style={styles.sectionContent}>
+            <Text style={{ color: colors.text }}>{t(`settings.plan.tiers.${planInfo.plan}`)}</Text>
+            <Text style={{ color: colors.text }}>
+              {planInfo.plan === 'FREE'
+                ? t('settings.plan.printsToday', { count: printsToday, limit: PRINT_DAILY_LIMIT })
+                : t('settings.plan.unlimited')}
+            </Text>
+            <Text style={{ color: colors.text }}>
+              {planInfo.plan === 'FREE'
+                ? t('settings.plan.reportsThisMonth', { count: reportsThisMonth, limit: REPORT_MONTHLY_LIMIT })
+                : t('settings.plan.unlimited')}
+            </Text>
+            <Text style={{ color: colors.text }}>{t('settings.plan.devices', { count: planInfo.deviceCount })}</Text>
+            {planInfo.plan === 'FREE' && (
+              <Button
+                title={t('settings.plan.upgradeButton')}
+                onPress={() => WebBrowser.openBrowserAsync('https://tozzo.uk/plan')}
+              />
+            )}
+          </View>
+        </View>
+      )}
 
       <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={[styles.sectionHeader, styles.sectionHeaderRow, { backgroundColor: colors.surfaceHeader }]}>

@@ -20,5 +20,7 @@
   "grandTotal": "Total geral",
   "share": "Compartilhar relatório",
   "reportTitle": "Relatório de vendas",
-  "until": "até"
+  "reportQuotaExceeded": "Limite mensal de relatórios atingido no plano Free. Faça upgrade nas Configurações para gerar relatórios ilimitados.",
+  "until": "até",
+  "generateReport": "Gerar relatório"
 }
