@@ -48,6 +48,35 @@ async function readCachedUser(): Promise<User | null> {
   }
 }
 
+// Chamado tanto no login quanto na restauração de sessão (app reaberto com
+// token já salvo) — sem isso, um dispositivo que nunca refaz login depois de
+// instalar essa feature nunca aparece em "Dispositivos em uso" nem conta pro
+// limite de dispositivos do plano. registerDevice é idempotente por device id
+// (upsert no servidor), seguro de chamar toda vez que a sessão é validada.
+async function syncDeviceAndPlan(token: string, establishmentId: number | string | null | undefined) {
+  try {
+    const deviceId = await getOrCreateDeviceId();
+    await api.registerDevice(token, deviceId, { platform: Platform.OS });
+  } catch (err: any) {
+    // Workaround while the API returns only a localized message rather than a structured
+    // DEVICE_LIMIT_REACHED code for this endpoint.
+    if (/limite de dispositivos atingido/i.test(String(err?.message ?? ''))) {
+      console.warn('[auth] device limit reached, printing/report gates will use fail-closed cache defaults');
+    } else {
+      console.warn('[auth] device registration failed (non-blocking)', err);
+    }
+  }
+
+  try {
+    const establishment = await api.getEstablishment(token);
+    if (establishment && typeof establishment.plan === 'string' && establishmentId != null) {
+      await cachePlan(establishment.plan, establishmentId);
+    }
+  } catch (err) {
+    console.warn('[auth] failed to prime plan cache (non-blocking)', err);
+  }
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -66,6 +95,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (me && mounted) {
               setUser(me);
               await cacheUser(me);
+              void syncDeviceAndPlan(stored, (me as any)?.establishmentId ?? null);
             }
           } catch (err: any) {
             // Only clear token on explicit auth errors (401/402/403).
@@ -131,29 +161,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await cacheUser(me);
 
         setToken(t);
-        void (async () => {
-          try {
-            const deviceId = await getOrCreateDeviceId();
-            await api.registerDevice(t, deviceId, { platform: Platform.OS });
-          } catch (err: any) {
-            // Workaround while the API returns only a localized message rather than a structured
-            // DEVICE_LIMIT_REACHED code for this endpoint.
-            if (/limite de dispositivos atingido/i.test(String(err?.message ?? ''))) {
-              console.warn('[auth] device limit reached, printing/report gates will use fail-closed cache defaults');
-            } else {
-              console.warn('[auth] device registration failed (non-blocking)', err);
-            }
-          }
-
-          try {
-            const establishment = await api.getEstablishment(t);
-            if (establishment && typeof establishment.plan === 'string' && meEstab != null) {
-              await cachePlan(establishment.plan, meEstab);
-            }
-          } catch (err) {
-            console.warn('[auth] failed to prime plan cache (non-blocking)', err);
-          }
-        })();
+        void syncDeviceAndPlan(t, meEstab);
 
         // The first sync must not block navigation. The list screens show their
         // skeletons while this background sync populates the local database.
