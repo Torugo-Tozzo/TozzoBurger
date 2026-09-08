@@ -127,30 +127,6 @@ function fallbackSalesPagination(res: Response, filters: SalesFilters, receivedC
   return { page, limit, total, totalPages, hasNextPage: page < totalPages };
 }
 
-export async function login(email: string, password: string) {
-  const url = `${BASE_URL}/auth/login`;
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...NGROK_HEADERS },
-      body: JSON.stringify({ email, senha: password }),
-    });
-
-    if (!res.ok) {
-      const errBody = await handleJsonResponse(res).catch(() => null);
-      const message = (errBody && (errBody.message || JSON.stringify(errBody))) || `HTTP ${res.status}`;
-      console.error('API login error:', url, message);
-      throw new Error(message);
-    }
-
-    const body = await handleJsonResponse(res);
-    return body && typeof body === 'object' ? { ...body, user: body.user ? fromLegacyUser(body.user) : body.user } : body;
-  } catch (err: any) {
-    console.error('Network/login request failed', url, err?.message ?? err);
-    throw err;
-  }
-}
-
 export async function getMe(token: string) {
   const url = `${BASE_URL}/usuarios/me`;
   try {
@@ -163,7 +139,7 @@ export async function getMe(token: string) {
       const errBody = await handleJsonResponse(res).catch(() => null);
       const message = (errBody && (errBody.message || JSON.stringify(errBody))) || `HTTP ${res.status}`;
       console.error('API getMe error:', url, message);
-      throw new Error(message);
+      throw new ApiHttpError(res.status, errBody, message);
     }
 
     return fromLegacyUser(await handleJsonResponse(res));

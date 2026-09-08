@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { Platform } from 'react-native';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
+import { AppState, Platform } from 'react-native';
 import * as api from '@/services/api';
+import { authClient } from '@/services/authClient';
 import * as SecureStore from 'expo-secure-store';
 import { getOrCreateDeviceId } from '@/services/deviceId';
 import { cachePlan, clearCachedPlan } from '@/services/planCache';
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextData | undefined>(undefined);
 
 const TOKEN_KEY = 'tozzo_token_v1';
 const USER_CACHE_KEY = 'tozzo_user_cache_v1';
+const DATA_OWNER_KEY = 'tozzo_local_data_owner_v1';
 
 async function cacheUser(user: User) {
   try {
@@ -82,103 +84,131 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Rehydrate token on mount and validate it
+  const acceptedSession = useRef(false);
+  const revision = useRef(0);
+  const currentUser = useRef<User | null>(null);
+
+  const clearLocalSession = () => {
+    acceptedSession.current = false;
+    revision.current++;
+    const establishmentId = currentUser.current?.establishmentId;
+    currentUser.current = null;
+    setToken(null);
+    setUser(null);
+    void SecureStore.deleteItemAsync(TOKEN_KEY).catch(console.warn);
+    void SecureStore.deleteItemAsync(USER_CACHE_KEY).catch(console.warn);
+    if (establishmentId != null) {
+      void Promise.resolve(clearCachedPlan(establishmentId)).catch(console.warn);
+      void Promise.resolve(clearReportQuota(establishmentId)).catch(console.warn);
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
+    const initialRevision = revision.current;
+    const { data: { subscription } } = authClient.onAuthStateChange((event, session) => {
+      // Keep this callback synchronous: auth-js may hold its session lock here.
+      if (!mounted) return;
+      if (event === 'SIGNED_OUT') clearLocalSession();
+      if (event === 'TOKEN_REFRESHED' && acceptedSession.current && session) {
+        setToken(session.access_token);
+      }
+    });
+    const refreshForState = (state: string) => {
+      if (state === 'active') void authClient.startAutoRefresh();
+      else void authClient.stopAutoRefresh();
+    };
+    const appStateSubscription = AppState.addEventListener('change', refreshForState);
     const load = async () => {
       try {
-        const stored = await SecureStore.getItemAsync(TOKEN_KEY);
-        if (stored && mounted) {
-          setToken(stored);
-          try {
-            const me = await api.getMe(stored);
-            if (me && mounted) {
-              setUser(me);
-              await cacheUser(me);
-              void syncDeviceAndPlan(stored, (me as any)?.establishmentId ?? null);
-            }
-          } catch (err: any) {
-            // Only clear token on explicit auth errors (401/402/403).
-            // For network/server errors (offline) keep the stored token.
-            const status = err?.response?.status ?? err?.status ?? null;
-            if (status === 401 || status === 402 || status === 403) {
-              console.warn('Stored token invalid, clearing', err);
-              await SecureStore.deleteItemAsync(TOKEN_KEY);
-              if (mounted) {
-                setToken(null);
-                setUser(null);
-              }
-            } else {
-              console.warn('Network/server error validating token — keeping stored token', err);
-              const prev = await readCachedUser();
-              if (prev && mounted) {
-                setUser(prev);
-              }
-            }
+        // A legacy API token cannot be exchanged for a GoTrue refresh token.
+        await SecureStore.deleteItemAsync(TOKEN_KEY);
+        const { data, error } = await authClient.getSession();
+        if (error) throw error;
+        const session = data.session;
+        if (!session) return;
+        let me: User | null;
+        try {
+          me = await api.getMe(session.access_token);
+        } catch (error: any) {
+          if ([401, 403, 410].includes(error?.status)) {
+            await authClient.signOut({ scope: 'local' });
+            clearLocalSession();
+            return;
           }
+          if (error?.status === 402) return;
+          me = await readCachedUser();
+          if (session.user?.id && String(me?.id) !== session.user.id) me = null;
         }
-      } catch (err) {
-        console.warn('Failed to load token from SecureStore', err);
+        if (!me || !mounted || revision.current !== initialRevision) return;
+        await cacheUser(me);
+        if (!mounted || revision.current !== initialRevision) return;
+        currentUser.current = me;
+        acceptedSession.current = true;
+        setUser(me);
+        setToken(session.access_token);
+        void syncDeviceAndPlan(session.access_token, me.establishmentId);
+      } catch (error) {
+        console.warn('[auth] Session restoration failed', error);
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+          refreshForState(AppState.currentState);
+        }
       }
     };
-
-    load();
+    void load();
     return () => {
       mounted = false;
+      revision.current++;
+      subscription.unsubscribe();
+      appStateSubscription.remove();
+      void authClient.stopAutoRefresh();
     };
   }, []);
 
-  const login = async (email: string, senha: string) => {
+  const login = async (email: string, password: string) => {
+    const attempt = ++revision.current;
     setLoading(true);
     try {
-      const body = await api.login(email, senha);
-      // Expect the API to return an object that includes a token string.
-      // Common keys: token, accessToken. Try both.
-      const t = body?.token ?? body?.accessToken ?? body?.access_token ?? null;
-      if (!t) return false;
-      try {
-        await SecureStore.setItemAsync(TOKEN_KEY, t);
-      } catch (err) {
-        console.warn('Failed to persist token to SecureStore', err);
-      }
-
-      // Fetch user profile
-      try {
-        const me = await api.getMe(t);
-        if (!me) {
-          console.warn('Failed to fetch /usuarios/me: empty profile');
-          return false;
+      const { data, error } = await authClient.signInWithPassword({ email: email.trim(), password });
+      if (error) throw error;
+      if (!data.session) return false;
+      const accessToken = data.session.access_token;
+      const me = await api.getMe(accessToken);
+      if (!me || revision.current !== attempt) return false;
+      const previous = await readCachedUser();
+      const dataOwner = await SecureStore.getItemAsync(DATA_OWNER_KEY) ?? previous?.establishmentId;
+      if (String(dataOwner) !== String(me.establishmentId)) {
+        // Do not expose a different account until the previous local data is gone.
+        // runWithLock coalesces queued syncs; ensure OUR reset actually executed.
+        let reset = false;
+        while (!reset) {
+          if (revision.current !== attempt) return false;
+          await runWithLock(async () => {
+            await resetWatermelonLocalData();
+            reset = true;
+          });
         }
-        setUser(me);
-
-        const prev = await readCachedUser();
-        const meEstab = (me as any)?.establishmentId ?? null;
-        if (prev && String(prev.establishmentId) !== String(meEstab)) {
-          await resetWatermelonLocalData().catch((e) => console.warn('[auth] Watermelon local data reset failed', e));
-        }
-        await cacheUser(me);
-
-        setToken(t);
-        void syncDeviceAndPlan(t, meEstab);
-
-        // The first sync must not block navigation. The list screens show their
-        // skeletons while this background sync populates the local database.
-        void runWithLock(() => synchronizeWithServer(t, (me as any)?.establishmentId))
-          .then((res) => {
-            if (res === null) console.log('[sync] skipped login-triggered sync; another sync is in progress');
-          })
-          .catch((err) => console.warn('sync after login failed', err));
-        
-      } catch (err) {
-        console.warn('Failed to fetch /usuarios/me', err);
-        return false;
       }
-
+      if (revision.current !== attempt) return false;
+      await SecureStore.setItemAsync(DATA_OWNER_KEY, String(me.establishmentId));
+      await cacheUser(me);
+      if (revision.current !== attempt) return false;
+      currentUser.current = me;
+      acceptedSession.current = true;
+      setUser(me);
+      setToken(accessToken);
+      void syncDeviceAndPlan(accessToken, me.establishmentId);
+      void runWithLock(() => synchronizeWithServer(accessToken, me.establishmentId))
+        .catch((error) => console.warn('sync after login failed', error));
       return true;
-    } catch (err) {
-      console.warn('Login failed', err);
+    } catch (error) {
+      console.warn('Login failed', error);
+      if (revision.current === attempt) {
+        clearLocalSession();
+        await authClient.signOut({ scope: 'local' }).catch(console.warn);
+      }
       return false;
     } finally {
       setLoading(false);
@@ -186,19 +216,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
-    const establishmentId = user?.establishmentId;
-    setToken(null);
-    setUser(null);
-    SecureStore.deleteItemAsync(TOKEN_KEY).catch((err) => console.warn('Failed to delete token', err));
-    SecureStore.deleteItemAsync(USER_CACHE_KEY).catch((err) => console.warn('Failed to delete user cache', err));
-    // Cache de plano/quota já é escopado por estabelecimento (não vaza pra outra conta que logar
-    // depois neste dispositivo), mas ainda vale limpar a entrada da conta que está saindo.
-    if (establishmentId != null) {
-      void clearCachedPlan(establishmentId).catch((err) => console.warn('Failed to clear cached plan on logout', err));
-      void clearReportQuota(establishmentId).catch((err) => console.warn('Failed to clear report quota on logout', err));
-    }
+    clearLocalSession();
+    void authClient.signOut({ scope: 'local' }).catch((error) => console.warn('[auth] Sign out failed', error));
   };
-
   return (
     <AuthContext.Provider value={{ user, token, loading, login, logout }}>
       {children}
