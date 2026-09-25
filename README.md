@@ -2,6 +2,9 @@
 
 # 🍔 Tozzo Burger – App de Gestão de Vendas/Pedidos
 
+As diferenças atuais em relação à API e à web, junto das etapas para retomar o desenvolvimento Android, estão em [Alinhamento do mobile com API e web](docs/pendencias-alinhamento-api-web.md).
+As práticas compartilhadas dos projetos ficam no [guia de desenvolvimento](../api-tozzo.uk/skills/tozzo-development/SKILL.md).
+
 Este é um aplicativo desenvolvido para a lanchonete **Tozzo Burger**, feito em **React Native** utilizando **Expo**, com o objetivo de gerenciar vendas e pedidos, com **foco principal na impressão de pedidos** diretamente na cozinha.
 
 O projeto nasceu da necessidade do meu pai de ter um app simples e funcional para o controle dos pedidos da lanchonete. Além disso, o repositório está público para fins acadêmicos, servindo como comprovação do meu estágio não obrigatório.
