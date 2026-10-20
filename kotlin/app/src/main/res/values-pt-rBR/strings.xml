@@ -44,4 +44,34 @@
     <string name="notice_deleted_message">Este estabelecimento foi excluído.</string>
     <string name="action_ok">OK</string>
     <string name="login_error_device_limit_generic">Este estabelecimento atingiu o limite de aparelhos.</string>
+    <string name="role_owner">Proprietário</string>
+    <string name="role_manager">Gerente</string>
+    <string name="role_employee">Funcionário</string>
+    <string name="role_cook">Cozinheiro</string>
+    <string name="role_driver">Entregador</string>
+    <string name="role_customer">Cliente</string>
+    <string name="nav_open_menu">Abrir menu</string>
+    <string name="sync_synced">Sincronizado</string>
+    <string name="sync_syncing">Sincronizando</string>
+    <string name="sync_offline">Offline</string>
+    <string name="sync_pending_first">Aguardando sincronização</string>
+    <string name="payment_required_banner">Pagamento pendente. Regularize no site para continuar usando o Tozzo.</string>
+    <string name="module_coming_soon">Disponível em breve</string>
+    <string name="settings_user">Usuário</string>
+    <string name="settings_establishment">Estabelecimento</string>
+    <string name="settings_version">Versão do app</string>
+    <string name="settings_unbind">Desvincular este aparelho</string>
+    <string name="settings_unbind_confirm_title">Desvincular este aparelho?</string>
+    <string name="settings_unbind_confirm_message">Todos os dados guardados neste aparelho serão apagados e você sairá da conta. Depois, outro usuário poderá entrar.</string>
+    <string name="settings_unbind_confirm">Desvincular</string>
+    <string name="unbind_blocked_pending">Há alterações ainda não enviadas. Aguarde a sincronização antes de desvincular.</string>
+    <string name="unbind_blocked_offline">Conecte-se à internet para desvincular este aparelho.</string>
+    <string name="rejections_title">Recusas</string>
+    <string name="rejections_empty">Nenhuma alteração recusada.</string>
+    <string name="rejection_summary">%1$s · %2$s</string>
+    <plurals name="sync_rejections">
+        <item quantity="one">%d recusa</item>
+        <item quantity="many">%d recusas</item>
+        <item quantity="other">%d recusas</item>
+    </plurals>
 </resources>

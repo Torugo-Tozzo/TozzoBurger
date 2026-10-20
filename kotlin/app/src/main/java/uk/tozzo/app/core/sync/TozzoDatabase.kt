@@ -3,6 +3,7 @@ package uk.tozzo.app.core.sync
 import android.content.Context
 import com.powersync.DatabaseDriverFactory
 import com.powersync.PowerSyncDatabase
+import com.powersync.db.getStringOptional
 import com.powersync.sync.SyncStatusData
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -29,12 +30,29 @@ data class LocalSyncStatus(
     val hasSynced: Boolean?,
 )
 
+/** A row of [SYNC_REJECTIONS_TABLE]: a local change the server refused. */
+data class SyncRejection(
+    val id: String,
+    val tableName: String,
+    val code: String?,
+    val detail: String?,
+    /** ISO-8601 instant, as recorded by [DatabaseRejectionSink]. */
+    val createdAt: String,
+)
+
+/** Every rejection, newest first. */
+internal const val REJECTIONS_LIST_SQL =
+    "SELECT id, table_name, code, detail, created_at FROM $SYNC_REJECTIONS_TABLE ORDER BY created_at DESC"
+
 /** The local database, seen by the [SyncController] (a seam for tests without the SDK). */
 interface LocalDatabase {
     fun status(): Flow<LocalSyncStatus>
 
     /** Watches a `SELECT count(*)` query. */
     fun watchCount(sql: String): Flow<Int>
+
+    /** Watches [SYNC_REJECTIONS_TABLE], newest first. */
+    fun watchRejections(): Flow<List<SyncRejection>>
 
     suspend fun connect()
 
@@ -76,6 +94,21 @@ class TozzoDatabase
             flow {
                 emitAll(database().watch(sql) { it.getLong(0) ?: 0L })
             }.map { rows -> rows.firstOrNull()?.toInt() ?: 0 }.distinctUntilChanged()
+
+        override fun watchRejections(): Flow<List<SyncRejection>> =
+            flow {
+                emitAll(
+                    database().watch(REJECTIONS_LIST_SQL) {
+                        SyncRejection(
+                            id = it.getStringOptional("id").orEmpty(),
+                            tableName = it.getStringOptional("table_name").orEmpty(),
+                            code = it.getStringOptional("code"),
+                            detail = it.getStringOptional("detail"),
+                            createdAt = it.getStringOptional("created_at").orEmpty(),
+                        )
+                    },
+                )
+            }.distinctUntilChanged()
 
         override suspend fun connect() {
             database().connect(connector)

@@ -163,6 +163,8 @@ class SyncControllerTest {
 
         override fun status(): Flow<LocalSyncStatus> = status
 
+        override fun watchRejections(): Flow<List<SyncRejection>> = MutableStateFlow(emptyList())
+
         override fun watchCount(sql: String): Flow<Int> = counts[sql] ?: MutableStateFlow(0)
 
         override suspend fun connect() {

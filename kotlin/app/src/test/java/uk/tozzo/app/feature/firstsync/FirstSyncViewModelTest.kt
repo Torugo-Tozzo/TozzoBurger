@@ -21,6 +21,7 @@ import uk.tozzo.app.core.sync.Connectivity
 import uk.tozzo.app.core.sync.LocalDatabase
 import uk.tozzo.app.core.sync.LocalSyncStatus
 import uk.tozzo.app.core.sync.SyncController
+import uk.tozzo.app.core.sync.SyncRejection
 import uk.tozzo.app.domain.EstablishmentModules
 import uk.tozzo.app.domain.Role
 
@@ -83,6 +84,8 @@ class FirstSyncViewModelTest {
         val status = MutableStateFlow(LocalSyncStatus(false, false, false, false))
 
         override fun status(): Flow<LocalSyncStatus> = status
+
+        override fun watchRejections(): Flow<List<SyncRejection>> = MutableStateFlow(emptyList())
 
         override fun watchCount(sql: String): Flow<Int> = MutableStateFlow(0)
 

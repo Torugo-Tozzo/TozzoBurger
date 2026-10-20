@@ -44,4 +44,32 @@
     <string name="notice_deleted_message">该店铺已被删除。</string>
     <string name="action_ok">确定</string>
     <string name="login_error_device_limit_generic">该店铺已达到设备数量上限。</string>
+    <string name="role_owner">店主</string>
+    <string name="role_manager">经理</string>
+    <string name="role_employee">员工</string>
+    <string name="role_cook">厨师</string>
+    <string name="role_driver">配送员</string>
+    <string name="role_customer">顾客</string>
+    <string name="nav_open_menu">打开菜单</string>
+    <string name="sync_synced">已同步</string>
+    <string name="sync_syncing">正在同步</string>
+    <string name="sync_offline">离线</string>
+    <string name="sync_pending_first">等待同步</string>
+    <string name="payment_required_banner">付款待处理。请在网站上完成付款以继续使用 Tozzo。</string>
+    <string name="module_coming_soon">即将推出</string>
+    <string name="settings_user">用户</string>
+    <string name="settings_establishment">门店</string>
+    <string name="settings_version">应用版本</string>
+    <string name="settings_unbind">解除绑定此设备</string>
+    <string name="settings_unbind_confirm_title">解除绑定此设备？</string>
+    <string name="settings_unbind_confirm_message">此设备上保存的所有数据都将被删除，您也将退出登录。之后其他用户可以登录。</string>
+    <string name="settings_unbind_confirm">解除绑定</string>
+    <string name="unbind_blocked_pending">还有未发送的更改。请等待同步完成后再解除绑定。</string>
+    <string name="unbind_blocked_offline">请连接互联网以解除绑定此设备。</string>
+    <string name="rejections_title">被拒绝的更改</string>
+    <string name="rejections_empty">没有被拒绝的更改。</string>
+    <string name="rejection_summary">%1$s · %2$s</string>
+    <plurals name="sync_rejections">
+        <item quantity="other">%d 条被拒绝</item>
+    </plurals>
 </resources>

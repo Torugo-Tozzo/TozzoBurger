@@ -44,4 +44,34 @@
     <string name="notice_deleted_message">Cet établissement a été supprimé.</string>
     <string name="action_ok">OK</string>
     <string name="login_error_device_limit_generic">Cet établissement a atteint la limite d\'appareils.</string>
+    <string name="role_owner">Propriétaire</string>
+    <string name="role_manager">Gérant</string>
+    <string name="role_employee">Employé</string>
+    <string name="role_cook">Cuisinier</string>
+    <string name="role_driver">Livreur</string>
+    <string name="role_customer">Client</string>
+    <string name="nav_open_menu">Ouvrir le menu</string>
+    <string name="sync_synced">Synchronisé</string>
+    <string name="sync_syncing">Synchronisation</string>
+    <string name="sync_offline">Hors ligne</string>
+    <string name="sync_pending_first">En attente de synchronisation</string>
+    <string name="payment_required_banner">Paiement en attente. Régularisez-le sur le site pour continuer à utiliser Tozzo.</string>
+    <string name="module_coming_soon">Bientôt disponible</string>
+    <string name="settings_user">Utilisateur</string>
+    <string name="settings_establishment">Établissement</string>
+    <string name="settings_version">Version de l\'app</string>
+    <string name="settings_unbind">Dissocier cet appareil</string>
+    <string name="settings_unbind_confirm_title">Dissocier cet appareil ?</string>
+    <string name="settings_unbind_confirm_message">Toutes les données enregistrées sur cet appareil seront supprimées et vous serez déconnecté. Un autre utilisateur pourra ensuite se connecter.</string>
+    <string name="settings_unbind_confirm">Dissocier</string>
+    <string name="unbind_blocked_pending">Des modifications n\'ont pas encore été envoyées. Attendez la synchronisation avant de dissocier.</string>
+    <string name="unbind_blocked_offline">Connectez-vous à Internet pour dissocier cet appareil.</string>
+    <string name="rejections_title">Refus</string>
+    <string name="rejections_empty">Aucune modification refusée.</string>
+    <string name="rejection_summary">%1$s · %2$s</string>
+    <plurals name="sync_rejections">
+        <item quantity="one">%d refus</item>
+        <item quantity="many">%d refus</item>
+        <item quantity="other">%d refus</item>
+    </plurals>
 </resources>

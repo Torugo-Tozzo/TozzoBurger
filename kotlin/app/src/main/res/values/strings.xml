@@ -44,4 +44,33 @@
     <string name="notice_deleted_message">This establishment was deleted.</string>
     <string name="action_ok">OK</string>
     <string name="login_error_device_limit_generic">This establishment reached its device limit.</string>
+    <string name="role_owner">Owner</string>
+    <string name="role_manager">Manager</string>
+    <string name="role_employee">Employee</string>
+    <string name="role_cook">Cook</string>
+    <string name="role_driver">Driver</string>
+    <string name="role_customer">Customer</string>
+    <string name="nav_open_menu">Open menu</string>
+    <string name="sync_synced">Synced</string>
+    <string name="sync_syncing">Syncing</string>
+    <string name="sync_offline">Offline</string>
+    <string name="sync_pending_first">Waiting for sync</string>
+    <string name="payment_required_banner">Payment pending. Settle it on the website to keep using Tozzo.</string>
+    <string name="module_coming_soon">Coming soon</string>
+    <string name="settings_user">User</string>
+    <string name="settings_establishment">Establishment</string>
+    <string name="settings_version">App version</string>
+    <string name="settings_unbind">Unlink this device</string>
+    <string name="settings_unbind_confirm_title">Unlink this device?</string>
+    <string name="settings_unbind_confirm_message">All data stored on this device will be deleted and you will be signed out. Another user can then sign in.</string>
+    <string name="settings_unbind_confirm">Unlink</string>
+    <string name="unbind_blocked_pending">Some changes were not sent yet. Wait for them to sync before unlinking.</string>
+    <string name="unbind_blocked_offline">Connect to the internet to unlink this device.</string>
+    <string name="rejections_title">Rejections</string>
+    <string name="rejections_empty">No rejected changes.</string>
+    <string name="rejection_summary">%1$s · %2$s</string>
+    <plurals name="sync_rejections">
+        <item quantity="one">%d rejection</item>
+        <item quantity="other">%d rejections</item>
+    </plurals>
 </resources>
