@@ -229,3 +229,31 @@ Cada etapa termina com testes passando, o app rodando no emulador contra `dev-ap
 - Sem SSE no app: o próprio sync traz as mudanças.
 - ID de aparelho novo, sem ler o do RN (`tozzo_device_id_v1` no SecureStore do Expo). Na dev, o dono remove o aparelho antigo em Dispositivos se bater no limite do plano. **Pendência para o plano de migração da produção.**
 - Ordem das etapas.
+
+## Registro de execução — etapa 1
+
+**Data:** 2026-10-20. Emulador Pixel_7_Pro (Android 37.2, 2 GB de RAM, 2 núcleos) contra `dev-api.tozzo.uk`. Build debug, commit `1b7a2f5`. Contas de teste do estabelecimento "Teste Fase 2": um funcionário (EMPLOYEE) e um gerente (MANAGER). O dono entra só com Google, que fica para a etapa 6.
+
+**Roteiro:**
+
+| # | Item | Resultado |
+|---|---|---|
+| 1 | Primeira abertura cai no login | Passou |
+| 2 | Login → primeiro sync → gaveta, Vender como início, selo Sincronizado | Passou. EMPLOYEE sem Dispositivos e Relatórios; MANAGER com os dois (mesma regra do web) |
+| 3 | Linhas locais iguais às da API | Passou: `products`, `sales` e `sale_items` com os mesmos ids de `GET /v1/products` e `GET /v1/sales` (1, 1 e 1) |
+| 4 | Sem rede, matar e reabrir | Passou: abre na gaveta com o selo Offline |
+| 5 | Religar a rede | Passou: selo volta a Sincronizado em menos de 10 s |
+| 6 | Desvincular → login de outro usuário | Passou: tabelas `ps_data_*` vazias depois de desvincular; o gerente entra e sincroniza |
+| 7 | Outro usuário sem desvincular | Passou: "Este aparelho está vinculado a outro usuário". Sem "Sair" nesta etapa, simulado com `POST /v1/auth/logout {"allSessions": true}` do usuário vinculado; o app foi ao login mantendo o vínculo, e a sessão recusada é encerrada no servidor |
+
+**Números** (build debug, sem Baseline Profile, só referência):
+
+- Abertura a frio já logado (`am start -W`, `TotalTime`): 617, 625, 663, 664 e 668 ms; mediana **663 ms**.
+- Memória (`dumpsys meminfo`): `TOTAL PSS` **98 MB**.
+- APK release sem assinatura: **8,4 MB** (debug: 25,2 MB).
+
+**Pendências:**
+
+- Com o aparelho vinculado a outro usuário, a mensagem não diz como sair disso (entrar com o usuário vinculado e desvincular, ou o dono remover o aparelho).
+- Antes de publicar: a Play exige pedido de exclusão de conta no app e na web para apps com conta; e conferir a regra de link para pagamento fora da loja (o spec prevê link ao site quando o plano bloqueia algo).
+- Ambiente: o emulador sem limite de memória travou a máquina de dev (RAM e swap esgotadas). Rodar com `-memory 2048 -cores 2` dentro de `systemd-run --user --scope -p MemoryMax=5G -p MemorySwapMax=0`, e o Gradle no mesmo tipo de escopo.
