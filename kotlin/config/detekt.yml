@@ -1,0 +1,7 @@
+# Builds upon detekt defaults (see buildUponDefaultConfig in app/build.gradle.kts).
+style:
+  MaxLineLength:
+    maxLineLength: 120
+  MagicNumber:
+    ignorePropertyDeclaration: true
+    ignoreAnnotation: true
