@@ -5,3 +5,6 @@ style:
   MagicNumber:
     ignorePropertyDeclaration: true
     ignoreAnnotation: true
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
