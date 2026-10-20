@@ -1,7 +1,10 @@
 package uk.tozzo.app.testing
 
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import uk.tozzo.app.core.network.AuthApi
 import uk.tozzo.app.core.network.LoginRequest
 import uk.tozzo.app.core.network.LogoutRequest
@@ -73,11 +76,28 @@ class FakeLocalDatabase(
     val counts = mutableMapOf<String, MutableStateFlow<Int>>()
     val rejections = MutableStateFlow<List<SyncRejection>>(emptyList())
 
+    /** Makes `disconnectAndClear` throw, like an SDK or SQLite failure. */
+    var clearFailure: Exception? = null
+
+    /** Makes every status collection started from now on throw. */
+    var statusFailure: Exception? = null
+
+    /** Queries whose count is never emitted (the first read has not finished). */
+    val unreadCounts = mutableSetOf<String>()
+
     fun count(sql: String): MutableStateFlow<Int> = counts.getOrPut(sql) { MutableStateFlow(0) }
 
-    override fun status(): Flow<LocalSyncStatus> = status
+    override fun status(): Flow<LocalSyncStatus> =
+        flow {
+            statusFailure?.let { throw it }
+            emitAll(status)
+        }
 
-    override fun watchCount(sql: String): Flow<Int> = count(sql)
+    override fun watchCount(sql: String): Flow<Int> =
+        flow {
+            if (sql in unreadCounts) awaitCancellation()
+            emitAll(count(sql))
+        }
 
     override fun watchRejections(): Flow<List<SyncRejection>> = rejections
 
@@ -89,6 +109,7 @@ class FakeLocalDatabase(
 
     override suspend fun disconnectAndClear() {
         log?.calls?.add("db.clear")
+        clearFailure?.let { throw it }
         clears++
     }
 }

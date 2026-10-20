@@ -69,6 +69,7 @@
     <string name="rejections_title">अस्वीकृतियाँ</string>
     <string name="rejections_empty">कोई अस्वीकृत बदलाव नहीं।</string>
     <string name="rejection_summary">%1$s · %2$s</string>
+    <string name="unbind_failed">इस डिवाइस का डेटा हटाया नहीं जा सका। फिर से कोशिश करें।</string>
     <plurals name="sync_rejections">
         <item quantity="one">%d अस्वीकृति</item>
         <item quantity="other">%d अस्वीकृतियाँ</item>

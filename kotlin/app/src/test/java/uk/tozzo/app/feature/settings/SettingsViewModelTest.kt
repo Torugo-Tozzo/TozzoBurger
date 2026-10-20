@@ -117,4 +117,37 @@ class SettingsViewModelTest {
             assertNull(binding.current.value)
             assertNull(tokens.refreshToken())
         }
+
+    @Test
+    fun unbindStaysBlockedUntilThePendingCountWasRead() =
+        runTest(UnconfinedTestDispatcher()) {
+            db.unreadCounts += PENDING_OPS_SQL
+            val vm = viewModel()
+            assertEquals(false, vm.state.value.canUnbind)
+            vm.unbind()
+            assertEquals(0, db.clears)
+            assertEquals(foodOwnerBinding(), binding.current.value)
+        }
+
+    @Test
+    fun failedClearKeepsTheDeviceBoundAndShowsTheError() =
+        runTest(UnconfinedTestDispatcher()) {
+            val vm = viewModel()
+            db.clearFailure = IllegalStateException("sqlite")
+            vm.unbound.test {
+                vm.unbind()
+                expectNoEvents()
+            }
+            assertEquals(R.string.unbind_failed, vm.state.value.unbindError)
+            assertEquals(foodOwnerBinding(), binding.current.value)
+            assertEquals("refresh", tokens.refreshToken())
+            // unbinding was reset: a retry runs again and succeeds
+            db.clearFailure = null
+            vm.unbound.test {
+                vm.unbind()
+                awaitItem()
+            }
+            assertNull(vm.state.value.unbindError)
+            assertNull(binding.current.value)
+        }
 }

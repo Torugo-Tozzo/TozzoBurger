@@ -69,6 +69,7 @@
     <string name="rejections_title">Rechazos</string>
     <string name="rejections_empty">Ningún cambio rechazado.</string>
     <string name="rejection_summary">%1$s · %2$s</string>
+    <string name="unbind_failed">No se pudieron borrar los datos de este dispositivo. Inténtalo de nuevo.</string>
     <plurals name="sync_rejections">
         <item quantity="one">%d rechazo</item>
         <item quantity="many">%d rechazos</item>

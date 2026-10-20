@@ -69,6 +69,7 @@
     <string name="rejections_title">Recusas</string>
     <string name="rejections_empty">Nenhuma alteração recusada.</string>
     <string name="rejection_summary">%1$s · %2$s</string>
+    <string name="unbind_failed">Não foi possível apagar os dados deste aparelho. Tente de novo.</string>
     <plurals name="sync_rejections">
         <item quantity="one">%d recusa</item>
         <item quantity="many">%d recusas</item>

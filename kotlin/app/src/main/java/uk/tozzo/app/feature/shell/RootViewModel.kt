@@ -3,6 +3,7 @@ package uk.tozzo.app.feature.shell
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -114,7 +115,7 @@ class RootViewModel
             if (!hasRefreshToken()) return RootState.Login
             val ready = readyOrBlocked(binding)
             if (ready is RootState.Blocked) return ready
-            return if (syncController.hasSynced.first()) ready else RootState.FirstSync
+            return if (syncController.hasSyncedOrFalse()) ready else RootState.FirstSync
         }
 
         /** An unreadable store counts as no binding: the login screen is the only way forward. */
@@ -140,7 +141,7 @@ class RootViewModel
                 SessionEvent.PaymentRequired -> _paymentRequired.value = true
                 SessionEvent.EstablishmentDeleted -> {
                     ++transition
-                    syncController.clearLocalData()
+                    bestEffort { syncController.clearLocalData() }
                     bestEffort { deviceBinding.clear() }
                     bestEffort { tokenStore.clear() }
                     moveTo(RootState.Blocked(Notice.ESTABLISHMENT_DELETED))
@@ -168,12 +169,31 @@ private fun readyOrBlocked(binding: Binding): RootState =
         ?.let { RootState.Ready(binding, it) }
         ?: RootState.Blocked(Notice.NO_ACCESS)
 
-/** The establishment is gone either way: a secure store failure must not hide the notice. */
-@Suppress("SwallowedException")
+/**
+ * The establishment is gone either way: a database or secure store failure must not stop the
+ * remaining steps, the notice, or the event collector.
+ */
+@Suppress("TooGenericExceptionCaught", "SwallowedException")
 private suspend fun bestEffort(block: suspend () -> Unit) {
     try {
         block()
-    } catch (_: IOException) {
-        // still show the notice
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        // still run the next step
     }
 }
+
+/**
+ * A database that fails to open (SDK or SQLite error) must not crash the start: it reads as
+ * "not synced yet", so the first sync screen shows and the sync retries from there.
+ */
+@Suppress("TooGenericExceptionCaught", "SwallowedException")
+private suspend fun SyncController.hasSyncedOrFalse(): Boolean =
+    try {
+        hasSynced.first()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        false
+    }

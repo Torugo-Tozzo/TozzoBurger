@@ -69,6 +69,7 @@
     <string name="rejections_title">被拒绝的更改</string>
     <string name="rejections_empty">没有被拒绝的更改。</string>
     <string name="rejection_summary">%1$s · %2$s</string>
+    <string name="unbind_failed">无法删除此设备上的数据。请重试。</string>
     <plurals name="sync_rejections">
         <item quantity="other">%d 条被拒绝</item>
     </plurals>

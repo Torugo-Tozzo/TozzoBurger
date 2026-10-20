@@ -1,5 +1,6 @@
 package uk.tozzo.app.feature.shell
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
@@ -15,6 +16,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import uk.tozzo.app.feature.firstsync.FirstSyncRoute
 import uk.tozzo.app.feature.login.LoginRoute
+import uk.tozzo.app.feature.login.Notice
 import uk.tozzo.app.feature.notice.NoticeScreen
 import uk.tozzo.app.feature.rejections.RejectionsRoute
 import uk.tozzo.app.feature.settings.SettingsRoute
@@ -55,12 +57,22 @@ fun AppRouter(viewModel: RootViewModel = hiltViewModel()) {
         }
         composable(FIRST_SYNC_ROUTE) { FirstSyncRoute(onDone = viewModel::onFirstSyncDone) }
         composable(BLOCKED_ROUTE) {
-            (state as? RootState.Blocked)?.let { NoticeScreen(it.notice, onBackToLogin = viewModel::onBackToLogin) }
+            (state as? RootState.Blocked)?.let { BlockedRoute(it.notice, onBackToLogin = viewModel::onBackToLogin) }
         }
         composable(SHELL_ROUTE) {
             (state as? RootState.Ready)?.let { ShellRoute(it, viewModel) }
         }
     }
+}
+
+/** A notice is the only entry of the root back stack: system back leads to the login, like its button. */
+@Composable
+internal fun BlockedRoute(
+    notice: Notice,
+    onBackToLogin: () -> Unit,
+) {
+    BackHandler(onBack = onBackToLogin)
+    NoticeScreen(notice, onBackToLogin)
 }
 
 private fun RootState.route(): String =

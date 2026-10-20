@@ -69,6 +69,7 @@
     <string name="rejections_title">Rejections</string>
     <string name="rejections_empty">No rejected changes.</string>
     <string name="rejection_summary">%1$s · %2$s</string>
+    <string name="unbind_failed">Could not delete the data on this device. Try again.</string>
     <plurals name="sync_rejections">
         <item quantity="one">%d rejection</item>
         <item quantity="other">%d rejections</item>

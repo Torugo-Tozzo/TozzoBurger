@@ -216,4 +216,30 @@ class RootViewModelTest {
             vm.onUnbound()
             assertEquals(RootState.Login, vm.state.value)
         }
+
+    @Test
+    fun establishmentDeletedStillBlocksWhenTheClearFails() =
+        runTest(UnconfinedTestDispatcher()) {
+            signedIn(hasSynced = true)
+            val vm = viewModel()
+            db.clearFailure = IllegalStateException("sqlite")
+            events.emit(SessionEvent.EstablishmentDeleted)
+            assertEquals(RootState.Blocked(Notice.ESTABLISHMENT_DELETED), vm.state.value)
+            assertNull(binding.current.value)
+            assertNull(tokens.refreshToken())
+            assertTrue(events.events.replayCache.isEmpty())
+            // the collector survived
+            events.emit(SessionEvent.PaymentRequired)
+            assertTrue(vm.paymentRequired.value)
+        }
+
+    @Test
+    fun unreadableSyncStatusGoesToFirstSync() =
+        runTest(UnconfinedTestDispatcher()) {
+            signedIn(hasSynced = true)
+            val controller = SyncController(db, connectivity, binding, backgroundScope)
+            db.statusFailure = IllegalStateException("cannot open")
+            val vm = RootViewModel(binding, tokens, controller, events)
+            assertEquals(RootState.FirstSync, vm.state.value)
+        }
 }

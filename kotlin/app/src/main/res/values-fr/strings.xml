@@ -69,6 +69,7 @@
     <string name="rejections_title">Refus</string>
     <string name="rejections_empty">Aucune modification refusée.</string>
     <string name="rejection_summary">%1$s · %2$s</string>
+    <string name="unbind_failed">Impossible de supprimer les données de cet appareil. Réessayez.</string>
     <plurals name="sync_rejections">
         <item quantity="one">%d refus</item>
         <item quantity="many">%d refus</item>
