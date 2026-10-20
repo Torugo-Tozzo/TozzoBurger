@@ -39,27 +39,30 @@ class ProductsScreenTest {
     private val deletedTypes = mutableListOf<String>()
     private val deletedProducts = mutableListOf<String>()
 
-    private fun show(startTab: ProductsTab = ProductsTab.PRODUCTS) =
-        rule.setContent {
-            var tab by remember { mutableStateOf(startTab) }
-            TozzoTheme {
-                ProductsScreen(
-                    tab = tab,
-                    search = "",
-                    products = products,
-                    types = types,
-                    onTab = { tab = it },
-                    onSearch = {},
-                    onLoadMore = {},
-                    onNewProduct = {},
-                    onEditProduct = {},
-                    onDeleteProduct = { deletedProducts += it },
-                    onNewType = {},
-                    onEditType = {},
-                    onDeleteType = { deletedTypes += it },
-                )
-            }
+    private fun show(
+        startTab: ProductsTab = ProductsTab.PRODUCTS,
+        canEdit: Boolean = true,
+    ) = rule.setContent {
+        var tab by remember { mutableStateOf(startTab) }
+        TozzoTheme {
+            ProductsScreen(
+                tab = tab,
+                search = "",
+                products = products,
+                types = types,
+                onTab = { tab = it },
+                onSearch = {},
+                onLoadMore = {},
+                onNewProduct = {},
+                onEditProduct = {},
+                onDeleteProduct = { deletedProducts += it },
+                onNewType = {},
+                onEditType = {},
+                onDeleteType = { deletedTypes += it },
+                canEdit = canEdit,
+            )
         }
+    }
 
     @Test
     fun theTabsSwitchTheNewButton() {
@@ -113,6 +116,29 @@ class ProductsScreenTest {
         rule.onDialogConfirm("Excluir")
 
         assertEquals(listOf("p1"), deletedProducts)
+    }
+
+    @Test
+    fun aReadOnlyViewHasNoNewEditOrDelete() {
+        show(canEdit = false)
+        rule.onNodeWithText("X-Burger").assertExists()
+        rule.onNodeWithText("Novo produto").assertDoesNotExist()
+        rule.onNodeWithText("Editar").assertDoesNotExist()
+        rule.onNodeWithText("Excluir").assertDoesNotExist()
+
+        rule.onNodeWithText("Tipos").performClick()
+        rule.onNodeWithText("Sazonal (inativo)").assertExists()
+        rule.onNodeWithText("Novo tipo").assertDoesNotExist()
+        rule.onNodeWithText("Editar").assertDoesNotExist()
+        rule.onNodeWithText("Excluir").assertDoesNotExist()
+    }
+
+    @Test
+    fun anEditorSeesNewEditAndDelete() {
+        show(canEdit = true)
+        rule.onNodeWithText("Novo produto").assertExists()
+        rule.onAllNodesWithText("Editar")[0].assertExists()
+        rule.onAllNodesWithText("Excluir")[0].assertExists()
     }
 }
 

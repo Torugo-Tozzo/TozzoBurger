@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -25,8 +26,11 @@ import uk.tozzo.app.core.data.CatalogWriter
 import uk.tozzo.app.core.data.ImageUploadException
 import uk.tozzo.app.core.data.ManagedProduct
 import uk.tozzo.app.core.data.ProductImageUploader
+import uk.tozzo.app.core.session.Binding
+import uk.tozzo.app.core.session.DeviceBinding
 import uk.tozzo.app.core.sync.Connectivity
 import uk.tozzo.app.domain.ProductType
+import uk.tozzo.app.domain.Role
 import javax.inject.Inject
 
 enum class ProductsTab { PRODUCTS, TYPES }
@@ -89,6 +93,7 @@ class ProductsViewModel
         private val writer: CatalogWriter,
         private val uploader: ProductImageUploader,
         connectivity: Connectivity,
+        deviceBinding: DeviceBinding,
     ) : ViewModel() {
         private val tabState = MutableStateFlow(ProductsTab.PRODUCTS)
         private val searchState = MutableStateFlow("")
@@ -102,6 +107,12 @@ class ProductsViewModel
         val productForm: StateFlow<ProductFormState?> = productFormState.asStateFlow()
         val typeForm: StateFlow<TypeFormState?> = typeFormState.asStateFlow()
         val online: StateFlow<Boolean> = connectivity.online
+
+        /** Only OWNER and MANAGER write products and types (the API refuses the rest); others read. */
+        val canEdit: StateFlow<Boolean> =
+            deviceBinding.current
+                .map { it.canEditCatalog() }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, deviceBinding.current.value.canEditCatalog())
 
         /** A failure to show on the list (a delete that could not be written). */
         val message: StateFlow<Int?> = messageState.asStateFlow()
@@ -145,6 +156,7 @@ class ProductsViewModel
 
         /** Opens the form of a new product, or loads the one of [id] (whatever its price or type). */
         fun openProductForm(id: String?) {
+            if (!canEdit.value) return
             if (id == null) {
                 productFormState.value = ProductFormState()
                 return
@@ -224,6 +236,7 @@ class ProductsViewModel
         fun uploadImage(uri: Uri) {
             val form = productFormState.value ?: return
             val productId = form.id ?: return
+            if (!canEdit.value) return
             if (form.upload == ImageUploadState.Uploading) return
             if (!online.value) {
                 setUpload(ImageUploadState.Failed(R.string.products_image_offline))
@@ -257,7 +270,9 @@ class ProductsViewModel
 
         // --- type form ---
 
+        @Suppress("ReturnCount")
         fun openTypeForm(id: String?) {
+            if (!canEdit.value) return
             if (id == null) {
                 typeFormState.value = TypeFormState()
                 return
@@ -303,6 +318,7 @@ class ProductsViewModel
         fun deleteType(id: String) = write { writer.deleteType(id) }
 
         private fun write(block: suspend () -> Unit) {
+            if (!canEdit.value) return
             viewModelScope.launch {
                 try {
                     block()
@@ -314,3 +330,5 @@ class ProductsViewModel
             }
         }
     }
+
+private fun Binding?.canEditCatalog() = this?.role.let { it == Role.OWNER || it == Role.MANAGER }

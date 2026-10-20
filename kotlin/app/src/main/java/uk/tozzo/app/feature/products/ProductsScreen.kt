@@ -72,6 +72,7 @@ fun ProductsRoute(viewModel: ProductsViewModel = hiltViewModel()) {
     val types by viewModel.types.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val online by viewModel.online.collectAsStateWithLifecycle()
+    val canEdit by viewModel.canEdit.collectAsStateWithLifecycle()
     val productForm by viewModel.productForm.collectAsStateWithLifecycle()
     val typeForm by viewModel.typeForm.collectAsStateWithLifecycle()
     // The Photo Picker needs no permission: it hands back the one image the user chose.
@@ -125,6 +126,7 @@ fun ProductsRoute(viewModel: ProductsViewModel = hiltViewModel()) {
                 onDeleteType = viewModel::deleteType,
                 message = message,
                 onDismissMessage = viewModel::clearMessage,
+                canEdit = canEdit,
             )
     }
 }
@@ -151,6 +153,7 @@ fun ProductsScreen(
     onDeleteType: (String) -> Unit,
     message: Int? = null,
     onDismissMessage: () -> Unit = {},
+    canEdit: Boolean = true,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         PrimaryTabRow(selectedTabIndex = tab.ordinal, containerColor = MaterialTheme.colorScheme.background) {
@@ -178,11 +181,16 @@ fun ProductsScreen(
                         if (isProducts) R.string.products_search_products else R.string.products_search_types,
                     ),
             )
-            TozzoButton(
-                text = stringResource(if (isProducts) R.string.products_new_product else R.string.products_new_type),
-                onClick = if (isProducts) onNewProduct else onNewType,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            if (canEdit) {
+                TozzoButton(
+                    text =
+                        stringResource(
+                            if (isProducts) R.string.products_new_product else R.string.products_new_type,
+                        ),
+                    onClick = if (isProducts) onNewProduct else onNewType,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             if (message != null) {
                 Text(
                     stringResource(message),
@@ -191,9 +199,9 @@ fun ProductsScreen(
                 )
             }
             if (isProducts) {
-                ProductList(products, types.orEmpty(), onLoadMore, onEditProduct, onDeleteProduct)
+                ProductList(products, types.orEmpty(), canEdit, onLoadMore, onEditProduct, onDeleteProduct)
             } else {
-                TypeList(types, search, onEditType, onDeleteType)
+                TypeList(types, search, canEdit, onEditType, onDeleteType)
             }
         }
     }
@@ -203,6 +211,7 @@ fun ProductsScreen(
 private fun ProductList(
     products: List<ManagedProduct>?,
     types: List<ProductType>,
+    canEdit: Boolean,
     onLoadMore: () -> Unit,
     onEdit: (String) -> Unit,
     onDelete: (String) -> Unit,
@@ -228,7 +237,7 @@ private fun ProductList(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(products, key = { it.id }) { product ->
-                    ProductRow(product, types.firstOrNull { it.id == product.typeId }, onEdit, {
+                    ProductRow(product, types.firstOrNull { it.id == product.typeId }, canEdit, onEdit, {
                         pendingDelete =
                             product.id
                     })
@@ -254,6 +263,7 @@ private fun ProductList(
 private fun ProductRow(
     product: ManagedProduct,
     type: ProductType?,
+    canEdit: Boolean,
     onEdit: (String) -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -271,7 +281,7 @@ private fun ProductRow(
                 Text(stringResource(R.string.products_price_missing), color = MaterialTheme.colorScheme.error)
             }
         }
-        RowActions({ onEdit(product.id) }, onDelete)
+        if (canEdit) RowActions({ onEdit(product.id) }, onDelete)
     }
 }
 
@@ -279,6 +289,7 @@ private fun ProductRow(
 private fun TypeList(
     types: List<ProductType>?,
     search: String,
+    canEdit: Boolean,
     onEdit: (String) -> Unit,
     onDelete: (String) -> Unit,
 ) {
@@ -291,7 +302,7 @@ private fun TypeList(
         else ->
             LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(shown, key = { it.id }) { type ->
-                    TypeRow(type, onEdit, { pendingDelete = type.id })
+                    TypeRow(type, canEdit, onEdit, { pendingDelete = type.id })
                 }
             }
     }
@@ -313,6 +324,7 @@ private fun TypeList(
 @Composable
 private fun TypeRow(
     type: ProductType,
+    canEdit: Boolean,
     onEdit: (String) -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -331,7 +343,7 @@ private fun TypeRow(
                 style = MaterialTheme.typography.titleMedium,
             )
         }
-        RowActions({ onEdit(type.id) }, onDelete)
+        if (canEdit) RowActions({ onEdit(type.id) }, onDelete)
     }
 }
 

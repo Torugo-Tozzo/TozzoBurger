@@ -30,8 +30,12 @@ import uk.tozzo.app.core.network.CreateUploadRequest
 import uk.tozzo.app.core.network.SetProductImageRequest
 import uk.tozzo.app.core.network.UploadTicket
 import uk.tozzo.app.core.network.UploadsApi
+import uk.tozzo.app.core.session.DeviceBinding
+import uk.tozzo.app.domain.Role
 import uk.tozzo.app.testing.FakeConnectivity
+import uk.tozzo.app.testing.MemoryStore
 import uk.tozzo.app.testing.RobolectricSql
+import uk.tozzo.app.testing.foodOwnerBinding
 
 private class NeverCalledApi : UploadsApi {
     var calls = 0
@@ -78,13 +82,17 @@ class ProductsViewModelTest {
         sql.close()
     }
 
-    private fun viewModel() =
-        ProductsViewModel(
+    private suspend fun viewModel(role: Role = Role.OWNER): ProductsViewModel {
+        val binding = DeviceBinding(MemoryStore())
+        binding.save(foodOwnerBinding(role))
+        return ProductsViewModel(
             CatalogRepository(sql),
             CatalogWriter(sql),
             ProductImageUploader(api, OkHttpClient(), NoSource()),
             connectivity,
+            binding,
         )
+    }
 
     private suspend fun productCount() = sql.getAll("SELECT id FROM products", emptyList()) { it.string("id") }.size
 
@@ -237,6 +245,38 @@ class ProductsViewModelTest {
 
             assertEquals(ImageUploadState.Failed(R.string.products_image_offline), vm.productForm.value!!.upload)
             assertEquals(0, api.calls)
+            assertNotNull(vm.productForm.value)
+        }
+
+    @Test
+    fun anEmployeeReadsButCannotOpenFormsDeleteOrUpload() =
+        runTest {
+            sql.execute("INSERT INTO products (id, name, price) VALUES ('p1', 'X', '1.00')")
+            sql.execute("INSERT INTO product_types (id, description, color, is_active) VALUES ('t1', 'T', '#fff', 1)")
+            val vm = viewModel(Role.EMPLOYEE)
+
+            assertFalse(vm.canEdit.value)
+            assertEquals(listOf("X"), vm.products.value!!.map { it.name })
+            vm.openProductForm(null)
+            vm.openProductForm("p1")
+            vm.openTypeForm(null)
+            vm.openTypeForm("t1")
+            vm.deleteProduct("p1")
+            vm.deleteType("t1")
+
+            assertNull(vm.productForm.value)
+            assertNull(vm.typeForm.value)
+            assertEquals(1, productCount())
+            assertEquals(1, sql.getAll("SELECT id FROM product_types") { it.string("id") }.size)
+        }
+
+    @Test
+    fun ownersAndManagersCanEdit() =
+        runTest {
+            assertTrue(viewModel(Role.MANAGER).canEdit.value)
+            assertTrue(viewModel(Role.OWNER).canEdit.value)
+            val vm = viewModel(Role.MANAGER)
+            vm.openProductForm(null)
             assertNotNull(vm.productForm.value)
         }
 }
