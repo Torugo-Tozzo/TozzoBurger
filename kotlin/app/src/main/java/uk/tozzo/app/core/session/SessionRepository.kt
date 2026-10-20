@@ -9,6 +9,7 @@ import uk.tozzo.app.core.network.DeviceInfo
 import uk.tozzo.app.core.network.LoginRequest
 import uk.tozzo.app.core.network.LogoutRequest
 import uk.tozzo.app.core.network.Me
+import uk.tozzo.app.core.network.RefreshClient
 import uk.tozzo.app.core.network.RegisterDeviceRequest
 import uk.tozzo.app.core.network.SessionBody
 import uk.tozzo.app.core.network.toApiProblem
@@ -57,6 +58,7 @@ class SessionRepository
     @Inject
     constructor(
         private val authApi: AuthApi,
+        @param:RefreshClient private val bareAuthApi: AuthApi,
         private val deviceApi: DeviceApi,
         private val tokenStore: TokenStore,
         private val deviceBinding: DeviceBinding,
@@ -108,14 +110,19 @@ class SessionRepository
             tokenStore.clear()
         }
 
+        @Suppress("ReturnCount")
         private suspend fun bind(
             session: SessionBody,
             binding: Binding,
         ): LoginResult {
-            tokenStore.save(session)
+            try {
+                tokenStore.save(session)
+            } catch (_: IOException) {
+                logoutNewSession(session)
+                return LoginResult.Failed(null)
+            }
             val failure = registerDevice() ?: return saveBinding(session, binding)
-            tokenStore.clear()
-            logoutNewSession(session)
+            discardNewSession(session)
             return failure
         }
 
@@ -140,8 +147,7 @@ class SessionRepository
                 deviceBinding.save(binding)
                 LoginResult.Success(binding)
             } catch (_: IOException) {
-                tokenStore.clear()
-                logoutNewSession(session)
+                discardNewSession(session)
                 LoginResult.Failed(null)
             }
 
@@ -160,16 +166,30 @@ class SessionRepository
             }
         }
 
-        /**
-         * Logs the new session out using its access token from memory only; its refresh token is never
-         * stored. A failure here changes nothing for the caller.
-         */
-        private suspend fun logoutNewSession(session: SessionBody) {
-            tokenStore.accessToken = session.accessToken
+        /** Clears the tokens just saved (best effort) and logs the new session out. */
+        private suspend fun discardNewSession(session: SessionBody) {
             try {
-                runLogout()
-            } finally {
-                tokenStore.accessToken = null
+                tokenStore.clear()
+            } catch (_: IOException) {
+                // the logout below still runs
+            }
+            logoutNewSession(session)
+        }
+
+        /**
+         * Logs the new session out with its own bearer on the client without an authenticator, so the
+         * shared [TokenStore] (and the bound user's refresh token) is never touched. Best effort.
+         */
+        @Suppress("SwallowedException")
+        private suspend fun logoutNewSession(session: SessionBody) {
+            try {
+                bareAuthApi.logoutWith("Bearer ${session.accessToken}", LogoutRequest())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: IOException) {
+                // best effort
+            } catch (_: HttpException) {
+                // best effort
             }
         }
 

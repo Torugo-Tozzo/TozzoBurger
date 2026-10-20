@@ -1,5 +1,8 @@
 package uk.tozzo.app.core.session
 
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
@@ -25,6 +28,7 @@ import uk.tozzo.app.domain.BusinessModule
 import uk.tozzo.app.domain.BusinessProfile
 import uk.tozzo.app.domain.EstablishmentModules
 import uk.tozzo.app.domain.Role
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Provider
 
@@ -35,13 +39,21 @@ class SessionRepositoryTest {
     private val server = MockWebServer()
     private val secure = MemorySecureStore()
     private val tokenStore = TokenStore(secure)
+    private val events = SessionEvents()
     private val binding = DeviceBinding(secure)
     private val identity = DeviceIdentity(secure)
     private lateinit var repo: SessionRepository
+    private lateinit var mainApi: AuthApi
+    private lateinit var bareApi: AuthApi
+    private lateinit var deviceApi: DeviceApi
+
+    private fun newRepo(tokens: TokenStore) =
+        SessionRepository(mainApi, bareApi, deviceApi, tokens, binding, identity, FakeDevice)
 
     private var loginResponse: () -> MockResponse = { loginOk() }
     private var registerResponse: () -> MockResponse = { MockResponse().setResponseCode(204) }
     private var meResponse: () -> MockResponse = { MockResponse().setBody(meJson()).setHeader("Content-Type", JSON) }
+    private var logoutResponse: () -> MockResponse = { MockResponse().setResponseCode(204) }
     private val paths = mutableListOf<String>()
     private val authHeaders = mutableMapOf<String, String?>()
 
@@ -64,7 +76,7 @@ class SessionRepositoryTest {
                     return when (key) {
                         "POST /v1/auth/login" -> loginResponse()
                         "POST /v1/devices" -> registerResponse()
-                        "POST /v1/auth/logout" -> MockResponse().setResponseCode(204)
+                        "POST /v1/auth/logout" -> logoutResponse()
                         "GET /v1/me" -> meResponse()
                         else -> MockResponse().setResponseCode(404)
                     }
@@ -73,18 +85,13 @@ class SessionRepositoryTest {
         server.start()
         val base = server.url("/").toString()
         val refreshApi = NetworkModule.apiRetrofit(base, NetworkModule.refreshOkHttpClient()).create<AuthApi>()
-        val authenticator = TokenAuthenticator(tokenStore, Provider { refreshApi }, SessionEvents())
+        val authenticator = TokenAuthenticator(tokenStore, Provider { refreshApi }, events)
         val client = NetworkModule.okHttpClient(AuthInterceptor(tokenStore, authenticator), authenticator)
         val retrofit = NetworkModule.apiRetrofit(base, client)
-        repo =
-            SessionRepository(
-                retrofit.create(),
-                retrofit.create<DeviceApi>(),
-                tokenStore,
-                binding,
-                identity,
-                FakeDevice,
-            )
+        mainApi = retrofit.create()
+        bareApi = refreshApi
+        deviceApi = retrofit.create()
+        repo = newRepo(tokenStore)
     }
 
     @AfterEach
@@ -172,7 +179,48 @@ class SessionRepositoryTest {
             binding.load()
             assertEquals(bound(USER_A), binding.current.value)
             assertEquals("refresh-a", tokenStore.refreshToken())
+            assertEquals("old-access", tokenStore.accessToken)
+        }
+
+    @Test
+    fun rejectedLogoutWith401DoesNotTouchBoundUsersSession() =
+        runTest {
+            binding.save(bound(USER_A))
+            secure.put(TokenStore.REFRESH_TOKEN_KEY, "refresh-a")
+            loginResponse = { loginOk(userId = USER_B, access = "access-b", refresh = "refresh-b") }
+            logoutResponse = { problem(401, "INVALID_TOKEN") }
+            val seen = mutableListOf<SessionEvent>()
+            val job = launch(UnconfinedTestDispatcher(testScheduler)) { events.events.toList(seen) }
+
+            assertEquals(LoginResult.OtherUserBound, repo.login("b@b.c", "x"))
+
+            job.cancel()
+            assertEquals(0, count("POST /v1/auth/refresh"))
+            assertEquals("refresh-a", tokenStore.refreshToken())
+            assertEquals(bound(USER_A), binding.current.value)
+            assertTrue(seen.isEmpty())
             assertNull(tokenStore.accessToken)
+        }
+
+    @Test
+    fun failingSecureStoreMakesLoginFailedNotThrow() =
+        runTest {
+            val failing =
+                object : SecureStore {
+                    override suspend fun get(key: String): String? = null
+
+                    override suspend fun put(
+                        key: String,
+                        value: String?,
+                    ): Unit = throw IOException("keystore")
+
+                    override suspend fun clear() = Unit
+                }
+            val local = newRepo(TokenStore(failing))
+
+            assertEquals(LoginResult.Failed(null), local.login("a@b.c", "x"))
+            assertEquals(1, count("POST /v1/auth/logout"))
+            assertEquals("Bearer access-a", authHeaders["POST /v1/auth/logout"])
         }
 
     @Test
