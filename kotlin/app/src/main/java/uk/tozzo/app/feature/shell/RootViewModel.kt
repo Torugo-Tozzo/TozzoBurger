@@ -139,7 +139,12 @@ class RootViewModel
 
         private suspend fun handle(event: SessionEvent) {
             when (event) {
-                SessionEvent.Revoked -> moveTo(RootState.Login)
+                SessionEvent.Revoked -> {
+                    // Signed out: stop the sync (it would only keep failing on the dead session). The
+                    // next move to Ready or FirstSync starts it again.
+                    bestEffort { syncController.stop() }
+                    moveTo(RootState.Login)
+                }
                 SessionEvent.PaymentRequired -> _paymentRequired.value = true
                 SessionEvent.EstablishmentDeleted -> {
                     ++transition

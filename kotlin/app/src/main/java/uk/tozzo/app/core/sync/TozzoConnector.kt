@@ -31,12 +31,7 @@ class TozzoConnector
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    val problem = e.toApiProblem()
-                    when {
-                        problem?.status == GONE && problem.code == ESTABLISHMENT_DELETED ->
-                            sessionEvents.emit(SessionEvent.EstablishmentDeleted)
-                        problem?.status == PAYMENT_REQUIRED -> sessionEvents.emit(SessionEvent.PaymentRequired)
-                    }
+                    emitSessionEvent(e)
                     throw e
                 }
             return PowerSyncCredentials(endpoint = token.endpoint, token = token.token)
@@ -48,11 +43,38 @@ class TozzoConnector
          */
         override suspend fun uploadData(database: PowerSyncDatabase) {
             val sink = DatabaseRejectionSink { sql, params -> database.execute(sql, params) }
-            val processor = UploadProcessor(api, sink, deviceIdentity::id)
             while (true) {
                 val batch = database.getCrudBatch(BATCH_SIZE) ?: return
-                processor.process(batch.crud.map { it.toPendingOp() })
+                uploadOps(batch.crud.map { it.toPendingOp() }, sink)
                 batch.complete(null)
+            }
+        }
+
+        /**
+         * Uploads [ops] and records the rejected ones in [sink]. A deleted establishment (410) or a due
+         * payment (402) also ends the session, and the failure still throws, so the batch is not completed.
+         */
+        @Suppress("TooGenericExceptionCaught")
+        internal suspend fun uploadOps(
+            ops: List<PendingOp>,
+            sink: RejectionSink,
+        ) {
+            try {
+                UploadProcessor(api, sink, deviceIdentity::id).process(ops)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                emitSessionEvent(e)
+                throw e
+            }
+        }
+
+        private suspend fun emitSessionEvent(e: Exception) {
+            val problem = e.toApiProblem()
+            when {
+                problem?.status == GONE && problem.code == ESTABLISHMENT_DELETED ->
+                    sessionEvents.emit(SessionEvent.EstablishmentDeleted)
+                problem?.status == PAYMENT_REQUIRED -> sessionEvents.emit(SessionEvent.PaymentRequired)
             }
         }
 

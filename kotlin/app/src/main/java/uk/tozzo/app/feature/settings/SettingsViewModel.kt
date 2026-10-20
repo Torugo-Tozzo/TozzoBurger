@@ -31,6 +31,8 @@ data class SettingsUiState(
     @param:StringRes val unbindBlockedReason: Int?,
     val userName: String,
     val establishmentName: String,
+    /** Rejected changes kept on the device; unbinding deletes them, so the screen warns first. */
+    val rejections: Int = 0,
     /** Why the last unbind failed; the device stays bound. */
     @param:StringRes val unbindError: Int? = null,
 )
@@ -52,14 +54,22 @@ class SettingsViewModel
                 deviceBinding.current,
                 connectivity.online,
                 syncController.pendingOpCount,
+                syncController.rejectionCount,
                 unbindError,
-            ) { b, online, pending, error -> uiState(b, online, pending, error) }
-                .stateIn(
-                    viewModelScope,
-                    SharingStarted.Eagerly,
-                    // Until the queue was read, its size is unknown: never unbind on a guess.
-                    uiState(deviceBinding.current.value, connectivity.online.value, pending = null, error = null),
-                )
+            ) { b, online, pending, rejections, error ->
+                uiState(b, online, pending, rejections ?: 0, error)
+            }.stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                // Until the queue was read, its size is unknown: never unbind on a guess.
+                uiState(
+                    deviceBinding.current.value,
+                    connectivity.online.value,
+                    pending = null,
+                    rejections = 0,
+                    error = null,
+                ),
+            )
 
         private val unboundEvents = Channel<Unit>(Channel.BUFFERED)
 
@@ -127,6 +137,7 @@ class SettingsViewModel
             binding: Binding?,
             online: Boolean,
             pending: Int?,
+            rejections: Int,
             @StringRes error: Int?,
         ): SettingsUiState {
             val reason =
@@ -140,6 +151,7 @@ class SettingsViewModel
                 unbindBlockedReason = reason,
                 userName = binding?.userName.orEmpty(),
                 establishmentName = binding?.establishmentName.orEmpty(),
+                rejections = rejections,
                 unbindError = error,
             )
         }

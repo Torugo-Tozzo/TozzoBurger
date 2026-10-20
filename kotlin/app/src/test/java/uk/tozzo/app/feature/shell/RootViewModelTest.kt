@@ -141,6 +141,21 @@ class RootViewModelTest {
         }
 
     @Test
+    fun revokedStopsSync() =
+        runTest(UnconfinedTestDispatcher()) {
+            signedIn(hasSynced = true)
+            val vm = viewModel()
+            assertEquals(1, db.connects)
+            events.emit(SessionEvent.Revoked)
+            assertEquals(1, db.disconnects)
+            assertEquals(RootState.Login, vm.state.value)
+
+            vm.onLoggedIn()
+            assertEquals(RootState.Ready(foodOwnerBinding(), AppDestination.SELL), vm.state.value)
+            assertEquals(2, db.connects)
+        }
+
+    @Test
     fun establishmentDeletedClearsEverythingAndBlocks() =
         runTest(UnconfinedTestDispatcher()) {
             signedIn(hasSynced = true)

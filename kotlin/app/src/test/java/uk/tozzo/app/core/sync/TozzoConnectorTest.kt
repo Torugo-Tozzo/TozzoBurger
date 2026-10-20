@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Timeout
 import retrofit2.create
 import uk.tozzo.app.core.network.NetworkModule
 import uk.tozzo.app.core.network.SyncApi
+import uk.tozzo.app.core.network.UploadResult
 import uk.tozzo.app.core.session.DeviceIdentity
 import uk.tozzo.app.core.session.SecureStore
 import uk.tozzo.app.core.session.SessionEvent
@@ -86,6 +87,43 @@ class TozzoConnectorTest {
             server.enqueue(problem(500, "INTERNAL"))
 
             assertTrue(runCatching { connector.fetchCredentials() }.isFailure)
+            assertTrue(events.events.replayCache.isEmpty())
+        }
+
+    private val op = PendingOp(1, "PATCH", "products", "p1", mapOf("name" to "X"))
+
+    private object NoRejections : RejectionSink {
+        override suspend fun record(
+            op: PendingOp,
+            opId: String,
+            result: UploadResult,
+        ) = Unit
+    }
+
+    @Test
+    fun uploadPaymentRequiredEmitsEvent() =
+        runTest {
+            server.enqueue(problem(402, "PAYMENT_REQUIRED"))
+
+            assertTrue(runCatching { connector.uploadOps(listOf(op), NoRejections) }.isFailure)
+            assertEquals(listOf(SessionEvent.PaymentRequired), events.events.replayCache)
+        }
+
+    @Test
+    fun uploadGoneEmitsDeleted() =
+        runTest {
+            server.enqueue(problem(410, "ESTABLISHMENT_DELETED"))
+
+            assertTrue(runCatching { connector.uploadOps(listOf(op), NoRejections) }.isFailure)
+            assertEquals(listOf(SessionEvent.EstablishmentDeleted), events.events.replayCache)
+        }
+
+    @Test
+    fun otherUploadFailuresOnlyThrow() =
+        runTest {
+            server.enqueue(problem(500, "INTERNAL"))
+
+            assertTrue(runCatching { connector.uploadOps(listOf(op), NoRejections) }.isFailure)
             assertTrue(events.events.replayCache.isEmpty())
         }
 

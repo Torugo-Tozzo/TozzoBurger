@@ -21,6 +21,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uk.tozzo.app.R
 import uk.tozzo.app.core.sync.SyncRejection
+import uk.tozzo.app.core.sync.rejectionMessage
+import uk.tozzo.app.core.sync.tableLabel
 import uk.tozzo.app.ui.components.EmptyState
 import uk.tozzo.app.ui.components.LoadingState
 import uk.tozzo.app.ui.components.TozzoCard
@@ -36,7 +38,7 @@ fun RejectionsRoute(viewModel: RejectionsViewModel = hiltViewModel()) {
     RejectionsScreen(rejections)
 }
 
-/** The changes the server refused, newest first; null while loading. */
+/** The changes the server refused, newest first, explained in the app language; null while loading. */
 @Composable
 fun RejectionsScreen(rejections: List<SyncRejection>?) {
     when {
@@ -60,13 +62,12 @@ fun RejectionsScreen(rejections: List<SyncRejection>?) {
 @Composable
 private fun RejectionRow(rejection: SyncRejection) {
     val date = remember(rejection.createdAt) { formatInstant(rejection.createdAt) }
+    val label = tableLabel(rejection.tableName)?.let { stringResource(it) } ?: rejection.tableName
     TozzoCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                stringResource(R.string.rejection_summary, rejection.tableName, rejection.code.orEmpty()),
-                style = MaterialTheme.typography.titleSmall,
-            )
-            rejection.detail?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            Text(label, style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(rejectionMessage(rejection.code)), style = MaterialTheme.typography.bodyMedium)
+            rejection.summary?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
             Text(date, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

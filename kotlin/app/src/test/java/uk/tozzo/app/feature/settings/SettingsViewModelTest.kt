@@ -17,6 +17,7 @@ import uk.tozzo.app.R
 import uk.tozzo.app.core.session.DeviceBinding
 import uk.tozzo.app.core.session.TokenStore
 import uk.tozzo.app.core.sync.PENDING_OPS_SQL
+import uk.tozzo.app.core.sync.REJECTIONS_SQL
 import uk.tozzo.app.core.sync.SyncController
 import uk.tozzo.app.testing.CallLog
 import uk.tozzo.app.testing.FakeAuthApi
@@ -66,6 +67,22 @@ class SettingsViewModelTest {
             assertEquals(R.string.unbind_blocked_pending, vm.state.value.unbindBlockedReason)
             vm.unbind()
             assertEquals(0, db.clears)
+        }
+
+    @Test
+    fun unbindWarnsAboutRejections() =
+        runTest(UnconfinedTestDispatcher()) {
+            val vm = viewModel()
+            assertEquals(0, vm.state.value.rejections)
+            db.count(REJECTIONS_SQL).value = 3
+            assertEquals(3, vm.state.value.rejections)
+            // Still allowed: the dialog warns and asks again.
+            assertEquals(true, vm.state.value.canUnbind)
+            vm.unbound.test {
+                vm.unbind()
+                awaitItem()
+            }
+            assertEquals(1, db.clears)
         }
 
     @Test

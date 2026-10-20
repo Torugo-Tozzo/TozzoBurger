@@ -72,6 +72,7 @@ class FakeLocalDatabase(
 ) : LocalDatabase {
     var connects = 0
     var clears = 0
+    var disconnects = 0
     val status = MutableStateFlow(LocalSyncStatus(false, false, false, null))
     val counts = mutableMapOf<String, MutableStateFlow<Int>>()
     val rejections = MutableStateFlow<List<SyncRejection>>(emptyList())
@@ -116,7 +117,9 @@ class FakeLocalDatabase(
         connects++
     }
 
-    override suspend fun disconnect() = Unit
+    override suspend fun disconnect() {
+        disconnects++
+    }
 
     override suspend fun disconnectAndClear() {
         log?.calls?.add("db.clear")

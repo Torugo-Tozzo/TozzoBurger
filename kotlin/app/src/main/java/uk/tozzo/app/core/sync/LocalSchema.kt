@@ -31,6 +31,9 @@ val localSchema: Schema =
                     Column.text("deleted_at"),
                 ),
             ),
+            // driver_* come from the server; items_json, close_json and delivery_json never do: they hold
+            // what the device changed (the full item list, the closing, a delivery action), which the
+            // upload turns into the orders PUT/PATCH.
             Table(
                 "orders",
                 listOf(
@@ -44,6 +47,12 @@ val localSchema: Schema =
                     Column.text("deleted_at"),
                     Column.text("total"),
                     Column.text("seller_id"),
+                    Column.text("driver_id"),
+                    Column.text("external_driver_name"),
+                    Column.text("external_driver_phone"),
+                    Column.text("items_json"),
+                    Column.text("close_json"),
+                    Column.text("delivery_json"),
                 ),
             ),
             Table(
@@ -94,6 +103,9 @@ val localSchema: Schema =
                     Column.text("op"),
                     Column.text("code"),
                     Column.text("detail"),
+                    // The op's data as JSON (without items_json) and a short text for the screen.
+                    Column.text("op_data"),
+                    Column.text("summary"),
                     Column.text("created_at"),
                 ),
             ),

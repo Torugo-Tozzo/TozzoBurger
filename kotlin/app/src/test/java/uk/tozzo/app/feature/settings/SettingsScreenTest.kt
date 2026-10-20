@@ -44,6 +44,18 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun unbindWithRejectionsAsksOnceMoreAndCountsThem() {
+        show(SettingsUiState(true, null, "Ana", "Burger da Ana", rejections = 3))
+        rule.onNodeWithText("Desvincular este aparelho").performClick()
+        rule.onNodeWithText("Desvincular").performClick()
+        assertEquals(0, unbinds)
+        rule.onNodeWithText("Recusas serão apagadas").assertExists()
+        rule.onNodeWithText("3 alterações recusadas", substring = true).assertExists()
+        rule.onNodeWithText("Desvincular mesmo assim").performClick()
+        assertEquals(1, unbinds)
+    }
+
+    @Test
     fun blockedUnbindIsDisabledWithItsReason() {
         show(SettingsUiState(false, R.string.unbind_blocked_offline, "Ana", "Burger da Ana"))
         rule.onNodeWithText("Desvincular este aparelho").assertIsNotEnabled()

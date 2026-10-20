@@ -17,11 +17,30 @@ class RejectionsScreenTest {
     val rule = createComposeRule()
 
     @Test
-    fun showsTableCodeAndDetail() {
-        val rejection = SyncRejection("r1", "orders", "STOCK_LOW", "Sem estoque", "2026-10-20T12:00:00Z")
+    fun showsLabelExplanationSummaryAndHidesTheDetail() {
+        val rejection =
+            SyncRejection(
+                "r1",
+                "orders",
+                "ORDER_NOT_OPEN",
+                "order is not open",
+                "2026-10-20T12:00:00Z",
+                summary = "Ana",
+            )
         rule.setContent { TozzoTheme { RejectionsScreen(listOf(rejection)) } }
-        rule.onNodeWithText("orders · STOCK_LOW").assertExists()
-        rule.onNodeWithText("Sem estoque").assertExists()
+        rule.onNodeWithText("Pedido").assertExists()
+        rule.onNodeWithText("O pedido já foi fechado.").assertExists()
+        rule.onNodeWithText("Ana").assertExists()
+        rule.onNodeWithText("order is not open").assertDoesNotExist()
+        rule.onNodeWithText("ORDER_NOT_OPEN").assertDoesNotExist()
+    }
+
+    @Test
+    fun unknownCodeShowsTheGenericMessage() {
+        val rejection = SyncRejection("r1", "gadgets", "NEW_CODE", null, "2026-10-20T12:00:00Z")
+        rule.setContent { TozzoTheme { RejectionsScreen(listOf(rejection)) } }
+        rule.onNodeWithText("gadgets").assertExists()
+        rule.onNodeWithText("O servidor recusou esta alteração.").assertExists()
     }
 
     @Test

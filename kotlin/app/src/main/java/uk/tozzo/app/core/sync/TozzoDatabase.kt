@@ -1,6 +1,7 @@
 package uk.tozzo.app.core.sync
 
 import android.content.Context
+import android.util.Log
 import com.powersync.DatabaseDriverFactory
 import com.powersync.PowerSyncDatabase
 import com.powersync.db.getStringOptional
@@ -16,6 +17,9 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import uk.tozzo.app.core.network.UploadResult
 import java.time.Instant
 import javax.inject.Inject
@@ -42,11 +46,16 @@ data class SyncRejection(
     val detail: String?,
     /** ISO-8601 instant, as recorded by [DatabaseRejectionSink]. */
     val createdAt: String,
+    /** The op's data as JSON, without `items_json`. */
+    val opData: String? = null,
+    /** Short text for the screen, such as the customer or product name; recorded when the op was refused. */
+    val summary: String? = null,
 )
 
 /** Every rejection, newest first. */
 internal const val REJECTIONS_LIST_SQL =
-    "SELECT id, table_name, code, detail, created_at FROM $SYNC_REJECTIONS_TABLE ORDER BY created_at DESC"
+    "SELECT id, table_name, code, detail, op_data, summary, created_at " +
+        "FROM $SYNC_REJECTIONS_TABLE ORDER BY created_at DESC"
 
 /** The local database, seen by the [SyncController] (a seam for tests without the SDK). */
 interface LocalDatabase {
@@ -108,6 +117,8 @@ class TozzoDatabase
                             tableName = it.getStringOptional("table_name").orEmpty(),
                             code = it.getStringOptional("code"),
                             detail = it.getStringOptional("detail"),
+                            opData = it.getStringOptional("op_data"),
+                            summary = it.getStringOptional("summary"),
                             createdAt = it.getStringOptional("created_at").orEmpty(),
                         )
                     },
@@ -154,11 +165,51 @@ class DatabaseRejectionSink(
         opId: String,
         result: UploadResult,
     ) {
+        // The detail is for the log: the screen shows a translated message.
+        Log.w(TAG, "rejected ${op.op} ${op.table}/${op.id}: ${result.code} ${result.detail}")
+        val values = op.data.orEmpty().filterKeys { it != ITEMS_JSON }
+        // An order op without the customer name (a close, a delivery action) takes the name the order row has now.
         execute(
-            "INSERT INTO $SYNC_REJECTIONS_TABLE (id, op_id, table_name, row_id, op, code, detail, created_at) " +
-                "SELECT uuid(), ?, ?, ?, ?, ?, ?, ? " +
+            "INSERT INTO $SYNC_REJECTIONS_TABLE " +
+                "(id, op_id, table_name, row_id, op, code, detail, op_data, summary, created_at) " +
+                "SELECT uuid(), ?, ?, ?, ?, ?, ?, ?, " +
+                "COALESCE(?, (SELECT customer_name FROM orders WHERE id = ? AND ? = 'orders')), ? " +
                 "WHERE NOT EXISTS (SELECT 1 FROM $SYNC_REJECTIONS_TABLE WHERE op_id = ?)",
-            listOf(opId, op.table, op.id, op.op, result.code, result.detail, Instant.now().toString(), opId),
+            listOf(
+                opId,
+                op.table,
+                op.id,
+                op.op,
+                result.code,
+                result.detail,
+                opDataJson(values),
+                summaryOf(values),
+                op.id,
+                op.table,
+                Instant.now().toString(),
+                opId,
+            ),
         )
+    }
+
+    private fun summaryOf(values: Map<String, Any?>): String? =
+        SUMMARY_KEYS.firstNotNullOfOrNull { key -> (values[key] as? String)?.takeIf { it.isNotBlank() } }
+
+    private fun opDataJson(values: Map<String, Any?>): String =
+        JsonObject(
+            values.mapValues { (_, value) ->
+                when (value) {
+                    null -> JsonNull
+                    is Number -> JsonPrimitive(value)
+                    is Boolean -> JsonPrimitive(value)
+                    else -> JsonPrimitive(value.toString())
+                }
+            },
+        ).toString()
+
+    private companion object {
+        const val TAG = "SyncRejection"
+        const val ITEMS_JSON = "items_json"
+        val SUMMARY_KEYS = listOf("customer_name", "name", "description")
     }
 }
