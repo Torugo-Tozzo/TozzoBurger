@@ -7,6 +7,8 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.JsonArray
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -21,19 +23,22 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import retrofit2.Retrofit
-import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import org.junit.jupiter.api.Timeout
 import retrofit2.create
+import retrofit2.http.GET
 import uk.tozzo.app.core.session.SecureStore
 import uk.tozzo.app.core.session.SessionEvent
 import uk.tozzo.app.core.session.SessionEvents
 import uk.tozzo.app.core.session.TokenStore
 import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Provider
 
+/** Builds the client the way [NetworkModule] does, against a [MockWebServer]. */
+@Timeout(TEST_TIMEOUT_SECONDS)
 class TokenAuthenticatorTest {
     private val server = MockWebServer()
     private val log: MutableList<String> = Collections.synchronizedList(mutableListOf())
@@ -42,6 +47,11 @@ class TokenAuthenticatorTest {
     private val events = SessionEvents()
     private val refreshCalls = AtomicInteger()
     private val ordersCalls = AtomicInteger()
+
+    private interface OrdersApi {
+        @GET("/v1/orders")
+        suspend fun orders(): JsonArray
+    }
 
     @BeforeEach
     fun setUp() {
@@ -59,36 +69,42 @@ class TokenAuthenticatorTest {
     @Test
     fun concurrentUnauthorizedRefreshesOnce() =
         runTest {
-            val parallel = 5
-            val oldArrived = CountDownLatch(parallel)
-            server.dispatcher =
-                dispatcher(refreshResponse = sessionResponse()) { request ->
-                    if (request.getHeader("Authorization") == "Bearer $OLD_ACCESS") {
-                        oldArrived.countDown()
-                        oldArrived.await(LATCH_SECONDS, TimeUnit.SECONDS)
-                        problem(401, "INVALID_TOKEN")
-                    } else {
-                        null
-                    }
-                }
+            server.dispatcher = dispatcher(sessionResponse(), holdOldTokenUntil(PARALLEL))
             val client = client()
 
-            val codes =
-                withContext(Dispatchers.IO) {
-                    (1..parallel).map { async { client.get("/v1/orders") } }.awaitAll()
-                }
+            val codes = parallelGets(client, PARALLEL)
 
-            assertEquals(List(parallel) { 200 }, codes)
+            assertEquals(List(PARALLEL) { 200 }, codes)
             assertEquals(1, refreshCalls.get())
             val authHeaders = log.filter { it.startsWith("request:") }
-            assertEquals(parallel, authHeaders.count { it == "request:Bearer $OLD_ACCESS" })
-            assertEquals(parallel, authHeaders.count { it == "request:Bearer $NEW_ACCESS" })
+            assertEquals(PARALLEL, authHeaders.count { it == "request:Bearer $OLD_ACCESS" })
+            assertEquals(PARALLEL, authHeaders.count { it == "request:Bearer $NEW_ACCESS" })
+        }
+
+    @Test
+    fun concurrentRetrofitCallsShareOneRefresh() =
+        runTest {
+            // More suspend calls than OkHttp's 5 per host: all 5 running calls block in the authenticator.
+            val parallel = 6
+            server.dispatcher = dispatcher(sessionResponse(), holdOldTokenUntil(MAX_REQUESTS_PER_HOST))
+            val orders =
+                NetworkModule.apiRetrofit(server.url("/").toString(), client()).create<OrdersApi>()
+
+            val results =
+                withContext(Dispatchers.IO) {
+                    withTimeout(CALLS_TIMEOUT_MS) {
+                        (1..parallel).map { async { orders.orders() } }.awaitAll()
+                    }
+                }
+
+            assertEquals(parallel, results.size)
+            assertEquals(1, refreshCalls.get())
         }
 
     @Test
     fun refreshTokenSavedBeforeRetry() =
         runTest {
-            server.dispatcher = dispatcher(refreshResponse = sessionResponse())
+            server.dispatcher = dispatcher(sessionResponse())
             val client = client()
 
             val code = withContext(Dispatchers.IO) { client.get("/v1/orders") }
@@ -103,28 +119,95 @@ class TokenAuthenticatorTest {
         }
 
     @Test
-    fun revokedSessionEmitsEventAndStops() =
+    fun revokedSessionEmitsEventOnceAndStops() =
         runTest {
-            server.dispatcher = dispatcher(refreshResponse = problem(401, "SESSION_REVOKED"))
+            server.dispatcher = dispatcher(problem(401, "SESSION_REVOKED"), holdOldTokenUntil(PARALLEL))
             val client = client()
 
             events.events.test {
-                val code = withContext(Dispatchers.IO) { client.get("/v1/orders") }
+                val codes = parallelGets(client, PARALLEL)
 
-                assertEquals(401, code)
+                assertEquals(List(PARALLEL) { 401 }, codes)
                 assertEquals(SessionEvent.Revoked, awaitItem())
+                expectNoEvents()
             }
             assertEquals(1, refreshCalls.get())
-            assertEquals(1, ordersCalls.get())
+            assertEquals(PARALLEL, ordersCalls.get())
             assertNull(tokenStore.refreshToken())
             assertNull(tokenStore.accessToken)
         }
 
     @Test
+    fun failedRefreshIsNotRepeatedByWaitingRequests() =
+        runTest {
+            server.dispatcher = dispatcher(problem(503, "UNAVAILABLE"), holdOldTokenUntil(PARALLEL))
+            val client = client()
+
+            val codes = parallelGets(client, PARALLEL)
+
+            assertEquals(List(PARALLEL) { 401 }, codes)
+            assertEquals(1, refreshCalls.get())
+            assertEquals(OLD_REFRESH, tokenStore.refreshToken())
+            assertEquals(OLD_ACCESS, tokenStore.accessToken)
+            assertEquals(0, events.events.replayCache.size)
+        }
+
+    @Test
+    fun malformedRefreshResponseKeepsSession() =
+        runTest {
+            val malformed =
+                MockResponse()
+                    .setResponseCode(200)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody("""{"accessToken":42""")
+            server.dispatcher = dispatcher(malformed)
+            val client = client()
+
+            val code = withContext(Dispatchers.IO) { client.get("/v1/orders") }
+
+            assertEquals(401, code)
+            assertEquals(1, refreshCalls.get())
+            assertEquals(OLD_REFRESH, tokenStore.refreshToken())
+            assertEquals(0, events.events.replayCache.size)
+        }
+
+    @Test
+    fun coldStartRefreshesWithStoredToken() =
+        runTest {
+            tokenStore.accessToken = null
+            server.dispatcher = dispatcher(sessionResponse())
+            val client = client()
+
+            val codes = parallelGets(client, PARALLEL)
+
+            assertEquals(List(PARALLEL) { 200 }, codes)
+            assertEquals(1, refreshCalls.get())
+            assertEquals(NEW_ACCESS, tokenStore.accessToken)
+            assertEquals(NEW_REFRESH, tokenStore.refreshToken())
+        }
+
+    @Test
+    fun coldStartWithoutRefreshTokenSendsNoToken() =
+        runTest {
+            tokenStore.accessToken = null
+            secure.put(REFRESH_KEY, null)
+            server.dispatcher = dispatcher(sessionResponse())
+            val client = client()
+
+            val code = withContext(Dispatchers.IO) { client.get("/v1/orders") }
+
+            assertEquals(401, code)
+            assertEquals(0, refreshCalls.get())
+            assertTrue("request:null" in log, "a token was sent: $log")
+            assertEquals(0, events.events.replayCache.size)
+        }
+
+    @Test
     fun nonTokenUnauthorizedIsNotRefreshed() =
         runTest {
+            tokenStore.accessToken = null
             server.dispatcher =
-                dispatcher(refreshResponse = sessionResponse()) { request ->
+                dispatcher(sessionResponse()) { request ->
                     if (request.path == "/v1/auth/login") problem(401, "INVALID_CREDENTIALS") else null
                 }
             val client = client()
@@ -147,27 +230,40 @@ class TokenAuthenticatorTest {
         }
 
     private fun client(): OkHttpClient {
-        val authApi =
-            Retrofit
-                .Builder()
-                .baseUrl(server.url("/"))
-                .client(OkHttpClient())
-                .addConverterFactory(ApiJson.asConverterFactory("application/json".toMediaType()))
-                .build()
-                .create<AuthApi>()
-        return OkHttpClient
-            .Builder()
-            .addInterceptor(AuthInterceptor(tokenStore))
-            .authenticator(TokenAuthenticator(tokenStore, Provider { authApi }, events))
-            .build()
+        val refreshApi =
+            NetworkModule.apiRetrofit(server.url("/").toString(), NetworkModule.refreshOkHttpClient()).create<AuthApi>()
+        val authenticator = TokenAuthenticator(tokenStore, Provider { refreshApi }, events)
+        return NetworkModule.okHttpClient(AuthInterceptor(tokenStore, authenticator), authenticator)
     }
+
+    private suspend fun parallelGets(
+        client: OkHttpClient,
+        count: Int,
+    ): List<Int> =
+        withContext(Dispatchers.IO) {
+            (1..count).map { async { client.get("/v1/orders") } }.awaitAll()
+        }
 
     private fun OkHttpClient.get(path: String): Int =
         newCall(Request.Builder().url(server.url(path)).build()).execute().use { it.code }
 
+    /** Holds the 401s for the old token until [count] of them arrived, so they all fail together. */
+    private fun holdOldTokenUntil(count: Int): (RecordedRequest) -> MockResponse? {
+        val arrived = CountDownLatch(count)
+        return { request ->
+            if (request.getHeader("Authorization") == "Bearer $OLD_ACCESS") {
+                arrived.countDown()
+                arrived.await(LATCH_SECONDS, TimeUnit.SECONDS)
+                problem(401, "INVALID_TOKEN")
+            } else {
+                null
+            }
+        }
+    }
+
     /**
      * Serves refresh with [refreshResponse]; other paths go to [override] first, then answer
-     * 200 for the new access token and 401 INVALID_TOKEN otherwise.
+     * 200 for the new access token, 401 UNAUTHENTICATED without a token and 401 INVALID_TOKEN otherwise.
      */
     private fun dispatcher(
         refreshResponse: MockResponse,
@@ -179,12 +275,13 @@ class TokenAuthenticatorTest {
                 return refreshResponse
             }
             if (request.path == "/v1/orders") ordersCalls.incrementAndGet()
-            log.add("request:${request.getHeader("Authorization")}")
+            val authorization = request.getHeader("Authorization")
+            log.add("request:$authorization")
             return override(request)
-                ?: if (request.getHeader("Authorization") == "Bearer $NEW_ACCESS") {
-                    MockResponse().setResponseCode(200).setBody("[]")
-                } else {
-                    problem(401, "INVALID_TOKEN")
+                ?: when (authorization) {
+                    "Bearer $NEW_ACCESS" -> MockResponse().setResponseCode(200).setBody("[]")
+                    null -> problem(401, "UNAUTHENTICATED")
+                    else -> problem(401, "INVALID_TOKEN")
                 }
         }
     }
@@ -195,7 +292,7 @@ class TokenAuthenticatorTest {
     ) = MockResponse()
         .setResponseCode(status)
         .setHeader("Content-Type", "application/problem+json")
-        .setBody("""{"title":"Unauthorized","status":$status,"code":"$code"}""")
+        .setBody("""{"title":"Error","status":$status,"code":"$code"}""")
 
     private fun sessionResponse() =
         MockResponse()
@@ -215,7 +312,7 @@ class TokenAuthenticatorTest {
     private class RecordingSecureStore(
         private val log: MutableList<String>,
     ) : SecureStore {
-        private val values = java.util.concurrent.ConcurrentHashMap<String, String>()
+        private val values = ConcurrentHashMap<String, String>()
 
         override suspend fun get(key: String): String? = values[key]
 
@@ -234,11 +331,16 @@ class TokenAuthenticatorTest {
     }
 
     private companion object {
+        const val PARALLEL = 5
+        const val MAX_REQUESTS_PER_HOST = 5
         const val OLD_ACCESS = "access-1"
         const val NEW_ACCESS = "access-2"
         const val OLD_REFRESH = "refresh-1"
         const val NEW_REFRESH = "refresh-2"
         const val REFRESH_KEY = TokenStore.REFRESH_TOKEN_KEY
         const val LATCH_SECONDS = 5L
+        const val CALLS_TIMEOUT_MS = 15_000L
     }
 }
+
+private const val TEST_TIMEOUT_SECONDS = 30L

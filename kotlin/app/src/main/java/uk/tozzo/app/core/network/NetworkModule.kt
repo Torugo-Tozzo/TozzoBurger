@@ -11,13 +11,20 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import retrofit2.create
 import uk.tozzo.app.BuildConfig
 import java.util.concurrent.TimeUnit
+import javax.inject.Qualifier
 import javax.inject.Singleton
+
+/** The [AuthApi] on a separate OkHttp client, used only to refresh the session. */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class RefreshClient
 
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
     private const val CONNECT_TIMEOUT_SECONDS = 15L
     private const val READ_TIMEOUT_SECONDS = 30L
+    private const val CALL_TIMEOUT_SECONDS = 60L
 
     @Provides
     @Singleton
@@ -25,27 +32,27 @@ object NetworkModule {
         authInterceptor: AuthInterceptor,
         tokenAuthenticator: TokenAuthenticator,
     ): OkHttpClient =
-        OkHttpClient
-            .Builder()
-            .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        baseClient()
             .addInterceptor(authInterceptor)
             .authenticator(tokenAuthenticator)
             .build()
 
     @Provides
     @Singleton
-    fun retrofit(client: OkHttpClient): Retrofit =
-        Retrofit
-            .Builder()
-            .baseUrl(BuildConfig.API_BASE_URL)
-            .client(client)
-            .addConverterFactory(ApiJson.asConverterFactory("application/json".toMediaType()))
-            .build()
+    fun retrofit(client: OkHttpClient): Retrofit = apiRetrofit(BuildConfig.API_BASE_URL, client)
 
     @Provides
     @Singleton
     fun authApi(retrofit: Retrofit): AuthApi = retrofit.create()
+
+    /**
+     * Own client (own dispatcher, no auth): the requests waiting for a refresh hold the main
+     * client's per-host slots, so a refresh queued there would never run.
+     */
+    @Provides
+    @Singleton
+    @RefreshClient
+    fun refreshAuthApi(): AuthApi = apiRetrofit(BuildConfig.API_BASE_URL, refreshOkHttpClient()).create()
 
     @Provides
     @Singleton
@@ -54,4 +61,24 @@ object NetworkModule {
     @Provides
     @Singleton
     fun syncApi(retrofit: Retrofit): SyncApi = retrofit.create()
+
+    internal fun refreshOkHttpClient(): OkHttpClient = baseClient().build()
+
+    internal fun apiRetrofit(
+        baseUrl: String,
+        client: OkHttpClient,
+    ): Retrofit =
+        Retrofit
+            .Builder()
+            .baseUrl(baseUrl)
+            .client(client)
+            .addConverterFactory(ApiJson.asConverterFactory("application/json".toMediaType()))
+            .build()
+
+    private fun baseClient(): OkHttpClient.Builder =
+        OkHttpClient
+            .Builder()
+            .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .callTimeout(CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
 }

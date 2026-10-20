@@ -16,13 +16,17 @@ sealed interface SessionEvent {
     data object PaymentRequired : SessionEvent
 }
 
-/** App-wide stream of [SessionEvent]s; events emitted while nobody collects are dropped. */
+/**
+ * App-wide stream of [SessionEvent]s. The latest event is kept (also for collectors that arrive
+ * later) until the handler calls [consume].
+ */
 @Singleton
 class SessionEvents
     @Inject
     constructor() {
         private val flow =
             MutableSharedFlow<SessionEvent>(
+                replay = 1,
                 extraBufferCapacity = BUFFER,
                 onBufferOverflow = BufferOverflow.DROP_OLDEST,
             )
@@ -31,6 +35,12 @@ class SessionEvents
 
         fun emit(e: SessionEvent) {
             flow.tryEmit(e)
+        }
+
+        /** Marks the kept event as handled, so new collectors do not receive it again. */
+        @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+        fun consume() {
+            flow.resetReplayCache()
         }
 
         private companion object {
