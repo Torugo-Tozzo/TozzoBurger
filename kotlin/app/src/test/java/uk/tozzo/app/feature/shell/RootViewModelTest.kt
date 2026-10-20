@@ -162,6 +162,19 @@ class RootViewModelTest {
         }
 
     @Test
+    fun signOutGoesToLoginEvenWhenTheSecureStoreFails() =
+        runTest(UnconfinedTestDispatcher()) {
+            signedIn(hasSynced = true)
+            val vm = viewModel()
+            signOutService.failure = java.io.IOException("keystore")
+
+            vm.signOut()
+
+            assertEquals(RootState.Login, vm.state.value)
+            assertEquals(1, db.disconnects)
+        }
+
+    @Test
     fun revokedGoesToLoginKeepingBindingAndData() =
         runTest(UnconfinedTestDispatcher()) {
             signedIn(hasSynced = true)

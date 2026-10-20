@@ -15,9 +15,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import uk.tozzo.app.core.sync.LocalSyncStatus
 import uk.tozzo.app.core.sync.SignOut
 import uk.tozzo.app.core.sync.SyncController
 import uk.tozzo.app.core.sync.SyncState
@@ -79,26 +79,31 @@ class FirstSyncViewModel
         }
 
         /**
-         * Online, every change of the SDK status counts as progress and restarts the wait: after
-         * [DOWNLOAD_FAILED_MS] with a failed download, or [NO_PROGRESS_MS] otherwise, [failed] turns on.
-         * Offline there is nothing to wait for.
+         * Online: after [DOWNLOAD_FAILED_MS] in the failed-download state, or [NO_PROGRESS_MS] without
+         * progress otherwise, [failed] turns on. Only the failed flag and real progress (a download
+         * starting) restart the wait; other status changes (connected, uploading) do not.
          */
         private suspend fun watchForFailure() {
             val offline = syncController.state.map { it == SyncState.OFFLINE }.distinctUntilChanged()
-            combine(offline, syncController.syncStatus) { isOffline, status -> isOffline to status }
-                .collectLatest { (isOffline, status) ->
-                    if (isOffline) {
+            val downloadFailed = syncController.syncStatus.map { it?.downloadFailed == true }.distinctUntilChanged()
+            val progress =
+                syncController.syncStatus
+                    .map { it?.downloading == true }
+                    .distinctUntilChanged()
+                    .scan(0) { count, downloading -> if (downloading) count + 1 else count }
+                    .distinctUntilChanged()
+            var seenProgress = 0
+            combine(offline, downloadFailed, progress) { off, dlFailed, count -> Triple(off, dlFailed, count) }
+                .collectLatest { (off, dlFailed, count) ->
+                    if (off) {
                         failed.value = false
                     } else {
-                        waitForFailure(status)
+                        if (count != seenProgress) failed.value = false
+                        seenProgress = count
+                        delay(if (dlFailed) DOWNLOAD_FAILED_MS else NO_PROGRESS_MS)
+                        failed.value = true
                     }
                 }
-        }
-
-        private suspend fun waitForFailure(status: LocalSyncStatus?) {
-            if (status?.downloading == true && !status.downloadFailed) failed.value = false
-            delay(if (status?.downloadFailed == true) DOWNLOAD_FAILED_MS else NO_PROGRESS_MS)
-            failed.value = true
         }
 
         private companion object {

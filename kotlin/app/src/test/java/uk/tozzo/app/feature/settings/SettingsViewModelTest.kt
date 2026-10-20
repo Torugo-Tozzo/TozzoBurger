@@ -77,6 +77,19 @@ class SettingsViewModelTest {
         }
 
     @Test
+    fun signOutLeavesEvenWhenTheSecureStoreFails() =
+        runTest(UnconfinedTestDispatcher()) {
+            val vm = viewModel()
+            signOutService.failure = IOException("keystore")
+            vm.signedOut.test {
+                vm.signOut()
+                awaitItem()
+            }
+            assertEquals(1, db.disconnects)
+            assertEquals(foodOwnerBinding(), binding.current.value)
+        }
+
+    @Test
     fun showsTheBoundUserAndEstablishment() =
         runTest(UnconfinedTestDispatcher()) {
             val state = viewModel().state.value

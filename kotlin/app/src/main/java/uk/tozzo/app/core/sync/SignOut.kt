@@ -16,19 +16,17 @@ class SignOut
         private val sessions: SignOutService,
         private val sync: SyncController,
     ) {
+        /** Never throws (but for cancellation): "Sair" always leads to the login. */
         suspend fun signOut() {
-            try {
-                sessions.signOutKeepingData()
-            } finally {
-                // A store failure above must not leave the sync running on a dead session.
-                stopQuietly()
-            }
+            bestEffort { sessions.signOutKeepingData() }
+            // A store failure above must not leave the sync running on a dead session.
+            bestEffort { sync.stop() }
         }
 
         @Suppress("TooGenericExceptionCaught", "SwallowedException")
-        private suspend fun stopQuietly() {
+        private suspend fun bestEffort(block: suspend () -> Unit) {
             try {
-                sync.stop()
+                block()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {

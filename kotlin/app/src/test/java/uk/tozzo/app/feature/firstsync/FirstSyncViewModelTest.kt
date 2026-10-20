@@ -91,9 +91,29 @@ class FirstSyncViewModelTest {
             assertEquals(false, vm.state.value.failed)
             // Progress (the status changed) starts the wait again.
             db.status.value = LocalSyncStatus(true, false, false, false)
+            db.status.value = LocalSyncStatus(true, true, false, false)
             advanceTimeBy(29_999)
             assertEquals(false, vm.state.value.failed)
             advanceTimeBy(2)
+            assertEquals(true, vm.state.value.failed)
+        }
+
+    @Test
+    fun otherStatusChangesDoNotRestartTheWait() =
+        runTest(UnconfinedTestDispatcher()) {
+            online.value = true
+            val vm = viewModel()
+
+            // The SDK retries: `connected` toggles every 5 s while the download stays failed.
+            var connected = true
+            db.status.value = LocalSyncStatus(connected, false, false, false, downloadFailed = true)
+            repeat(3) {
+                advanceTimeBy(5_000)
+                connected = !connected
+                db.status.value = LocalSyncStatus(connected, false, false, false, downloadFailed = true)
+            }
+            assertEquals(false, vm.state.value.failed)
+            advanceTimeBy(5_001)
             assertEquals(true, vm.state.value.failed)
         }
 
@@ -121,6 +141,19 @@ class FirstSyncViewModelTest {
             online.value = false
 
             assertEquals(FirstSyncUiState(offline = true, failed = false), vm.state.value)
+        }
+
+    @Test
+    fun signOutLeavesEvenWhenTheSecureStoreFails() =
+        runTest(UnconfinedTestDispatcher()) {
+            online.value = true
+            signOutService.failure = java.io.IOException("keystore")
+            val vm = viewModel()
+            vm.signedOut.test {
+                vm.signOut()
+                awaitItem()
+            }
+            assertEquals(1, db.disconnects)
         }
 
     @Test

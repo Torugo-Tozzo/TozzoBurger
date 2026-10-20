@@ -164,8 +164,12 @@ class FakeSignOutService(
 ) : SignOutService {
     var signOuts = 0
 
+    /** Makes the sign-out throw, like a secure store that cannot be written. */
+    var failure: Exception? = null
+
     override suspend fun signOutKeepingData() {
         log?.calls?.add("session.signOut")
         signOuts++
+        failure?.let { throw it }
     }
 }
