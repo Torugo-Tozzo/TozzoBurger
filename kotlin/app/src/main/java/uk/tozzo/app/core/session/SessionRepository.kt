@@ -52,6 +52,14 @@ sealed interface LoginResult {
     ) : LoginResult
 }
 
+/** The sign-in call, as seen by the login screen (a seam for tests). */
+interface LoginService {
+    suspend fun login(
+        email: String,
+        password: String,
+    ): LoginResult
+}
+
 /** Signs in, binds this device to one user and keeps that binding across sign-outs. */
 @Singleton
 class SessionRepository
@@ -64,9 +72,9 @@ class SessionRepository
         private val deviceBinding: DeviceBinding,
         private val deviceIdentity: DeviceIdentity,
         private val deviceInfo: DeviceInfoSource,
-    ) {
+    ) : LoginService {
         @Suppress("ReturnCount")
-        suspend fun login(
+        override suspend fun login(
             email: String,
             password: String,
         ): LoginResult {

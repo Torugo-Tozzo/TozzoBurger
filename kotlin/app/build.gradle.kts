@@ -19,6 +19,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         buildConfigField("String", "API_BASE_URL", "\"https://dev-api.tozzo.uk\"")
+        buildConfigField("String", "WEB_BASE_URL", "\"https://dev.tozzo.uk\"")
     }
 
     buildTypes {
