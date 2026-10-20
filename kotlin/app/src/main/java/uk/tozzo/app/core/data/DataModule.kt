@@ -10,4 +10,7 @@ import dagger.hilt.components.SingletonComponent
 abstract class DataModule {
     @Binds
     abstract fun localSql(impl: PowerSyncLocalSql): LocalSql
+
+    @Binds
+    abstract fun imageSource(impl: ContentResolverImageSource): ImageSource
 }

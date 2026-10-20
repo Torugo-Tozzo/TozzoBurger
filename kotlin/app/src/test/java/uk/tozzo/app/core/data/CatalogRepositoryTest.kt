@@ -178,4 +178,47 @@ class CatalogRepositoryTest {
             assertEquals(false, all.last().isActive)
             assertEquals("#fff", all.first().color)
         }
+
+    @Test
+    fun manageProductsFollowsTheWebRuleAndKeepsAnInvalidPriceToFix() =
+        runTest {
+            type("t1", "Burgers")
+            type("t2", "Old", active = 0)
+            product("p1", "X-Burger", typeId = "t1")
+            product("p2", "Old thing", typeId = "t2")
+            product("p3", "No price", price = "abc")
+            product("p4", "Gone", deletedAt = "2026-01-01")
+
+            val rows = repo.manageProducts("", 50).first()
+
+            // Like GET /v1/products: the products of an inactive type are left out.
+            assertEquals(listOf("No price", "X-Burger"), rows.map { it.name })
+            assertNull(rows.first { it.name == "No price" }.priceCents)
+            assertEquals(1000L, rows.first { it.name == "X-Burger" }.priceCents)
+        }
+
+    @Test
+    fun manageProductsSearchesIgnoringAccentsAndLimits() =
+        runTest {
+            product("p1", "PÃO de queijo")
+            product("p2", "Pastel")
+            product("p3", "Pizza")
+
+            assertEquals(listOf("PÃO de queijo"), repo.manageProducts("pao", 50).first().map { it.name })
+            assertEquals(2, repo.manageProducts("", 2).first().size)
+        }
+
+    @Test
+    fun productForEditOpensAnyTypeAndAnyPrice() =
+        runTest {
+            type("t2", "Old", active = 0)
+            product("p1", "Old thing", price = null, typeId = "t2")
+
+            val found = repo.productForEdit("p1")!!
+
+            assertEquals("Old thing", found.name)
+            assertNull(found.priceCents)
+            assertEquals("t2", found.typeId)
+            assertNull(repo.productForEdit("missing"))
+        }
 }

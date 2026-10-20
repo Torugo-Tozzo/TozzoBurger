@@ -19,12 +19,18 @@ import javax.inject.Singleton
 @Retention(AnnotationRetention.BINARY)
 annotation class RefreshClient
 
+/** The OkHttp client of the presigned image PUT: no auth interceptor, so the token never reaches the storage host. */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class PresignClient
+
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
     private const val CONNECT_TIMEOUT_SECONDS = 15L
     private const val READ_TIMEOUT_SECONDS = 30L
     private const val CALL_TIMEOUT_SECONDS = 60L
+    private const val UPLOAD_CALL_TIMEOUT_SECONDS = 180L
 
     @Provides
     @Singleton
@@ -61,6 +67,15 @@ object NetworkModule {
     @Provides
     @Singleton
     fun syncApi(retrofit: Retrofit): SyncApi = retrofit.create()
+
+    @Provides
+    @Singleton
+    fun uploadsApi(retrofit: Retrofit): UploadsApi = retrofit.create()
+
+    @Provides
+    @Singleton
+    @PresignClient
+    fun presignClient(): OkHttpClient = baseClient().callTimeout(UPLOAD_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS).build()
 
     internal fun refreshOkHttpClient(): OkHttpClient = baseClient().build()
 

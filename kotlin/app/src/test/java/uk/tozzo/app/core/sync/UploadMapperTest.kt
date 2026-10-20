@@ -56,7 +56,8 @@ class UploadMapperTest {
     @Test
     fun typedValuesKeepTheirTypes() {
         val item = PendingOp(2, "PUT", "sale_items", "i1", mapOf("quantity" to 3L, "unit_price" to "4.00"))
-        val product = PendingOp(2, "PATCH", "products", "p1", mapOf("quantity" to 3L, "price" to "4.00"))
+        // Only the products table renames its price (see productPriceGoesAsCents).
+        val product = PendingOp(2, "PATCH", "services", "p1", mapOf("quantity" to 3L, "price" to "4.00"))
         val data = dataOf(UploadMapper.toJson(product, DEVICE))
 
         assertEquals(JsonPrimitive(3L), data["quantity"])
@@ -230,6 +231,27 @@ class UploadMapperTest {
 
         val bad = salePut.copy(data = mapOf("sold_at" to "ontem"))
         assertThrows(IllegalArgumentException::class.java) { UploadMapper.toJson(bad, DEVICE) }
+    }
+
+    @Test
+    fun productPriceGoesAsCents() {
+        val put = PendingOp(1, "PUT", "products", "p1", mapOf("name" to "X", "price" to "12.50", "ingredients" to ""))
+        val data = dataOf(UploadMapper.toJson(put, DEVICE))
+
+        assertEquals(JsonPrimitive(1250L), data["price_cents"])
+        assertNull(data["price"])
+        assertEquals(JsonPrimitive("X"), data["name"])
+
+        val patch = PendingOp(2, "PATCH", "products", "p1", mapOf("price" to "0.05"))
+        assertEquals(JsonPrimitive(5L), dataOf(UploadMapper.toJson(patch, DEVICE))["price_cents"])
+    }
+
+    @Test
+    fun aProductPriceThatIsNotAnAmountCannotBeSent() {
+        listOf("abc", "1.234", "-1", "").forEach { price ->
+            val op = PendingOp(3, "PATCH", "products", "p1", mapOf("price" to price))
+            assertThrows(IllegalArgumentException::class.java) { UploadMapper.toJson(op, DEVICE) }
+        }
     }
 
     private companion object {

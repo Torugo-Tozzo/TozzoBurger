@@ -81,24 +81,71 @@ class CatalogRepository
                     ::toProduct,
                 ).map { it.firstOrNull() }
 
-        private fun toProduct(row: SqlRow): Product? {
-            val price = Money.parseDecimalToCents(row.string("price")) ?: return null
-            return Product(
+        /**
+         * Products for the management list, by name, with the web's rule: the products of an inactive type
+         * are left out (`GET /v1/products` omits them). Unlike [products], one whose price is not a valid
+         * decimal stays (with a null price) so it can be opened and fixed. [limit] is the page size
+         * that grows with the scroll; [search] ignores case and accents.
+         */
+        fun manageProducts(
+            search: String,
+            limit: Int,
+        ): Flow<List<ManagedProduct>> {
+            val needle = fold(search)
+            return sql
+                .watch(
+                    "SELECT $PRODUCT_COLUMNS $PRODUCT_FROM ORDER BY p.name COLLATE NOCASE, p.id LIMIT ?",
+                    listOf(READ_CAP),
+                    ::toManaged,
+                ).map { rows ->
+                    rows.filter { needle.isEmpty() || fold(it.name).contains(needle) }.take(limit)
+                }
+        }
+
+        /** One live product for the edit form, whatever its type and price (a null price is to be fixed). */
+        suspend fun productForEdit(id: String): ManagedProduct? =
+            sql
+                .getAll(
+                    "SELECT $PRODUCT_COLUMNS FROM products p WHERE p.id = ? AND p.deleted_at IS NULL",
+                    listOf(id),
+                    ::toManaged,
+                ).firstOrNull()
+
+        private fun toManaged(row: SqlRow) =
+            ManagedProduct(
                 id = row.string("id").orEmpty(),
                 name = row.string("name").orEmpty(),
-                priceCents = price,
+                priceCents = Money.parseDecimalToCents(row.string("price")),
                 ingredients = row.string("ingredients"),
                 typeId = row.string("product_type_id"),
                 imageKey = row.string("image_key"),
             )
+
+        private fun toProduct(row: SqlRow): Product? {
+            val managed = toManaged(row)
+            val price = managed.priceCents ?: return null
+            return Product(managed.id, managed.name, price, managed.ingredients, managed.typeId, managed.imageKey)
         }
 
-        private fun fold(text: String): String =
-            Normalizer
-                .normalize(text.trim(), Normalizer.Form.NFD)
-                .replace(ACCENTS, "")
-                .lowercase(Locale.ROOT)
+        private fun fold(text: String): String = foldForSearch(text)
     }
+
+/** Lower case without accents, for the searches that SQLite's ASCII-only folding cannot do. */
+internal fun foldForSearch(text: String): String =
+    Normalizer
+        .normalize(text.trim(), Normalizer.Form.NFD)
+        .replace(ACCENTS, "")
+        .lowercase(Locale.ROOT)
 
 private const val READ_CAP = 5000
 private val ACCENTS = Regex("\\p{InCombiningDiacriticalMarks}+")
+
+/** A product as the management screen sees it: [priceCents] is null when the stored price is not valid. */
+data class ManagedProduct(
+    val id: String,
+    val name: String,
+    val priceCents: Long?,
+    val ingredients: String?,
+    val typeId: String?,
+    val imageKey: String?,
+)

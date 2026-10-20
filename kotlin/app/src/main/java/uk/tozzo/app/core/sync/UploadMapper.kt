@@ -14,6 +14,7 @@ import uk.tozzo.app.core.network.SyncApi
 import uk.tozzo.app.core.network.UploadRequest
 import uk.tozzo.app.core.network.UploadResult
 import uk.tozzo.app.domain.DbTime
+import uk.tozzo.app.domain.Money
 import java.util.UUID
 
 /** One entry of the local upload queue (a PowerSync `CrudEntry`), with its typed values in [data]. */
@@ -27,6 +28,9 @@ data class PendingOp(
 
 /** Turns [PendingOp]s into the ops of `POST /v1/sync/upload`. */
 object UploadMapper {
+    private const val PRODUCTS = "products"
+    private const val PRICE = "price"
+    private const val PRICE_CENTS = "price_cents"
     private const val SALES = "sales"
     private const val SALE_ITEMS = "sale_items"
     private const val ORDERS = "orders"
@@ -75,7 +79,7 @@ object UploadMapper {
             ORDERS -> orderData(op, values)
             else ->
                 buildJsonObject {
-                    putColumns(values.filterKeys { it != ITEMS_JSON })
+                    putColumns(op.table, values.filterKeys { it != ITEMS_JSON })
                     if (op.table == SALES && op.op == PUT) putItems(values, always = true)
                 }
         }
@@ -102,7 +106,7 @@ object UploadMapper {
                 op.op == PATCH && close != null -> put("close", ApiJson.parseToJsonElement(close))
                 op.op == PATCH && delivery != null -> put("delivery", ApiJson.parseToJsonElement(delivery))
                 op.op == PUT || op.op == PATCH -> {
-                    putColumns(values.filterKeys { it in ORDER_WRITABLE })
+                    putColumns(ORDERS, values.filterKeys { it in ORDER_WRITABLE })
                     putItems(values, always = op.op == PUT)
                 }
             }
@@ -121,8 +125,16 @@ object UploadMapper {
         }
     }
 
-    private fun JsonObjectBuilder.putColumns(values: Map<String, Any?>) {
+    private fun JsonObjectBuilder.putColumns(
+        table: String,
+        values: Map<String, Any?>,
+    ) {
         for ((key, value) in values) {
+            if (table == PRODUCTS && key == PRICE) {
+                // The database holds decimal text; the API takes integer cents.
+                put(PRICE_CENTS, JsonPrimitive(value.toCents()))
+                continue
+            }
             put(
                 key,
                 when {
@@ -142,6 +154,9 @@ object UploadMapper {
             false, 0, 0L, "0", "false" -> JsonPrimitive(false)
             else -> throw IllegalArgumentException("$column is not a boolean: $this")
         }
+
+    private fun Any?.toCents(): Long =
+        Money.parseDecimalToCents(this?.toString()) ?: throw IllegalArgumentException("price is not an amount: $this")
 
     private fun Any?.toRfc3339(column: String): JsonElement =
         when (this) {

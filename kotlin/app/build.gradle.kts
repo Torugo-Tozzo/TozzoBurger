@@ -20,6 +20,8 @@ android {
         versionName = "0.1.0"
         buildConfigField("String", "API_BASE_URL", "\"https://dev-api.tozzo.uk\"")
         buildConfigField("String", "WEB_BASE_URL", "\"https://dev.tozzo.uk\"")
+        // R2_PUBLIC_URL of the dev API: the public base of the product images (Media.URL joins it with the key).
+        buildConfigField("String", "MEDIA_BASE_URL", "\"https://media-dev.tozzo.uk\"")
     }
 
     buildTypes {
@@ -83,6 +85,8 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.tink.android)
     implementation(libs.powersync.core)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     ksp(libs.hilt.compiler)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
