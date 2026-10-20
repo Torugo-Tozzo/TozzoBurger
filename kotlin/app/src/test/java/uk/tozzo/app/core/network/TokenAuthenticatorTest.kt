@@ -229,6 +229,107 @@ class TokenAuthenticatorTest {
             assertEquals(OLD_REFRESH, tokenStore.refreshToken())
         }
 
+    @Test
+    fun requestSentDuringRevokedRefreshDoesNotRefreshAgain() =
+        runTest {
+            val held = HeldRefresh(problem(401, "SESSION_REVOKED"))
+            server.dispatcher = dispatcher(held.response, held.override)
+            val client = client()
+
+            events.events.test {
+                val codes = held.runOverlapping(client)
+
+                assertEquals(listOf(401, 401), codes)
+                assertEquals(SessionEvent.Revoked, awaitItem())
+                expectNoEvents()
+            }
+            assertEquals(1, refreshCalls.get())
+        }
+
+    @Test
+    fun requestSentDuringFailedRefreshDoesNotRefreshAgain() =
+        runTest {
+            val held = HeldRefresh(problem(503, "UNAVAILABLE"))
+            server.dispatcher = dispatcher(held.response, held.override)
+            val client = client()
+
+            val codes = held.runOverlapping(client)
+
+            assertEquals(listOf(401, 401), codes)
+            assertEquals(1, refreshCalls.get())
+            assertEquals(OLD_REFRESH, tokenStore.refreshToken())
+            assertEquals(0, events.events.replayCache.size)
+        }
+
+    @Test
+    fun unreadableRefreshTokenKeepsSessionOnUnauthorized() =
+        runTest {
+            secure.failReads = true
+            server.dispatcher = dispatcher(sessionResponse())
+            val client = client()
+
+            val code = withContext(Dispatchers.IO) { client.get("/v1/orders") }
+
+            assertEquals(401, code)
+            assertEquals(0, refreshCalls.get())
+            assertEquals(OLD_ACCESS, tokenStore.accessToken)
+            assertEquals(0, events.events.replayCache.size)
+        }
+
+    @Test
+    fun unreadableRefreshTokenOnColdStartSendsRequestWithoutToken() =
+        runTest {
+            tokenStore.accessToken = null
+            secure.failReads = true
+            server.dispatcher = dispatcher(sessionResponse())
+            val client = client()
+
+            val code = withContext(Dispatchers.IO) { client.get("/v1/orders") }
+
+            assertEquals(401, code)
+            assertEquals(0, refreshCalls.get())
+            assertTrue("request:null" in log, "a token was sent: $log")
+            assertEquals(0, events.events.replayCache.size)
+        }
+
+    /**
+     * Holds the refresh started by a first request until a second request, sent while the refresh
+     * is in flight, reached the server; then answers the refresh with [response].
+     */
+    private inner class HeldRefresh(
+        val response: MockResponse,
+    ) {
+        private val refreshStarted = CountDownLatch(1)
+        private val secondArrived = CountDownLatch(2)
+        private val release = CountDownLatch(1)
+
+        val override: (RecordedRequest) -> MockResponse? = { request ->
+            if (request.path == "/v1/orders") secondArrived.countDown()
+            null
+        }
+
+        init {
+            heldRefresh = this
+        }
+
+        suspend fun runOverlapping(client: OkHttpClient): List<Int> =
+            withContext(Dispatchers.IO) {
+                val first = async { client.get("/v1/orders") }
+                assertTrue(refreshStarted.await(LATCH_SECONDS, TimeUnit.SECONDS), "refresh did not start")
+                val second = async { client.get("/v1/orders") }
+                assertTrue(secondArrived.await(LATCH_SECONDS, TimeUnit.SECONDS), "second request not sent")
+                release.countDown()
+                listOf(first.await(), second.await())
+            }
+
+        fun onRefresh() {
+            refreshStarted.countDown()
+            release.await(LATCH_SECONDS, TimeUnit.SECONDS)
+        }
+    }
+
+    private var heldRefresh: HeldRefresh? = null
+
     private fun client(): OkHttpClient {
         val refreshApi =
             NetworkModule.apiRetrofit(server.url("/").toString(), NetworkModule.refreshOkHttpClient()).create<AuthApi>()
@@ -272,6 +373,7 @@ class TokenAuthenticatorTest {
         override fun dispatch(request: RecordedRequest): MockResponse {
             if (request.path == "/v1/auth/refresh") {
                 refreshCalls.incrementAndGet()
+                heldRefresh?.onRefresh()
                 return refreshResponse
             }
             if (request.path == "/v1/orders") ordersCalls.incrementAndGet()
@@ -314,7 +416,13 @@ class TokenAuthenticatorTest {
     ) : SecureStore {
         private val values = ConcurrentHashMap<String, String>()
 
-        override suspend fun get(key: String): String? = values[key]
+        @Volatile
+        var failReads = false
+
+        override suspend fun get(key: String): String? {
+            if (failReads) throw IllegalStateException("keystore unavailable")
+            return values[key]
+        }
 
         override suspend fun put(
             key: String,

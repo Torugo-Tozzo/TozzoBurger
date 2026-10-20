@@ -16,7 +16,7 @@ import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
 
-/** Refresh attempts made before a request was sent; set by [AuthInterceptor] as a request tag. */
+/** Refresh attempts finished before a request was sent; set by [AuthInterceptor] as a request tag. */
 internal class RefreshGeneration(
     val value: Int,
 )
@@ -41,7 +41,7 @@ class TokenAuthenticator
     ) : Authenticator {
         private val mutex = Mutex()
 
-        /** Refresh attempts started so far; changed only under [mutex]. */
+        /** Refresh attempts finished so far; changed only under [mutex]. */
         @Volatile
         internal var generation = 0
             private set
@@ -67,11 +67,12 @@ class TokenAuthenticator
 
         /**
          * An access token for a request about to go out with none in memory (after a process
-         * restart), refreshed with the stored refresh token; null when there is no session.
+         * restart), refreshed with the stored refresh token; null when there is no session or the
+         * refresh token cannot be read.
          */
         internal suspend fun coldStartAccessToken(): String? {
-            if (tokenStore.refreshToken() == null) return null
-            return freshAccessToken(staleToken = null, sentAt = generation)
+            val sentAt = generation
+            return if (readRefreshToken().getOrNull() != null) freshAccessToken(staleToken = null, sentAt) else null
         }
 
         private suspend fun freshAccessToken(
@@ -82,30 +83,53 @@ class TokenAuthenticator
                 val current = tokenStore.accessToken
                 when {
                     current != null && current != staleToken -> current
-                    generation != sentAt -> null // a refresh already ran for this request and failed
+                    generation != sentAt -> null // a refresh finished after this request was sent and failed
                     else -> refresh()
                 }
             }
 
+        /** One refresh attempt; [generation] moves on only when it finishes, under [mutex]. */
         @Suppress("TooGenericExceptionCaught") // any failure must keep the session, never crash a call
-        private suspend fun refresh(): String? {
-            generation++
-            val refreshToken = tokenStore.refreshToken() ?: return endSession()
-            return try {
-                val session = authApiProvider.get().refresh(RefreshRequest(refreshToken))
-                tokenStore.save(session)
-                session.accessToken
+        private suspend fun refresh(): String? =
+            try {
+                val refreshToken = readRefreshToken().getOrThrow()
+                if (refreshToken == null) endSession() else refreshWith(refreshToken)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: HttpException) {
                 if (e.code() == HTTP_UNAUTHORIZED) endSession() else null
             } catch (_: Exception) {
                 null
+            } finally {
+                generation++
             }
+
+        private suspend fun refreshWith(refreshToken: String): String {
+            val session = authApiProvider.get().refresh(RefreshRequest(refreshToken))
+            tokenStore.save(session)
+            return session.accessToken
         }
 
+        /** The stored refresh token; a failure to read it is not the same as having none. */
+        @Suppress("TooGenericExceptionCaught")
+        private suspend fun readRefreshToken(): Result<String?> =
+            try {
+                Result.success(tokenStore.refreshToken())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+
+        @Suppress("TooGenericExceptionCaught", "SwallowedException")
         private suspend fun endSession(): String? {
-            tokenStore.clear()
+            try {
+                tokenStore.clear()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                tokenStore.accessToken = null // the stored refresh token is already revoked by the API
+            }
             events.emit(SessionEvent.Revoked)
             return null
         }

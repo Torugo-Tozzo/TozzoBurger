@@ -17,15 +17,17 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.security.GeneralSecurityException
 import java.util.Base64
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Small key-value store for secrets. */
+/** Small key-value store for secrets. Implementations may throw [IOException] when the store is unusable. */
 interface SecureStore {
     suspend fun get(key: String): String?
 
@@ -64,22 +66,16 @@ class TinkSecureStore
         }
 
         override suspend fun get(key: String): String? =
-            withContext(Dispatchers.IO) {
-                val stored = dataStore.data.first()[stringPreferencesKey(key)] ?: return@withContext null
-                try {
-                    String(aead.decrypt(Base64.getDecoder().decode(stored), key.toByteArray()), Charsets.UTF_8)
-                } catch (_: GeneralSecurityException) {
-                    null
-                } catch (_: IllegalArgumentException) {
-                    null
-                }
+            io {
+                val stored = dataStore.data.first()[stringPreferencesKey(key)]
+                stored?.let { decryptOrNull(aead, it, key) }
             }
 
         override suspend fun put(
             key: String,
             value: String?,
         ) {
-            withContext(Dispatchers.IO) {
+            io {
                 val encrypted =
                     value?.let {
                         val cipher = aead.encrypt(it.toByteArray(Charsets.UTF_8), key.toByteArray())
@@ -93,8 +89,40 @@ class TinkSecureStore
         }
 
         override suspend fun clear() {
-            withContext(Dispatchers.IO) { dataStore.edit { it.clear() } }
+            io { dataStore.edit { it.clear() } }
         }
+
+        /** A stored value that no longer decrypts (corrupt, or the key was lost) reads as absent. */
+        private fun decryptOrNull(
+            aead: Aead,
+            stored: String,
+            key: String,
+        ): String? =
+            try {
+                String(aead.decrypt(Base64.getDecoder().decode(stored), key.toByteArray()), Charsets.UTF_8)
+            } catch (_: GeneralSecurityException) {
+                null
+            } catch (_: IllegalArgumentException) {
+                null
+            }
+
+        /**
+         * Runs [block] off the main thread; any failure of the keyset, the Keystore or DataStore
+         * reaches the caller as an [IOException].
+         */
+        @Suppress("TooGenericExceptionCaught")
+        private suspend fun <T> io(block: suspend () -> T): T =
+            withContext(Dispatchers.IO) {
+                try {
+                    block()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: IOException) {
+                    throw e
+                } catch (e: Exception) {
+                    throw IOException("Secure store failed", e)
+                }
+            }
 
         private companion object {
             const val DATASTORE_NAME = "secure_store"
