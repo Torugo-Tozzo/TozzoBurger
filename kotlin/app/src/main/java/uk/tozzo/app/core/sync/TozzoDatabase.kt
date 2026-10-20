@@ -1,0 +1,116 @@
+package uk.tozzo.app.core.sync
+
+import android.content.Context
+import com.powersync.DatabaseDriverFactory
+import com.powersync.PowerSyncDatabase
+import com.powersync.db.Queries
+import com.powersync.sync.SyncStatusData
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import uk.tozzo.app.core.network.UploadResult
+import java.time.Instant
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/** What the app needs of the sync status of the [LocalDatabase]. */
+data class LocalSyncStatus(
+    val connected: Boolean,
+    val downloading: Boolean,
+    val uploading: Boolean,
+    /** Null until the SDK has read the stored sync state. */
+    val hasSynced: Boolean?,
+)
+
+/** The local database, seen by the [SyncController] (a seam for tests without the SDK). */
+interface LocalDatabase {
+    fun status(): Flow<LocalSyncStatus>
+
+    /** Watches a `SELECT count(*)` query. */
+    fun watchCount(sql: String): Flow<Int>
+
+    suspend fun connect()
+
+    suspend fun disconnect()
+
+    /** Disconnects and deletes every row, local-only tables included. */
+    suspend fun disconnectAndClear()
+}
+
+/** The PowerSync database of the app (`tozzo.db`), opened on [Dispatchers.IO] when first used. */
+@Singleton
+class TozzoDatabase
+    @Inject
+    constructor(
+        @ApplicationContext private val context: Context,
+        private val connector: TozzoConnector,
+    ) : LocalDatabase {
+        private val mutex = Mutex()
+        private var opened: PowerSyncDatabase? = null
+
+        suspend fun database(): PowerSyncDatabase =
+            mutex.withLock {
+                opened ?: withContext(Dispatchers.IO) {
+                    PowerSyncDatabase(
+                        factory = DatabaseDriverFactory(context),
+                        schema = localSchema,
+                        dbFilename = DB_FILE,
+                    )
+                }.also { opened = it }
+            }
+
+        override fun status(): Flow<LocalSyncStatus> =
+            flow {
+                val status = database().currentStatus
+                emitAll(status.asFlow().onStart { emit(status) })
+            }.map { it.toLocal() }.distinctUntilChanged()
+
+        override fun watchCount(sql: String): Flow<Int> =
+            flow {
+                emitAll(database().watch(sql) { it.getLong(0) ?: 0L })
+            }.map { rows -> rows.firstOrNull()?.toInt() ?: 0 }.distinctUntilChanged()
+
+        override suspend fun connect() {
+            database().connect(connector)
+        }
+
+        override suspend fun disconnect() {
+            database().disconnect()
+        }
+
+        // clearLocal also empties the local-only tables (sync_rejections): powersync_clear flag 1.
+        override suspend fun disconnectAndClear() {
+            database().disconnectAndClear(clearLocal = true)
+        }
+
+        private fun SyncStatusData.toLocal() = LocalSyncStatus(connected, downloading, uploading, hasSynced)
+
+        private companion object {
+            const val DB_FILE = "tozzo.db"
+        }
+    }
+
+/** [RejectionSink] on the local-only `sync_rejections` table. */
+class DatabaseRejectionSink(
+    private val db: Queries,
+) : RejectionSink {
+    override suspend fun record(
+        op: PendingOp,
+        opId: String,
+        result: UploadResult,
+    ) {
+        db.execute(
+            "INSERT INTO $SYNC_REJECTIONS_TABLE (id, op_id, table_name, row_id, op, code, detail, created_at) " +
+                "VALUES (uuid(), ?, ?, ?, ?, ?, ?, ?)",
+            listOf(opId, op.table, op.id, op.op, result.code, result.detail, Instant.now().toString()),
+        )
+    }
+}
