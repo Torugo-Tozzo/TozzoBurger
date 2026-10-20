@@ -47,7 +47,8 @@ class TozzoConnector
          * and its rejections are in `sync_rejections`; a failure throws and the SDK sends it again.
          */
         override suspend fun uploadData(database: PowerSyncDatabase) {
-            val processor = UploadProcessor(api, DatabaseRejectionSink(database), deviceIdentity::id)
+            val sink = DatabaseRejectionSink { sql, params -> database.execute(sql, params) }
+            val processor = UploadProcessor(api, sink, deviceIdentity::id)
             while (true) {
                 val batch = database.getCrudBatch(BATCH_SIZE) ?: return
                 processor.process(batch.crud.map { it.toPendingOp() })

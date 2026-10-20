@@ -36,7 +36,11 @@ object UploadMapper {
         clientId: Int,
     ): String = UUID.nameUUIDFromBytes("$deviceId:$clientId".toByteArray()).toString()
 
-    /** The op to upload, or null for `sale_items` (the server creates them from the sales PUT). */
+    /**
+     * The op to upload, or null for `sale_items` (the server creates them from the sales PUT).
+     * Throws [IllegalArgumentException] when the op's data cannot be sent (an `items_json` that is
+     * not a JSON array).
+     */
     fun toJson(
         op: PendingOp,
         deviceId: String,
@@ -76,7 +80,10 @@ object UploadMapper {
 
 /** Keeps the ops the server rejected. */
 interface RejectionSink {
-    /** Must be durable when it returns: the caller then completes the batch, which deletes the op. */
+    /**
+     * Must be durable when it returns: the caller then completes the batch, which deletes the op.
+     * Recording an [opId] that is already kept must not add a second row.
+     */
     suspend fun record(
         op: PendingOp,
         opId: String,
@@ -91,22 +98,39 @@ class UploadProcessor(
     private val deviceId: suspend () -> String,
 ) {
     /**
-     * Uploads [ops] and records each rejected one in the [sink] before returning. Throws when the
-     * request fails; the caller then must not complete the batch, so the same ops (and op ids) go again.
+     * Uploads [ops] and records each rejected one in the [sink] before returning. An op whose data
+     * cannot be sent is recorded as [LOCAL_INVALID_DATA] and left out, so it never blocks the queue.
+     * Throws when the request fails; the caller then must not complete the batch, so the same ops
+     * (and op ids) go again.
      */
     suspend fun process(ops: List<PendingOp>) {
         val device = deviceId()
-        val uploads = ops.mapNotNull { op -> UploadMapper.toJson(op, device)?.let { op to it } }
+        val uploads = mutableListOf<Pair<PendingOp, JsonObject>>()
+        for (op in ops) {
+            try {
+                UploadMapper.toJson(op, device)?.let { uploads += op to it }
+            } catch (e: IllegalArgumentException) {
+                // Also covers SerializationException, a subclass.
+                val opId = UploadMapper.opId(device, op.clientId)
+                sink.record(op, opId, UploadResult(opId, REJECTED, LOCAL_INVALID_DATA, e.message ?: e.toString()))
+            }
+        }
         if (uploads.isEmpty()) return
         val response = api.upload(UploadRequest(device, uploads.map { it.second }))
         val byOpId = uploads.associate { (op, _) -> UploadMapper.opId(device, op.clientId) to op }
-        for (result in response.results.filter { it.status == REJECTED }) {
+        for (result in response.results.filter { it.isRejection() }) {
             val op = byOpId[result.opId] ?: continue
             sink.record(op, result.opId, result)
         }
     }
 
-    private companion object {
-        const val REJECTED = "rejected"
+    /** A duplicate carries the code of the original rejection, whose answer may have been lost. */
+    private fun UploadResult.isRejection() = status == REJECTED || (status == DUPLICATE && code != null)
+
+    companion object {
+        /** Code of an op rejected on the device, before reaching the API. */
+        const val LOCAL_INVALID_DATA = "LOCAL_INVALID_DATA"
+        private const val REJECTED = "rejected"
+        private const val DUPLICATE = "duplicate"
     }
 }

@@ -3,7 +3,6 @@ package uk.tozzo.app.core.sync
 import android.content.Context
 import com.powersync.DatabaseDriverFactory
 import com.powersync.PowerSyncDatabase
-import com.powersync.db.Queries
 import com.powersync.sync.SyncStatusData
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -98,19 +97,23 @@ class TozzoDatabase
         }
     }
 
-/** [RejectionSink] on the local-only `sync_rejections` table. */
+/**
+ * [RejectionSink] on the local-only `sync_rejections` table, through [execute] (`Queries.execute`).
+ * One row per op id: a crash between recording and completing the batch must not add a second row.
+ */
 class DatabaseRejectionSink(
-    private val db: Queries,
+    private val execute: suspend (sql: String, params: List<Any?>) -> Unit,
 ) : RejectionSink {
     override suspend fun record(
         op: PendingOp,
         opId: String,
         result: UploadResult,
     ) {
-        db.execute(
+        execute(
             "INSERT INTO $SYNC_REJECTIONS_TABLE (id, op_id, table_name, row_id, op, code, detail, created_at) " +
-                "VALUES (uuid(), ?, ?, ?, ?, ?, ?, ?)",
-            listOf(opId, op.table, op.id, op.op, result.code, result.detail, Instant.now().toString()),
+                "SELECT uuid(), ?, ?, ?, ?, ?, ?, ? " +
+                "WHERE NOT EXISTS (SELECT 1 FROM $SYNC_REJECTIONS_TABLE WHERE op_id = ?)",
+            listOf(opId, op.table, op.id, op.op, result.code, result.detail, Instant.now().toString(), opId),
         )
     }
 }

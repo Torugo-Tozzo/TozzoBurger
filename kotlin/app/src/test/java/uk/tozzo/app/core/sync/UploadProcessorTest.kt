@@ -73,7 +73,7 @@ class UploadProcessorTest {
         }
 
     @Test
-    fun appliedAndDuplicateAreNotRecorded() =
+    fun appliedAndDuplicateWithoutCodeAreNotRecorded() =
         runTest {
             server.enqueue(
                 results(
@@ -85,6 +85,55 @@ class UploadProcessorTest {
             processor.process(listOf(sale, order))
 
             assertTrue(sink.records.isEmpty())
+        }
+
+    @Test
+    fun duplicateWithCodeIsRecorded() =
+        runTest {
+            val orderOpId = UploadMapper.opId(DEVICE, 3)
+            val duplicate = UploadResult(orderOpId, "duplicate", "SYNC_OP_INVALID", null)
+            server.enqueue(
+                results(
+                    """{"opId":"${UploadMapper.opId(DEVICE, 1)}","status":"duplicate"}""",
+                    ApiJson.encodeToString(UploadResult.serializer(), duplicate),
+                ),
+            )
+
+            processor.process(listOf(sale, order))
+
+            assertEquals(listOf(Triple(order, orderOpId, duplicate)), sink.records)
+        }
+
+    @Test
+    fun badItemsJsonIsRecordedLocallyAndTheRestIsSent() =
+        runTest {
+            val bad = PendingOp(5, "PUT", "sales", "sale-bad", mapOf("items_json" to "{not json"))
+            server.enqueue(results())
+
+            processor.process(listOf(bad, order))
+
+            assertEquals(listOf(UploadMapper.opId(DEVICE, 3)), sentOpIds())
+            assertEquals(1, sink.records.size)
+            val (op, opId, result) = sink.records.single()
+            assertEquals(bad, op)
+            assertEquals(UploadMapper.opId(DEVICE, 5), opId)
+            assertEquals(opId, result.opId)
+            assertEquals("rejected", result.status)
+            assertEquals("LOCAL_INVALID_DATA", result.code)
+            assertTrue(!result.detail.isNullOrBlank())
+        }
+
+    @Test
+    fun onlyBadOpsMakeNoRequestAndAreAllRecorded() =
+        runTest {
+            val notJson = PendingOp(5, "PUT", "sales", "s5", mapOf("items_json" to "{not json"))
+            val notArray = PendingOp(6, "PUT", "sales", "s6", mapOf("items_json" to """{"a":1}"""))
+
+            processor.process(listOf(notJson, notArray))
+
+            assertEquals(0, server.requestCount)
+            assertEquals(listOf("s5", "s6"), sink.records.map { it.first.id })
+            assertTrue(sink.records.all { it.third.code == "LOCAL_INVALID_DATA" })
         }
 
     @Test
