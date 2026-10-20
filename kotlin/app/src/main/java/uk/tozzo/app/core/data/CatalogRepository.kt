@@ -5,6 +5,8 @@ import kotlinx.coroutines.flow.map
 import uk.tozzo.app.domain.Money
 import uk.tozzo.app.domain.Product
 import uk.tozzo.app.domain.ProductType
+import java.text.Normalizer
+import java.util.Locale
 import javax.inject.Inject
 
 private const val PRODUCT_COLUMNS = "p.id, p.name, p.price, p.ingredients, p.product_type_id, p.image_key"
@@ -37,8 +39,10 @@ class CatalogRepository
         }
 
         /**
-         * Live products, by name, whose type is active or absent; [search] matches the name, ignoring case.
-         * A product whose price is not a valid decimal is left out (it would sell for a wrong amount).
+         * Live products, by name, whose type is active or absent; [search] matches the name ignoring case and
+         * accents ("pao" finds "PÃO"): SQLite folds only ASCII, so the match runs here on a capped read.
+         * A product whose price is not a valid decimal is left out (it would sell for a wrong amount), and
+         * [limit] counts the products that remain.
          */
         fun products(
             search: String,
@@ -47,21 +51,25 @@ class CatalogRepository
         ): Flow<List<Product>> {
             val params = mutableListOf<Any?>()
             var where = ""
-            if (search.isNotBlank()) {
-                where += " AND lower(p.name) LIKE ? ESCAPE '\\'"
-                params += "%${escapeLike(search.trim().lowercase())}%"
-            }
             if (typeId != null) {
                 where += " AND p.product_type_id = ?"
                 params += typeId
             }
-            params += limit
+            params += READ_CAP
+            val needle = fold(search)
             return sql
                 .watch(
                     "SELECT $PRODUCT_COLUMNS $PRODUCT_FROM$where ORDER BY p.name COLLATE NOCASE, p.id LIMIT ?",
                     params,
                     ::toProduct,
-                ).map { it.filterNotNull() }
+                ).map { rows ->
+                    rows
+                        .asSequence()
+                        .filterNotNull()
+                        .filter { needle.isEmpty() || fold(it.name).contains(needle) }
+                        .take(limit)
+                        .toList()
+                }
         }
 
         /** One live product by id, whatever its type (an order keeps showing the items it already has). */
@@ -85,5 +93,12 @@ class CatalogRepository
             )
         }
 
-        private fun escapeLike(text: String) = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        private fun fold(text: String): String =
+            Normalizer
+                .normalize(text.trim(), Normalizer.Form.NFD)
+                .replace(ACCENTS, "")
+                .lowercase(Locale.ROOT)
     }
+
+private const val READ_CAP = 5000
+private val ACCENTS = Regex("\\p{InCombiningDiacriticalMarks}+")

@@ -89,6 +89,28 @@ class CatalogRepositoryTest {
         }
 
     @Test
+    fun searchIgnoresCaseOfAccentedLetters() =
+        runTest {
+            product("p1", "ÁGUA")
+            product("p2", "PÃO DE QUEIJO")
+            product("p3", "Coke")
+
+            assertEquals(listOf("ÁGUA"), repo.products("água", null, 50).first().map { it.name })
+            assertEquals(listOf("PÃO DE QUEIJO"), repo.products("pao", null, 50).first().map { it.name })
+            assertEquals(listOf("PÃO DE QUEIJO"), repo.products("Pão de", null, 50).first().map { it.name })
+        }
+
+    @Test
+    fun limitCountsOnlyProductsWithAValidPrice() =
+        runTest {
+            product("p1", "A bad", price = "abc")
+            product("p2", "B ok")
+            product("p3", "C ok")
+
+            assertEquals(listOf("B ok", "C ok"), repo.products("", null, 2).first().map { it.name })
+        }
+
+    @Test
     fun searchTreatsPercentAndUnderscoreAsPlainText() =
         runTest {
             product("p1", "100% beef")
