@@ -129,4 +129,23 @@
     <string name="notice_open_plan">Ver planos no site</string>
     <string name="settings_logout_hint">Sair mantém este aparelho vinculado e os dados guardados. Só o mesmo usuário consegue entrar de novo.</string>
     <string name="nav_more_options">Mais opções</string>
+    <string name="catalog_burger">Hambúrguer</string>
+    <string name="catalog_pizza">Pizza</string>
+    <string name="catalog_drink">Bebidas</string>
+    <string name="catalog_fries">Batata frita</string>
+    <string name="catalog_dessert">Sobremesas</string>
+    <string name="catalog_side">Acompanhamentos</string>
+    <string name="catalog_hot_dog">Cachorro-quente</string>
+    <string name="catalog_extra">Adicional</string>
+    <string name="catalog_other">Outros</string>
+    <string name="type_all">Todas</string>
+    <string name="payment_cash">Dinheiro</string>
+    <string name="payment_pix">Pix</string>
+    <string name="payment_credit_card">Crédito</string>
+    <string name="payment_debit_card">Débito</string>
+    <string name="payment_on_account">Fiado</string>
+    <string name="payment_not_informed">Não informado</string>
+    <string name="payment_method_label">Pagamento</string>
+    <string name="picker_search">Buscar produto...</string>
+    <string name="picker_empty">Nenhum produto encontrado.</string>
 </resources>

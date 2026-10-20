@@ -127,4 +127,23 @@
     <string name="notice_open_plan">Open plans on the website</string>
     <string name="settings_logout_hint">Signing out keeps this device linked and its data stored. Only the same user can sign in again.</string>
     <string name="nav_more_options">More options</string>
+    <string name="catalog_burger">Burger</string>
+    <string name="catalog_pizza">Pizza</string>
+    <string name="catalog_drink">Drinks</string>
+    <string name="catalog_fries">French fries</string>
+    <string name="catalog_dessert">Desserts</string>
+    <string name="catalog_side">Side dishes</string>
+    <string name="catalog_hot_dog">Hot dog</string>
+    <string name="catalog_extra">Extra</string>
+    <string name="catalog_other">Other</string>
+    <string name="type_all">All</string>
+    <string name="payment_cash">Cash</string>
+    <string name="payment_pix">Pix</string>
+    <string name="payment_credit_card">Credit card</string>
+    <string name="payment_debit_card">Debit card</string>
+    <string name="payment_on_account">On account</string>
+    <string name="payment_not_informed">Not specified</string>
+    <string name="payment_method_label">Payment</string>
+    <string name="picker_search">Search products...</string>
+    <string name="picker_empty">No products found.</string>
 </resources>

@@ -4,6 +4,7 @@ package uk.tozzo.app.domain
 
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatterBuilder
@@ -30,7 +31,7 @@ object DbTime {
         if (value.isNullOrBlank()) return null
         return try {
             if (value.contains('T')) {
-                Instant.parse(value)
+                OffsetDateTime.parse(value, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toInstant()
             } else {
                 LocalDateTime.parse(value, syncParse).toInstant(ZoneOffset.UTC)
             }

@@ -125,4 +125,23 @@
     <string name="notice_open_plan">在网站上查看套餐</string>
     <string name="settings_logout_hint">退出登录会保留此设备的绑定和数据。只有同一用户可以再次登录。</string>
     <string name="nav_more_options">更多选项</string>
+    <string name="catalog_burger">汉堡包</string>
+    <string name="catalog_pizza">披萨</string>
+    <string name="catalog_drink">饮料</string>
+    <string name="catalog_fries">炸薯条</string>
+    <string name="catalog_dessert">甜点</string>
+    <string name="catalog_side">配菜</string>
+    <string name="catalog_hot_dog">热狗</string>
+    <string name="catalog_extra">额外配料</string>
+    <string name="catalog_other">其他</string>
+    <string name="type_all">全部</string>
+    <string name="payment_cash">现金</string>
+    <string name="payment_pix">Pix</string>
+    <string name="payment_credit_card">信用卡</string>
+    <string name="payment_debit_card">借记卡</string>
+    <string name="payment_on_account">赊账</string>
+    <string name="payment_not_informed">未指定</string>
+    <string name="payment_method_label">付款</string>
+    <string name="picker_search">搜索商品...</string>
+    <string name="picker_empty">未找到商品。</string>
 </resources>

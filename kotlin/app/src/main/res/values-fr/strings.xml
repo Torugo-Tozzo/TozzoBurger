@@ -129,4 +129,23 @@
     <string name="notice_open_plan">Voir les forfaits sur le site</string>
     <string name="settings_logout_hint">Se déconnecter garde cet appareil lié et ses données enregistrées. Seul le même utilisateur peut se reconnecter.</string>
     <string name="nav_more_options">Plus d\'options</string>
+    <string name="catalog_burger">Hamburger</string>
+    <string name="catalog_pizza">Pizza</string>
+    <string name="catalog_drink">Boissons</string>
+    <string name="catalog_fries">Frites</string>
+    <string name="catalog_dessert">Desserts</string>
+    <string name="catalog_side">Accompagnements</string>
+    <string name="catalog_hot_dog">Hot-dog</string>
+    <string name="catalog_extra">Supplément</string>
+    <string name="catalog_other">Autre</string>
+    <string name="type_all">Toutes</string>
+    <string name="payment_cash">Espèces</string>
+    <string name="payment_pix">Pix</string>
+    <string name="payment_credit_card">Carte de crédit</string>
+    <string name="payment_debit_card">Carte de débit</string>
+    <string name="payment_on_account">À crédit</string>
+    <string name="payment_not_informed">Non indiqué</string>
+    <string name="payment_method_label">Paiement</string>
+    <string name="picker_search">Rechercher un produit...</string>
+    <string name="picker_empty">Aucun produit trouvé.</string>
 </resources>

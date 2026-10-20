@@ -129,4 +129,23 @@
     <string name="notice_open_plan">Ver planes en el sitio web</string>
     <string name="settings_logout_hint">Cerrar sesión mantiene este dispositivo vinculado y sus datos guardados. Solo el mismo usuario puede volver a entrar.</string>
     <string name="nav_more_options">Más opciones</string>
+    <string name="catalog_burger">Hamburguesa</string>
+    <string name="catalog_pizza">Pizza</string>
+    <string name="catalog_drink">Bebidas</string>
+    <string name="catalog_fries">Papas fritas</string>
+    <string name="catalog_dessert">Postres</string>
+    <string name="catalog_side">Acompañamientos</string>
+    <string name="catalog_hot_dog">Perrito caliente</string>
+    <string name="catalog_extra">Extra</string>
+    <string name="catalog_other">Otros</string>
+    <string name="type_all">Todas</string>
+    <string name="payment_cash">Efectivo</string>
+    <string name="payment_pix">Pix</string>
+    <string name="payment_credit_card">Tarjeta de crédito</string>
+    <string name="payment_debit_card">Tarjeta de débito</string>
+    <string name="payment_on_account">A cuenta</string>
+    <string name="payment_not_informed">No indicado</string>
+    <string name="payment_method_label">Pago</string>
+    <string name="picker_search">Buscar productos...</string>
+    <string name="picker_empty">No se encontraron productos.</string>
 </resources>

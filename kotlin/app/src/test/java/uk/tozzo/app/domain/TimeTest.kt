@@ -35,4 +35,10 @@ class TimeTest {
         assertEquals("2026-10-20T12:00:00.000Z", DbTime.toRfc3339("2026-10-20 12:00:00.000"))
         assertNull(DbTime.toRfc3339("nope"))
     }
+
+    @Test
+    fun isoOffsetsOtherThanZAreAccepted() {
+        assertEquals(Instant.parse("2026-10-20T12:00:00Z"), DbTime.parse("2026-10-20T12:00:00+00:00"))
+        assertEquals(Instant.parse("2026-10-20T12:00:00Z"), DbTime.parse("2026-10-20T09:00:00-03:00"))
+    }
 }
