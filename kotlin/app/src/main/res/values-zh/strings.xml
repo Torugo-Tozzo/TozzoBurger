@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tozzo</string>
+    <string name="nav_orders">订单</string>
+    <string name="nav_kitchen">厨房</string>
+    <string name="nav_deliveries">配送</string>
+    <string name="nav_sales">销售</string>
+    <string name="nav_products">产品</string>
+    <string name="nav_services">服务目录</string>
+    <string name="nav_estimates">报价</string>
+    <string name="nav_service_orders">服务</string>
+    <string name="nav_employees">员工</string>
+    <string name="nav_schedule">排班</string>
+    <string name="nav_devices">设备</string>
+    <string name="nav_reports">报告</string>
+    <string name="nav_settings">设置</string>
+    <string name="action_logout">退出登录</string>
+    <string name="nav_sell">收银</string>
+    <string name="nav_group_operation">运营</string>
+    <string name="nav_group_catalog">目录</string>
+    <string name="nav_group_management">管理</string>
+</resources>

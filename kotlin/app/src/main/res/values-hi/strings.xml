@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tozzo</string>
+    <string name="nav_orders">ऑर्डर</string>
+    <string name="nav_kitchen">रसोई</string>
+    <string name="nav_deliveries">डिलीवरी</string>
+    <string name="nav_sales">बिक्री</string>
+    <string name="nav_products">उत्पाद</string>
+    <string name="nav_services">सेवा सूची</string>
+    <string name="nav_estimates">अनुमान</string>
+    <string name="nav_service_orders">सेवाएँ</string>
+    <string name="nav_employees">कर्मचारी</string>
+    <string name="nav_schedule">समय सारणी</string>
+    <string name="nav_devices">डिवाइस</string>
+    <string name="nav_reports">रिपोर्ट</string>
+    <string name="nav_settings">सेटिंग्स</string>
+    <string name="action_logout">लॉग आउट</string>
+    <string name="nav_sell">बेचें</string>
+    <string name="nav_group_operation">संचालन</string>
+    <string name="nav_group_catalog">सूची</string>
+    <string name="nav_group_management">प्रबंधन</string>
+</resources>

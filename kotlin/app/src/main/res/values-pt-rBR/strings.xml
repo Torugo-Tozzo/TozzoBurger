@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tozzo</string>
+    <string name="nav_orders">Pedidos</string>
+    <string name="nav_kitchen">Cozinha</string>
+    <string name="nav_deliveries">Entregas</string>
+    <string name="nav_sales">Vendas</string>
+    <string name="nav_products">Produtos</string>
+    <string name="nav_services">Catálogo de serviços</string>
+    <string name="nav_estimates">Orçamentos</string>
+    <string name="nav_service_orders">Serviços</string>
+    <string name="nav_employees">Funcionários</string>
+    <string name="nav_schedule">Horários</string>
+    <string name="nav_devices">Dispositivos</string>
+    <string name="nav_reports">Relatórios</string>
+    <string name="nav_settings">Configurações</string>
+    <string name="action_logout">Sair</string>
+    <string name="nav_sell">Vender</string>
+    <string name="nav_group_operation">Operação</string>
+    <string name="nav_group_catalog">Cadastro</string>
+    <string name="nav_group_management">Gestão</string>
+</resources>
