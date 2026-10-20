@@ -1,6 +1,7 @@
 package uk.tozzo.app.domain
 
 import androidx.annotation.StringRes
+import kotlinx.serialization.Serializable
 import uk.tozzo.app.R
 
 enum class Role {
@@ -37,6 +38,7 @@ enum class BusinessModule {
     SETTINGS,
 }
 
+@Serializable
 data class EstablishmentModules(
     val category: String?,
     val businessProfiles: List<BusinessProfile>?,

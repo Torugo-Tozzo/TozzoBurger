@@ -33,6 +33,13 @@ class ApiProblemTest {
     }
 
     @Test
+    fun limitIsParsed() {
+        val body = """{"title":"Limit","status":409,"code":"DEVICE_LIMIT_REACHED","limit":3}"""
+
+        assertEquals(3, httpError(409, body).toApiProblem()?.limit)
+    }
+
+    @Test
     fun emptyBodyIsNull() {
         assertNull(httpError(500, "").toApiProblem())
     }

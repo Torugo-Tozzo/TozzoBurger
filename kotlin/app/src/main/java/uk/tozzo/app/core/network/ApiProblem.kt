@@ -11,6 +11,8 @@ data class ApiProblem(
     val code: String,
     val title: String,
     val detail: String?,
+    /** The device limit, carried by `DEVICE_LIMIT_REACHED`. */
+    val limit: Int? = null,
 )
 
 class ApiException(
@@ -23,6 +25,7 @@ private data class ProblemBody(
     val status: Int,
     val code: String,
     val detail: String? = null,
+    val limit: Int? = null,
 )
 
 /** The API problem carried by this error, or null when it is not an API error with a problem body. */
@@ -38,7 +41,7 @@ internal fun parseProblem(body: String): ApiProblem? {
     if (body.isBlank()) return null
     return try {
         val parsed = ApiJson.decodeFromString(ProblemBody.serializer(), body)
-        ApiProblem(parsed.status, parsed.code, parsed.title, parsed.detail)
+        ApiProblem(parsed.status, parsed.code, parsed.title, parsed.detail, parsed.limit)
     } catch (_: SerializationException) {
         null
     }
