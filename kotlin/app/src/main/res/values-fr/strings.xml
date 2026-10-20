@@ -28,6 +28,7 @@
     <string name="login_error_credentials">E-mail ou mot de passe incorrect.</string>
     <string name="login_error_email_not_verified">Vérifiez votre e-mail avant de vous connecter.</string>
     <string name="login_error_other_user">Cet appareil est lié à un autre utilisateur.</string>
+    <string name="login_error_unsent_data">Cet appareil contient des modifications non envoyées d’un compte qu’il ne peut plus identifier. Pour les protéger, la connexion est bloquée ici. Contactez le support Tozzo.</string>
     <string name="login_error_device_limit">Cet établissement a atteint la limite de %1$d appareils.</string>
     <string name="login_error_offline">Pas de connexion internet. Réessayez.</string>
     <string name="login_error_generic">Connexion impossible. Réessayez.</string>

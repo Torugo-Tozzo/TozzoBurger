@@ -101,6 +101,7 @@ class LoginViewModelTest {
         assertError(LoginResult.InvalidCredentials, UiText(R.string.login_error_credentials))
         assertError(LoginResult.EmailNotVerified, UiText(R.string.login_error_email_not_verified))
         assertError(LoginResult.OtherUserBound, UiText(R.string.login_error_other_user))
+        assertError(LoginResult.UnsentDataOfUnknownUser, UiText(R.string.login_error_unsent_data))
         assertError(LoginResult.DeviceLimitReached(3), UiText(R.string.login_error_device_limit, listOf(3)))
         assertError(LoginResult.DeviceLimitReached(null), UiText(R.string.login_error_device_limit_generic))
         assertError(LoginResult.Offline, UiText(R.string.login_error_offline))

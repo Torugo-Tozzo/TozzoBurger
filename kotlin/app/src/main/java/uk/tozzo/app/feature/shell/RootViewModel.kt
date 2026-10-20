@@ -65,12 +65,14 @@ class RootViewModel
         val paymentRequired: StateFlow<Boolean> = _paymentRequired.asStateFlow()
 
         val syncBadge: StateFlow<SyncBadgeState> =
-            combine(syncController.state, syncController.rejectionCount, ::SyncBadgeState)
-                .stateIn(
-                    viewModelScope,
-                    SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-                    SyncBadgeState(syncController.state.value, rejections = 0),
-                )
+            // An unreadable rejections table shows the sync state alone.
+            combine(syncController.state, syncController.rejectionCount) { state, rejections ->
+                SyncBadgeState(state, rejections ?: 0)
+            }.stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+                SyncBadgeState(syncController.state.value, rejections = 0),
+            )
 
         // Bumped by every transition; a resolve() that started before a newer one does not apply.
         private var transition = 0

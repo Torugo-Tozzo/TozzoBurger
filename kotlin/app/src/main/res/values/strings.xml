@@ -28,6 +28,7 @@
     <string name="login_error_credentials">Wrong email or password.</string>
     <string name="login_error_email_not_verified">Verify your email before signing in.</string>
     <string name="login_error_other_user">This device is linked to another user.</string>
+    <string name="login_error_unsent_data">This device has unsent changes from an account it can no longer identify. To keep them safe, sign-in is blocked here. Contact Tozzo support.</string>
     <string name="login_error_device_limit">This establishment reached its limit of %1$d devices.</string>
     <string name="login_error_offline">No internet connection. Try again.</string>
     <string name="login_error_generic">Could not sign in. Try again.</string>

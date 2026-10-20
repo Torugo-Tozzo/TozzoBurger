@@ -2,6 +2,7 @@ package uk.tozzo.app.feature.shell
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -21,6 +22,7 @@ import uk.tozzo.app.core.session.SessionEvents
 import uk.tozzo.app.core.session.TokenStore
 import uk.tozzo.app.core.sync.LocalSyncStatus
 import uk.tozzo.app.core.sync.SyncController
+import uk.tozzo.app.core.sync.SyncState
 import uk.tozzo.app.domain.AppDestination
 import uk.tozzo.app.domain.BusinessProfile
 import uk.tozzo.app.domain.EstablishmentModules
@@ -241,5 +243,17 @@ class RootViewModelTest {
             db.statusFailure = IllegalStateException("cannot open")
             val vm = RootViewModel(binding, tokens, controller, events)
             assertEquals(RootState.FirstSync, vm.state.value)
+        }
+
+    @Test
+    fun aDatabaseThatFailsToOpenKeepsTheBadgeAndTheRouting() =
+        runTest(UnconfinedTestDispatcher()) {
+            signedIn(hasSynced = true)
+            db.statusFailure = IllegalStateException("cannot open")
+            db.countFailure = IllegalStateException("cannot open")
+            val vm = viewModel()
+            backgroundScope.launch { vm.syncBadge.collect {} }
+            assertEquals(RootState.FirstSync, vm.state.value)
+            assertEquals(SyncBadgeState(SyncState.SYNCING, rejections = 0), vm.syncBadge.value)
         }
 }

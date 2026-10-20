@@ -7,8 +7,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -44,7 +43,8 @@ class FirstSyncViewModel
         init {
             viewModelScope.launch { syncController.start() }
             viewModelScope.launch {
-                syncController.hasSynced.filter { it }.first()
+                // A database that cannot be opened ends the flow without true: stay on this screen.
+                syncController.hasSynced.firstOrNull { it } ?: return@launch
                 doneEvents.send(Unit)
             }
         }

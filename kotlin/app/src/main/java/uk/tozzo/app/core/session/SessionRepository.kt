@@ -33,6 +33,9 @@ sealed interface LoginResult {
 
     data object OtherUserBound : LoginResult
 
+    /** No readable binding, but the upload queue holds changes of some earlier user. */
+    data object UnsentDataOfUnknownUser : LoginResult
+
     data object NoAccess : LoginResult
 
     data object RoleNotYetSupported : LoginResult
@@ -72,6 +75,7 @@ class SessionRepository
         private val deviceBinding: DeviceBinding,
         private val deviceIdentity: DeviceIdentity,
         private val deviceInfo: DeviceInfoSource,
+        private val localData: LocalDataGate,
     ) : LoginService {
         @Suppress("ReturnCount")
         override suspend fun login(
@@ -93,6 +97,12 @@ class SessionRepository
                 return it
             }
             val binding = session.user.toBinding(session.user.establishment.id) ?: return LoginResult.NoAccess
+            if (deviceBinding.current.value == null) {
+                localData.prepareForNewUser()?.let {
+                    logoutNewSession(session)
+                    return it
+                }
+            }
             return bind(session, binding)
         }
 

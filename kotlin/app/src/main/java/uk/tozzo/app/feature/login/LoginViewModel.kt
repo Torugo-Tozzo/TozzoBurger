@@ -68,6 +68,7 @@ private fun LoginResult.errorText(): UiText? =
         LoginResult.InvalidCredentials -> UiText(R.string.login_error_credentials)
         LoginResult.EmailNotVerified -> UiText(R.string.login_error_email_not_verified)
         LoginResult.OtherUserBound -> UiText(R.string.login_error_other_user)
+        LoginResult.UnsentDataOfUnknownUser -> UiText(R.string.login_error_unsent_data)
         is LoginResult.DeviceLimitReached ->
             if (limit != null) {
                 UiText(R.string.login_error_device_limit, listOf(limit))

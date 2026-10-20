@@ -28,6 +28,10 @@ data class LocalSyncStatus(
     val uploading: Boolean,
     /** Null until the SDK has read the stored sync state. */
     val hasSynced: Boolean?,
+    /** The last upload attempt failed (the SDK retries it). */
+    val uploadFailed: Boolean = false,
+    /** The last download or connection attempt failed (the SDK retries it). */
+    val downloadFailed: Boolean = false,
 )
 
 /** A row of [SYNC_REJECTIONS_TABLE]: a local change the server refused. */
@@ -123,7 +127,15 @@ class TozzoDatabase
             database().disconnectAndClear(clearLocal = true)
         }
 
-        private fun SyncStatusData.toLocal() = LocalSyncStatus(connected, downloading, uploading, hasSynced)
+        private fun SyncStatusData.toLocal() =
+            LocalSyncStatus(
+                connected = connected,
+                downloading = downloading,
+                uploading = uploading,
+                hasSynced = hasSynced,
+                uploadFailed = uploadError != null,
+                downloadFailed = downloadError != null,
+            )
 
         private companion object {
             const val DB_FILE = "tozzo.db"

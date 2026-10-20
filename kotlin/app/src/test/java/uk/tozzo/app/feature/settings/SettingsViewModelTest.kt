@@ -150,4 +150,15 @@ class SettingsViewModelTest {
             assertNull(vm.state.value.unbindError)
             assertNull(binding.current.value)
         }
+
+    @Test
+    fun aQueueThatCannotBeReadBlocksTheUnbindWithoutCrashing() =
+        runTest(UnconfinedTestDispatcher()) {
+            db.countFailure = IllegalStateException("cannot open")
+            val vm = viewModel()
+            assertEquals(false, vm.state.value.canUnbind)
+            vm.unbind()
+            assertEquals(0, db.clears)
+            assertEquals("Ana", vm.state.value.userName)
+        }
 }

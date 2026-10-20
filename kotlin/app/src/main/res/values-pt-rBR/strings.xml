@@ -28,6 +28,7 @@
     <string name="login_error_credentials">E-mail ou senha incorretos.</string>
     <string name="login_error_email_not_verified">Confirme seu e-mail antes de entrar.</string>
     <string name="login_error_other_user">Este aparelho está vinculado a outro usuário.</string>
+    <string name="login_error_unsent_data">Este aparelho tem alterações não enviadas de uma conta que ele não consegue mais identificar. Para protegê-las, a entrada está bloqueada aqui. Fale com o suporte do Tozzo.</string>
     <string name="login_error_device_limit">Este estabelecimento atingiu o limite de %1$d aparelhos.</string>
     <string name="login_error_offline">Sem conexão com a internet. Tente novamente.</string>
     <string name="login_error_generic">Não foi possível entrar. Tente novamente.</string>

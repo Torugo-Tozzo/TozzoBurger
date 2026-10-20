@@ -47,8 +47,32 @@ class SessionRepositoryTest {
     private lateinit var bareApi: AuthApi
     private lateinit var deviceApi: DeviceApi
 
+    private val localData = FakeLocalData()
+
     private fun newRepo(tokens: TokenStore) =
-        SessionRepository(mainApi, bareApi, deviceApi, tokens, binding, identity, FakeDevice)
+        SessionRepository(mainApi, bareApi, deviceApi, tokens, binding, identity, FakeDevice, localData)
+
+    /** Records what the sign-in saw of the session when it cleared the local data. */
+    private inner class FakeLocalData : LocalDataGate {
+        var pending = 0
+        var readFailure: Exception? = null
+        var clearFailure: Exception? = null
+        var clears = 0
+        var tokenAtClear: String? = "not cleared"
+        var bindingAtClear: Binding? = null
+
+        override suspend fun readPendingOpCount(): Int {
+            readFailure?.let { throw it }
+            return pending
+        }
+
+        override suspend fun clearLocalData() {
+            clearFailure?.let { throw it }
+            clears++
+            tokenAtClear = tokenStore.refreshToken()
+            bindingAtClear = binding.current.value
+        }
+    }
 
     private var loginResponse: () -> MockResponse = { loginOk() }
     private var registerResponse: () -> MockResponse = { MockResponse().setResponseCode(204) }
@@ -235,6 +259,7 @@ class SessionRepositoryTest {
             assertEquals(before.userId, (result as LoginResult.Success).binding.userId)
             assertEquals(ESTABLISHMENT, binding.current.value?.establishmentId)
             assertEquals(1, count("POST /v1/devices"))
+            assertEquals(0, localData.clears)
         }
 
     @Test
@@ -244,6 +269,55 @@ class SessionRepositoryTest {
 
             assertEquals(LoginResult.NoAccess, repo.login("a@b.c", "x"))
             assertNothingSaved()
+            assertEquals(0, localData.clears)
+        }
+
+    @Test
+    fun noReadableBindingClearsTheLocalDataBeforeBinding() =
+        runTest {
+            val result = repo.login("a@b.c", "x")
+
+            assertInstanceOf(LoginResult.Success::class.java, result)
+            assertEquals(1, localData.clears)
+            assertNull(localData.tokenAtClear)
+            assertNull(localData.bindingAtClear)
+            assertEquals(USER_A, binding.current.value?.userId)
+        }
+
+    @Test
+    fun noReadableBindingWithPendingOpsRefusesTheLogin() =
+        runTest {
+            localData.pending = 2
+
+            assertEquals(LoginResult.UnsentDataOfUnknownUser, repo.login("a@b.c", "x"))
+
+            assertEquals(0, localData.clears)
+            assertNothingSaved()
+            assertEquals(1, count("POST /v1/auth/logout"))
+            assertEquals("Bearer access-a", authHeaders["POST /v1/auth/logout"])
+        }
+
+    @Test
+    fun failedClearRefusesTheLogin() =
+        runTest {
+            localData.clearFailure = IllegalStateException("sqlite")
+
+            assertEquals(LoginResult.Failed(null), repo.login("a@b.c", "x"))
+
+            assertNothingSaved()
+            assertEquals(1, count("POST /v1/auth/logout"))
+        }
+
+    @Test
+    fun unreadableQueueRefusesTheLogin() =
+        runTest {
+            localData.readFailure = IllegalStateException("cannot open")
+
+            assertEquals(LoginResult.Failed(null), repo.login("a@b.c", "x"))
+
+            assertEquals(0, localData.clears)
+            assertNothingSaved()
+            assertEquals(1, count("POST /v1/auth/logout"))
         }
 
     @Test

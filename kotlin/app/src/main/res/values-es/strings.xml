@@ -28,6 +28,7 @@
     <string name="login_error_credentials">Correo o contraseña incorrectos.</string>
     <string name="login_error_email_not_verified">Verifica tu correo antes de iniciar sesión.</string>
     <string name="login_error_other_user">Este dispositivo está vinculado a otro usuario.</string>
+    <string name="login_error_unsent_data">Este dispositivo tiene cambios sin enviar de una cuenta que ya no puede identificar. Para protegerlos, el inicio de sesión está bloqueado aquí. Contacta con el soporte de Tozzo.</string>
     <string name="login_error_device_limit">Este establecimiento alcanzó el límite de %1$d dispositivos.</string>
     <string name="login_error_offline">Sin conexión a internet. Inténtalo de nuevo.</string>
     <string name="login_error_generic">No se pudo iniciar sesión. Inténtalo de nuevo.</string>

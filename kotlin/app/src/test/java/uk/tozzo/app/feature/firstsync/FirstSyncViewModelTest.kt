@@ -5,6 +5,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -79,11 +81,28 @@ class FirstSyncViewModelTest {
             }
         }
 
+    @Test
+    fun `a database that fails to open does not crash the first sync`() =
+        runTest(UnconfinedTestDispatcher()) {
+            db.openFailure = IllegalStateException("cannot open")
+            online.value = true
+            val vm = viewModel()
+            vm.done.test { expectNoEvents() }
+            assertEquals(FirstSyncUiState(offline = false), vm.state.value)
+        }
+
     private class FakeDb : LocalDatabase {
         var connects = 0
         val status = MutableStateFlow(LocalSyncStatus(false, false, false, false))
 
-        override fun status(): Flow<LocalSyncStatus> = status
+        /** Makes the status fail, like a database that cannot be opened. */
+        var openFailure: Exception? = null
+
+        override fun status(): Flow<LocalSyncStatus> =
+            flow {
+                openFailure?.let { throw it }
+                emitAll(status)
+            }
 
         override fun watchRejections(): Flow<List<SyncRejection>> = MutableStateFlow(emptyList())
 

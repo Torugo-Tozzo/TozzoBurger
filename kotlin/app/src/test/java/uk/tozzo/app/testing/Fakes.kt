@@ -82,6 +82,12 @@ class FakeLocalDatabase(
     /** Makes every status collection started from now on throw. */
     var statusFailure: Exception? = null
 
+    /** Makes every count query started from now on throw. */
+    var countFailure: Exception? = null
+
+    /** Makes every rejections query started from now on throw. */
+    var rejectionsFailure: Exception? = null
+
     /** Queries whose count is never emitted (the first read has not finished). */
     val unreadCounts = mutableSetOf<String>()
 
@@ -95,11 +101,16 @@ class FakeLocalDatabase(
 
     override fun watchCount(sql: String): Flow<Int> =
         flow {
+            countFailure?.let { throw it }
             if (sql in unreadCounts) awaitCancellation()
             emitAll(count(sql))
         }
 
-    override fun watchRejections(): Flow<List<SyncRejection>> = rejections
+    override fun watchRejections(): Flow<List<SyncRejection>> =
+        flow {
+            rejectionsFailure?.let { throw it }
+            emitAll(rejections)
+        }
 
     override suspend fun connect() {
         connects++

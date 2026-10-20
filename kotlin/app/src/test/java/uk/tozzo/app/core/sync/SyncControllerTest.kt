@@ -3,11 +3,14 @@ package uk.tozzo.app.core.sync
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import uk.tozzo.app.core.session.Binding
 import uk.tozzo.app.core.session.DeviceBinding
@@ -135,6 +138,88 @@ class SyncControllerTest {
         }
 
     @Test
+    fun onlineButNotConnectedIsNotSynced() =
+        runTest(UnconfinedTestDispatcher()) {
+            online.value = true
+            val sync = controller()
+
+            db.status.value = status(false, false, false, true)
+
+            assertEquals(SyncState.SYNCING, sync.state.value)
+        }
+
+    @Test
+    fun uploadOrDownloadErrorIsNotSynced() =
+        runTest(UnconfinedTestDispatcher()) {
+            online.value = true
+            val sync = controller()
+
+            db.status.value = status(true, false, false, true).copy(uploadFailed = true)
+            assertEquals(SyncState.SYNCING, sync.state.value)
+
+            db.status.value = status(true, false, false, true).copy(downloadFailed = true)
+            assertEquals(SyncState.SYNCING, sync.state.value)
+
+            db.status.value = status(true, false, false, true)
+            assertEquals(SyncState.SYNCED, sync.state.value)
+        }
+
+    @Test
+    fun pendingOpsAreNotSynced() =
+        runTest(UnconfinedTestDispatcher()) {
+            val pending = MutableStateFlow(3)
+            db.counts[PENDING_OPS_SQL] = pending
+            online.value = true
+            val sync = controller()
+            db.status.value = status(true, false, false, true)
+
+            assertEquals(SyncState.SYNCING, sync.state.value)
+
+            pending.value = 0
+            assertEquals(SyncState.SYNCED, sync.state.value)
+        }
+
+    @Test
+    fun databaseThatFailsToOpenGivesSafeValues() =
+        runTest(UnconfinedTestDispatcher()) {
+            db.openFailure = IllegalStateException("cannot open")
+            online.value = true
+            val sync = controller()
+
+            assertEquals(SyncState.SYNCING, sync.state.value)
+            assertEquals(false, sync.hasSynced.first())
+            assertNull(sync.pendingOpCount.first())
+            assertNull(sync.rejectionCount.first())
+
+            online.value = false
+            assertEquals(SyncState.OFFLINE, sync.state.value)
+        }
+
+    @Test
+    fun failedConnectKeepsTheReconnectLoop() =
+        runTest(UnconfinedTestDispatcher()) {
+            db.connectFailure = IllegalStateException("cannot open")
+            bind()
+            online.value = true
+            val sync = controller()
+            sync.start()
+            assertEquals(1, db.connects)
+
+            online.value = false
+            online.value = true
+
+            assertEquals(2, db.connects)
+        }
+
+    @Test
+    fun pendingOpCountIsReadOnceForTheLogin() =
+        runTest(UnconfinedTestDispatcher()) {
+            db.counts[PENDING_OPS_SQL] = MutableStateFlow(4)
+
+            assertEquals(4, controller().readPendingOpCount())
+        }
+
+    @Test
     fun hasSyncedAndCountsComeFromTheDatabase() =
         runTest(UnconfinedTestDispatcher()) {
             db.counts[PENDING_OPS_SQL] = MutableStateFlow(5)
@@ -161,14 +246,27 @@ class SyncControllerTest {
         val status = MutableStateFlow(LocalSyncStatus(false, false, false, null))
         val counts = mutableMapOf<String, Flow<Int>>()
 
-        override fun status(): Flow<LocalSyncStatus> = status
+        /** Makes every query fail, like a database that cannot be opened. */
+        var openFailure: Exception? = null
 
-        override fun watchRejections(): Flow<List<SyncRejection>> = MutableStateFlow(emptyList())
+        /** Makes `connect` throw after counting the call. */
+        var connectFailure: Exception? = null
 
-        override fun watchCount(sql: String): Flow<Int> = counts[sql] ?: MutableStateFlow(0)
+        override fun status(): Flow<LocalSyncStatus> = failingOr(status)
+
+        override fun watchRejections(): Flow<List<SyncRejection>> = failingOr(MutableStateFlow(emptyList()))
+
+        override fun watchCount(sql: String): Flow<Int> = failingOr(counts[sql] ?: MutableStateFlow(0))
+
+        private fun <T> failingOr(source: Flow<T>): Flow<T> =
+            flow {
+                openFailure?.let { throw it }
+                emitAll(source)
+            }
 
         override suspend fun connect() {
             connects++
+            connectFailure?.let { throw it }
         }
 
         override suspend fun disconnect() {

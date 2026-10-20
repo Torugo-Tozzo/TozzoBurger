@@ -28,6 +28,7 @@
     <string name="login_error_credentials">ईमेल या पासवर्ड गलत है।</string>
     <string name="login_error_email_not_verified">साइन इन करने से पहले अपना ईमेल सत्यापित करें।</string>
     <string name="login_error_other_user">यह डिवाइस किसी दूसरे उपयोगकर्ता से जुड़ा है।</string>
+    <string name="login_error_unsent_data">इस डिवाइस में ऐसे खाते के बिना भेजे गए बदलाव हैं जिसे यह अब पहचान नहीं सकता। उन्हें सुरक्षित रखने के लिए यहाँ साइन इन रोका गया है। Tozzo सहायता से संपर्क करें।</string>
     <string name="login_error_device_limit">इस प्रतिष्ठान की %1$d डिवाइस की सीमा पूरी हो चुकी है।</string>
     <string name="login_error_offline">इंटरनेट कनेक्शन नहीं है। फिर से कोशिश करें।</string>
     <string name="login_error_generic">साइन इन नहीं हो सका। फिर से कोशिश करें।</string>
