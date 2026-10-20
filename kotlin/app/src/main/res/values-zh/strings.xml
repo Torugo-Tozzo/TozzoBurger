@@ -27,7 +27,7 @@
     <string name="login_error_required">请输入邮箱和密码。</string>
     <string name="login_error_credentials">邮箱或密码错误。</string>
     <string name="login_error_email_not_verified">请先验证邮箱再登录。</string>
-    <string name="login_error_other_user">此设备已绑定其他用户。</string>
+    <string name="login_error_other_user">此设备已绑定 %1$s。该用户须先在设置中使用\"解除绑定此设备\",其他用户才能登录。</string>
     <string name="login_error_unsent_data">此设备上有一个无法再识别的账户尚未发送的更改。为保护这些更改，此处已禁止登录。请联系 Tozzo 支持。</string>
     <string name="login_error_device_limit">该店铺已达到 %1$d 台设备的上限。</string>
     <string name="login_error_offline">没有网络连接，请重试。</string>
@@ -39,8 +39,6 @@
     <string name="notice_open_web">打开网站</string>
     <string name="notice_no_access_title">无权访问</string>
     <string name="notice_no_access_message">您的账号无权使用此应用。</string>
-    <string name="notice_role_title">该角色暂不可用</string>
-    <string name="notice_role_message">应用暂时不支持您的角色。</string>
     <string name="notice_deleted_title">店铺已删除</string>
     <string name="notice_deleted_message">该店铺已被删除。</string>
     <string name="action_ok">确定</string>
@@ -118,4 +116,13 @@
     <plurals name="unbind_rejections_warning">
         <item quantity="other">%d 条被拒绝的更改将随此设备上的数据一并删除。如仍需要，请先查看列表。</item>
     </plurals>
+    <string name="common_cancel">取消</string>
+    <string name="first_sync_failed_title">无法下载数据</string>
+    <string name="first_sync_failed_message">请检查网络连接后重试,或退出登录。</string>
+    <string name="notice_device_limit_title">已达设备上限</string>
+    <string name="notice_payment_title">待付款</string>
+    <string name="notice_payment_message">请在网站上结清套餐费用,以便继续在此设备上使用 Tozzo。</string>
+    <string name="notice_open_plan">在网站上查看套餐</string>
+    <string name="settings_logout_hint">退出登录会保留此设备的绑定和数据。只有同一用户可以再次登录。</string>
+    <string name="nav_more_options">更多选项</string>
 </resources>

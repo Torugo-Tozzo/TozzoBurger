@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -22,16 +23,19 @@ import uk.tozzo.app.core.session.SecureStore
 import uk.tozzo.app.core.sync.Connectivity
 import uk.tozzo.app.core.sync.LocalDatabase
 import uk.tozzo.app.core.sync.LocalSyncStatus
+import uk.tozzo.app.core.sync.SignOut
 import uk.tozzo.app.core.sync.SyncController
 import uk.tozzo.app.core.sync.SyncRejection
 import uk.tozzo.app.domain.EstablishmentModules
 import uk.tozzo.app.domain.Role
+import uk.tozzo.app.testing.FakeSignOutService
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FirstSyncViewModelTest {
     private val online = MutableStateFlow(false)
     private val db = FakeDb()
     private val binding = DeviceBinding(MemoryStore())
+    private val signOutService = FakeSignOutService()
 
     @BeforeEach
     fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -47,7 +51,8 @@ class FirstSyncViewModelTest {
             object : Connectivity {
                 override val online = this@FirstSyncViewModelTest.online
             }
-        return FirstSyncViewModel(SyncController(db, connectivity, binding, backgroundScope))
+        val sync = SyncController(db, connectivity, binding, backgroundScope)
+        return FirstSyncViewModel(sync, SignOut(signOutService, sync))
     }
 
     @Test
@@ -59,6 +64,76 @@ class FirstSyncViewModelTest {
             assertEquals(FirstSyncUiState(offline = false), vm.state.value)
             online.value = false
             assertEquals(FirstSyncUiState(offline = true), vm.state.value)
+        }
+
+    @Test
+    fun showsErrorAfterTimeout() =
+        runTest(UnconfinedTestDispatcher()) {
+            online.value = true
+            val vm = viewModel()
+
+            // A failed download is reported after 20 s.
+            db.status.value = LocalSyncStatus(true, false, false, false, downloadFailed = true)
+            advanceTimeBy(19_999)
+            assertEquals(FirstSyncUiState(offline = false, failed = false), vm.state.value)
+            advanceTimeBy(2)
+            assertEquals(FirstSyncUiState(offline = false, failed = true), vm.state.value)
+        }
+
+    @Test
+    fun showsErrorAfterThirtySecondsWithoutProgress() =
+        runTest(UnconfinedTestDispatcher()) {
+            online.value = true
+            val vm = viewModel()
+
+            db.status.value = LocalSyncStatus(true, true, false, false)
+            advanceTimeBy(29_999)
+            assertEquals(false, vm.state.value.failed)
+            // Progress (the status changed) starts the wait again.
+            db.status.value = LocalSyncStatus(true, false, false, false)
+            advanceTimeBy(29_999)
+            assertEquals(false, vm.state.value.failed)
+            advanceTimeBy(2)
+            assertEquals(true, vm.state.value.failed)
+        }
+
+    @Test
+    fun offlineShowsConnectMessage() =
+        runTest(UnconfinedTestDispatcher()) {
+            val vm = viewModel()
+            db.status.value = LocalSyncStatus(false, false, false, false, downloadFailed = true)
+
+            advanceTimeBy(120_000)
+
+            // Offline is not an error: the message asks for a connection, with no timer running.
+            assertEquals(FirstSyncUiState(offline = true, failed = false), vm.state.value)
+        }
+
+    @Test
+    fun errorGoesAwayWhenTheDeviceGoesOffline() =
+        runTest(UnconfinedTestDispatcher()) {
+            online.value = true
+            val vm = viewModel()
+            db.status.value = LocalSyncStatus(true, false, false, false, downloadFailed = true)
+            advanceTimeBy(21_000)
+            assertEquals(true, vm.state.value.failed)
+
+            online.value = false
+
+            assertEquals(FirstSyncUiState(offline = true, failed = false), vm.state.value)
+        }
+
+    @Test
+    fun signOutStopsTheSyncAndLeaves() =
+        runTest(UnconfinedTestDispatcher()) {
+            online.value = true
+            val vm = viewModel()
+            vm.signedOut.test {
+                vm.signOut()
+                awaitItem()
+            }
+            assertEquals(1, signOutService.signOuts)
+            assertEquals(1, db.disconnects)
         }
 
     @Test
@@ -112,7 +187,11 @@ class FirstSyncViewModelTest {
             connects++
         }
 
-        override suspend fun disconnect() = Unit
+        var disconnects = 0
+
+        override suspend fun disconnect() {
+            disconnects++
+        }
 
         override suspend fun disconnectAndClear() = Unit
     }

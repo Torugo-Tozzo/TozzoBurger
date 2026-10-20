@@ -51,6 +51,14 @@ fun TozzoButton(
                 disabledContentColor = colors.contentColor.copy(alpha = DISABLED_ALPHA),
             ),
         border = border,
+        elevation =
+            ButtonDefaults.buttonElevation(
+                defaultElevation = 0.dp,
+                pressedElevation = 0.dp,
+                focusedElevation = 0.dp,
+                hoveredElevation = 0.dp,
+                disabledElevation = 0.dp,
+            ),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (loading) {

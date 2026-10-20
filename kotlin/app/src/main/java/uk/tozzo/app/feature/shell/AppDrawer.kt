@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.NavigationDrawerItem
@@ -23,9 +24,11 @@ import uk.tozzo.app.domain.AppDestination
 import uk.tozzo.app.domain.NavGroup
 import uk.tozzo.app.domain.NavItem
 import uk.tozzo.app.domain.Role
+import uk.tozzo.app.ui.icons.TozzoIcons
 
 internal const val DRAWER_TAG = "drawer"
 internal const val DRAWER_ITEM_TAG = "drawer_item"
+internal const val DRAWER_ICON_TAG = "drawer_icon"
 
 /** Drawer content: header, the [items] grouped in their order, and the footer group pinned at the bottom. */
 @Composable
@@ -88,6 +91,13 @@ private fun DrawerItem(
     val scheme = MaterialTheme.colorScheme
     NavigationDrawerItem(
         label = { Text(stringResource(item.label)) },
+        icon = {
+            Icon(
+                TozzoIcons.forDestination(item.destination),
+                contentDescription = null,
+                modifier = Modifier.testTag(DRAWER_ICON_TAG),
+            )
+        },
         selected = selected,
         onClick = { onSelect(item.destination) },
         modifier = Modifier.testTag(DRAWER_ITEM_TAG),
@@ -98,6 +108,8 @@ private fun DrawerItem(
                 selectedTextColor = scheme.background,
                 unselectedContainerColor = scheme.background,
                 unselectedTextColor = scheme.onBackground,
+                selectedIconColor = scheme.background,
+                unselectedIconColor = scheme.onBackground,
             ),
     )
 }

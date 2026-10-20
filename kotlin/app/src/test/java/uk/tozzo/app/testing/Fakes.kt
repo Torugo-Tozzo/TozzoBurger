@@ -13,6 +13,7 @@ import uk.tozzo.app.core.network.RefreshRequest
 import uk.tozzo.app.core.network.SessionBody
 import uk.tozzo.app.core.session.Binding
 import uk.tozzo.app.core.session.SecureStore
+import uk.tozzo.app.core.session.SignOutService
 import uk.tozzo.app.core.sync.Connectivity
 import uk.tozzo.app.core.sync.LocalDatabase
 import uk.tozzo.app.core.sync.LocalSyncStatus
@@ -155,4 +156,16 @@ class FakeAuthApi(
     ) = error("not used")
 
     override suspend fun me(): Me = error("not used")
+}
+
+/** Stands for [uk.tozzo.app.core.session.SessionRepository.signOutKeepingData]. */
+class FakeSignOutService(
+    private val log: CallLog? = null,
+) : SignOutService {
+    var signOuts = 0
+
+    override suspend fun signOutKeepingData() {
+        log?.calls?.add("session.signOut")
+        signOuts++
+    }
 }

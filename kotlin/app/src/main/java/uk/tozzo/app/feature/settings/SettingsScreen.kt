@@ -28,15 +28,17 @@ import uk.tozzo.app.ui.components.ConfirmDialog
 import uk.tozzo.app.ui.components.TozzoButton
 import uk.tozzo.app.ui.components.TozzoCard
 
-/** Gets the [SettingsViewModel] and reports when the device was unbound. */
+/** Gets the [SettingsViewModel] and reports when the device was unbound or signed out. */
 @Composable
 fun SettingsRoute(
     onUnbound: () -> Unit,
+    onSignedOut: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.unbound.collect { onUnbound() } }
-    SettingsScreen(state, BuildConfig.VERSION_NAME, viewModel::unbind)
+    LaunchedEffect(viewModel) { viewModel.signedOut.collect { onSignedOut() } }
+    SettingsScreen(state, BuildConfig.VERSION_NAME, viewModel::unbind, viewModel::signOut)
 }
 
 @Composable
@@ -44,6 +46,7 @@ fun SettingsScreen(
     state: SettingsUiState,
     versionName: String,
     onUnbind: () -> Unit,
+    onSignOut: () -> Unit,
 ) {
     // 0 = no dialog, 1 = the usual confirmation, 2 = the extra one when rejections would be deleted.
     var step by rememberSaveable { mutableIntStateOf(0) }
@@ -58,6 +61,17 @@ fun SettingsScreen(
                 Field(stringResource(R.string.settings_version), versionName)
             }
         }
+        TozzoButton(
+            text = stringResource(R.string.action_logout),
+            onClick = onSignOut,
+            modifier = Modifier.fillMaxWidth(),
+            variant = ButtonVariant.Outline,
+        )
+        Text(
+            stringResource(R.string.settings_logout_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         TozzoButton(
             text = stringResource(R.string.settings_unbind),
             onClick = { step = 1 },

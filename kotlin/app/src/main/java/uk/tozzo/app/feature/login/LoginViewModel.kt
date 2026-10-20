@@ -17,7 +17,22 @@ import uk.tozzo.app.core.session.LoginService
 import uk.tozzo.app.ui.UiText
 import javax.inject.Inject
 
-enum class Notice { NEEDS_WEB_SETUP, NO_ACCESS, ROLE_NOT_YET_SUPPORTED, ESTABLISHMENT_DELETED }
+/** A full-screen explanation that takes the place of the login. */
+sealed interface Notice {
+    data object NeedsWebSetup : Notice
+
+    data object NoAccess : Notice
+
+    data object EstablishmentDeleted : Notice
+
+    /** The establishment has no free device slot; [limit] is how many its plan allows, when known. */
+    data class DeviceLimitReached(
+        val limit: Int?,
+    ) : Notice
+
+    /** The plan is unpaid; the plan page on the website settles it. */
+    data object PaymentRequired : Notice
+}
 
 data class LoginUiState(
     val email: String = "",
@@ -49,7 +64,7 @@ class LoginViewModel
             val current = _state.value
             if (current.loading) return
             val email = current.email.trim()
-            val password = current.password.trim()
+            val password = current.password
             if (email.isEmpty() || password.isEmpty()) {
                 _state.update { it.copy(error = UiText(R.string.login_error_required)) }
                 return
@@ -67,29 +82,25 @@ private fun LoginResult.errorText(): UiText? =
     when (this) {
         LoginResult.InvalidCredentials -> UiText(R.string.login_error_credentials)
         LoginResult.EmailNotVerified -> UiText(R.string.login_error_email_not_verified)
-        LoginResult.OtherUserBound -> UiText(R.string.login_error_other_user)
+        is LoginResult.OtherUserBound -> UiText(R.string.login_error_other_user, listOf(userName))
         LoginResult.UnsentDataOfUnknownUser -> UiText(R.string.login_error_unsent_data)
-        is LoginResult.DeviceLimitReached ->
-            if (limit != null) {
-                UiText(R.string.login_error_device_limit, listOf(limit))
-            } else {
-                UiText(R.string.login_error_device_limit_generic)
-            }
         LoginResult.Offline -> UiText(R.string.login_error_offline)
         is LoginResult.Failed -> UiText(R.string.login_error_generic)
         is LoginResult.Success,
         LoginResult.NoAccess,
-        LoginResult.RoleNotYetSupported,
         LoginResult.NeedsWebSetup,
         LoginResult.EstablishmentDeleted,
+        is LoginResult.DeviceLimitReached,
+        LoginResult.PaymentRequired,
         -> null
     }
 
 private fun LoginResult.notice(): Notice? =
     when (this) {
-        LoginResult.NoAccess -> Notice.NO_ACCESS
-        LoginResult.RoleNotYetSupported -> Notice.ROLE_NOT_YET_SUPPORTED
-        LoginResult.NeedsWebSetup -> Notice.NEEDS_WEB_SETUP
-        LoginResult.EstablishmentDeleted -> Notice.ESTABLISHMENT_DELETED
+        LoginResult.NoAccess -> Notice.NoAccess
+        LoginResult.NeedsWebSetup -> Notice.NeedsWebSetup
+        LoginResult.EstablishmentDeleted -> Notice.EstablishmentDeleted
+        is LoginResult.DeviceLimitReached -> Notice.DeviceLimitReached(limit)
+        LoginResult.PaymentRequired -> Notice.PaymentRequired
         else -> null
     }

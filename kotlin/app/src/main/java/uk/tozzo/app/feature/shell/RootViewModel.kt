@@ -17,6 +17,7 @@ import uk.tozzo.app.core.session.DeviceBinding
 import uk.tozzo.app.core.session.SessionEvent
 import uk.tozzo.app.core.session.SessionEvents
 import uk.tozzo.app.core.session.TokenStore
+import uk.tozzo.app.core.sync.SignOut
 import uk.tozzo.app.core.sync.SyncController
 import uk.tozzo.app.domain.AppDestination
 import uk.tozzo.app.domain.resolveNavigationModules
@@ -47,6 +48,7 @@ sealed interface RootState {
  * Picks the top-level screen from the stored binding, the stored session and the persisted sync
  * status (never the network), and reacts to [SessionEvents].
  */
+@Suppress("TooManyFunctions")
 @HiltViewModel
 class RootViewModel
     @Inject
@@ -55,6 +57,7 @@ class RootViewModel
         private val tokenStore: TokenStore,
         private val syncController: SyncController,
         private val sessionEvents: SessionEvents,
+        private val signOutUseCase: SignOut,
     ) : ViewModel() {
         private val _state = MutableStateFlow<RootState>(RootState.Loading)
         val state: StateFlow<RootState> = _state.asStateFlow()
@@ -98,6 +101,17 @@ class RootViewModel
         fun onFirstSyncDone() {
             val binding = deviceBinding.current.value
             moveTo(binding?.let(::readyOrBlocked) ?: RootState.Login)
+        }
+
+        /** "Sair" (settings, first sync, the cook and driver menu): the session ended, binding and data stay. */
+        fun onSignedOut() = moveTo(RootState.Login)
+
+        /** "Sair" from the shell menu, which has no screen model of its own. */
+        fun signOut() {
+            viewModelScope.launch {
+                signOutUseCase.signOut()
+                onSignedOut()
+            }
         }
 
         /** Settings unbound the device: binding, session and local data are gone. */
@@ -151,7 +165,7 @@ class RootViewModel
                     bestEffort { syncController.clearLocalData() }
                     bestEffort { deviceBinding.clear() }
                     bestEffort { tokenStore.clear() }
-                    moveTo(RootState.Blocked(Notice.ESTABLISHMENT_DELETED))
+                    moveTo(RootState.Blocked(Notice.EstablishmentDeleted))
                 }
             }
         }
@@ -174,7 +188,7 @@ class RootViewModel
 private fun readyOrBlocked(binding: Binding): RootState =
     startDestination(resolveNavigationModules(binding.role, binding.modules))
         ?.let { RootState.Ready(binding, it) }
-        ?: RootState.Blocked(Notice.NO_ACCESS)
+        ?: RootState.Blocked(Notice.NoAccess)
 
 /**
  * The establishment is gone either way: a database or secure store failure must not stop the

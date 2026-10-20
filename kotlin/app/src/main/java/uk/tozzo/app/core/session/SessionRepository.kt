@@ -31,14 +31,15 @@ sealed interface LoginResult {
 
     data object EmailNotVerified : LoginResult
 
-    data object OtherUserBound : LoginResult
+    /** Another user is bound to this device; [userName] is who, so the screen can say it. */
+    data class OtherUserBound(
+        val userName: String,
+    ) : LoginResult
 
     /** No readable binding, but the upload queue holds changes of some earlier user. */
     data object UnsentDataOfUnknownUser : LoginResult
 
     data object NoAccess : LoginResult
-
-    data object RoleNotYetSupported : LoginResult
 
     data object NeedsWebSetup : LoginResult
 
@@ -47,6 +48,9 @@ sealed interface LoginResult {
     ) : LoginResult
 
     data object EstablishmentDeleted : LoginResult
+
+    /** The establishment's plan is unpaid (402); the device cannot be registered. */
+    data object PaymentRequired : LoginResult
 
     data object Offline : LoginResult
 
@@ -63,6 +67,11 @@ interface LoginService {
     ): LoginResult
 }
 
+/** Ends the session and keeps the binding and the local data (a seam for tests). */
+interface SignOutService {
+    suspend fun signOutKeepingData()
+}
+
 /** Signs in, binds this device to one user and keeps that binding across sign-outs. */
 @Singleton
 class SessionRepository
@@ -76,7 +85,8 @@ class SessionRepository
         private val deviceIdentity: DeviceIdentity,
         private val deviceInfo: DeviceInfoSource,
         private val localData: LocalDataGate,
-    ) : LoginService {
+    ) : LoginService,
+        SignOutService {
         @Suppress("ReturnCount")
         override suspend fun login(
             email: String,
@@ -123,7 +133,7 @@ class SessionRepository
             }
 
         /** Ends the session on the server (best effort) and locally, keeping the binding and local data. */
-        suspend fun signOutKeepingData() {
+        override suspend fun signOutKeepingData() {
             runLogout()
             tokenStore.clear()
         }
@@ -175,9 +185,8 @@ class SessionRepository
             val role = Role.parse(user.role)
             val bound = deviceBinding.current.value
             return when {
-                bound != null && bound.userId != user.id -> LoginResult.OtherUserBound
+                bound != null && bound.userId != user.id -> LoginResult.OtherUserBound(bound.userName)
                 role == null || role == Role.CUSTOMER -> LoginResult.NoAccess
-                role == Role.COOK || role == Role.DRIVER -> LoginResult.RoleNotYetSupported
                 user.establishment.status == STATUS_DELETED -> LoginResult.EstablishmentDeleted
                 needsWebSetup(role, user.establishment.toModules()) -> LoginResult.NeedsWebSetup
                 else -> null
@@ -226,7 +235,9 @@ class SessionRepository
 
         private fun failureResult(e: Throwable): LoginResult {
             val problem = e.toApiProblem()
+            val status = problem?.status ?: (e as? HttpException)?.code()
             return when {
+                status == HTTP_PAYMENT_REQUIRED -> LoginResult.PaymentRequired
                 problem?.code == "INVALID_CREDENTIALS" -> LoginResult.InvalidCredentials
                 problem?.code == "EMAIL_NOT_VERIFIED" -> LoginResult.EmailNotVerified
                 problem?.code == "DEVICE_LIMIT_REACHED" -> LoginResult.DeviceLimitReached(problem.limit)
@@ -237,6 +248,7 @@ class SessionRepository
 
         private companion object {
             const val STATUS_DELETED = "DELETED"
+            const val HTTP_PAYMENT_REQUIRED = 402
         }
     }
 

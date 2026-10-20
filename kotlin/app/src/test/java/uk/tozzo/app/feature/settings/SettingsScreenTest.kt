@@ -1,5 +1,6 @@
 package uk.tozzo.app.feature.settings
 
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -20,9 +21,10 @@ class SettingsScreenTest {
     val rule = createComposeRule()
 
     private var unbinds = 0
+    private var signOuts = 0
 
     private fun show(state: SettingsUiState) =
-        rule.setContent { TozzoTheme { SettingsScreen(state, "0.1.0") { unbinds++ } } }
+        rule.setContent { TozzoTheme { SettingsScreen(state, "0.1.0", { unbinds++ }, { signOuts++ }) } }
 
     @Test
     fun showsTheBindingAndVersion() {
@@ -53,6 +55,14 @@ class SettingsScreenTest {
         rule.onNodeWithText("3 alterações recusadas", substring = true).assertExists()
         rule.onNodeWithText("Desvincular mesmo assim").performClick()
         assertEquals(1, unbinds)
+    }
+
+    @Test
+    fun signOutIsAlwaysEnabledAndNeedsNoConfirmation() {
+        show(SettingsUiState(false, R.string.unbind_blocked_offline, "Ana", "Burger da Ana", rejections = 2))
+        rule.onNodeWithText("Sair").assertIsEnabled().performClick()
+        assertEquals(1, signOuts)
+        assertEquals(0, unbinds)
     }
 
     @Test

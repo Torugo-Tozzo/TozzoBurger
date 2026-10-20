@@ -45,6 +45,9 @@ class SyncController(
     // A database that cannot be opened reads as an unknown status (null), never as an exception.
     private val status: Flow<LocalSyncStatus?> = db.status().catchAsNull()
 
+    /** The raw SDK status; every change is progress or failure news for the first sync screen. */
+    val syncStatus: Flow<LocalSyncStatus?> get() = status
+
     /** Whether a full sync ever finished; kept by the SDK in the database, so it survives a restart. */
     val hasSynced: Flow<Boolean> =
         db

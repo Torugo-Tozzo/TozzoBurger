@@ -25,8 +25,8 @@ class BlockedRouteTest {
     }
 
     @Test
-    fun systemBackOnEstablishmentDeletedGoesToLogin() = backLeadsToLogin(Notice.ESTABLISHMENT_DELETED)
+    fun systemBackOnEstablishmentDeletedGoesToLogin() = backLeadsToLogin(Notice.EstablishmentDeleted)
 
     @Test
-    fun systemBackOnNoAccessGoesToLogin() = backLeadsToLogin(Notice.NO_ACCESS)
+    fun systemBackOnNoAccessGoesToLogin() = backLeadsToLogin(Notice.NoAccess)
 }

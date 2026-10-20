@@ -27,7 +27,7 @@
     <string name="login_error_required">Ingresa tu correo y tu contraseña.</string>
     <string name="login_error_credentials">Correo o contraseña incorrectos.</string>
     <string name="login_error_email_not_verified">Verifica tu correo antes de iniciar sesión.</string>
-    <string name="login_error_other_user">Este dispositivo está vinculado a otro usuario.</string>
+    <string name="login_error_other_user">Este dispositivo está vinculado a %1$s. Esa persona debe usar \"Desvincular este dispositivo\" en Configuración antes de que otro usuario pueda entrar.</string>
     <string name="login_error_unsent_data">Este dispositivo tiene cambios sin enviar de una cuenta que ya no puede identificar. Para protegerlos, el inicio de sesión está bloqueado aquí. Contacta con el soporte de Tozzo.</string>
     <string name="login_error_device_limit">Este establecimiento alcanzó el límite de %1$d dispositivos.</string>
     <string name="login_error_offline">Sin conexión a internet. Inténtalo de nuevo.</string>
@@ -39,8 +39,6 @@
     <string name="notice_open_web">Abrir el sitio web</string>
     <string name="notice_no_access_title">Sin acceso</string>
     <string name="notice_no_access_message">Tu cuenta no tiene acceso a esta app.</string>
-    <string name="notice_role_title">Rol aún no disponible</string>
-    <string name="notice_role_message">La app aún no está disponible para tu rol.</string>
     <string name="notice_deleted_title">Establecimiento eliminado</string>
     <string name="notice_deleted_message">Este establecimiento fue eliminado.</string>
     <string name="action_ok">Aceptar</string>
@@ -122,4 +120,13 @@
         <item quantity="many">Se eliminarán %d cambios rechazados junto con los datos de este dispositivo. Revisa la lista antes si aún los necesitas.</item>
         <item quantity="other">Se eliminarán %d cambios rechazados junto con los datos de este dispositivo. Revisa la lista antes si aún los necesitas.</item>
     </plurals>
+    <string name="common_cancel">Cancelar</string>
+    <string name="first_sync_failed_title">No se pudieron descargar los datos</string>
+    <string name="first_sync_failed_message">Revisa tu conexión a internet e inténtalo de nuevo, o cierra sesión.</string>
+    <string name="notice_device_limit_title">Límite de dispositivos alcanzado</string>
+    <string name="notice_payment_title">Pago pendiente</string>
+    <string name="notice_payment_message">Regulariza el pago del plan en el sitio web para seguir usando Tozzo en este dispositivo.</string>
+    <string name="notice_open_plan">Ver planes en el sitio web</string>
+    <string name="settings_logout_hint">Cerrar sesión mantiene este dispositivo vinculado y sus datos guardados. Solo el mismo usuario puede volver a entrar.</string>
+    <string name="nav_more_options">Más opciones</string>
 </resources>

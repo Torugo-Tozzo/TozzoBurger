@@ -22,6 +22,7 @@ import uk.tozzo.app.core.session.Binding
 import uk.tozzo.app.core.session.DeviceBinding
 import uk.tozzo.app.core.session.TokenStore
 import uk.tozzo.app.core.sync.Connectivity
+import uk.tozzo.app.core.sync.SignOut
 import uk.tozzo.app.core.sync.SyncController
 import java.io.IOException
 import javax.inject.Inject
@@ -46,6 +47,7 @@ class SettingsViewModel
         private val deviceBinding: DeviceBinding,
         private val tokenStore: TokenStore,
         private val authApi: AuthApi,
+        private val signOutUseCase: SignOut,
     ) : ViewModel() {
         private val unbindError = MutableStateFlow<Int?>(null)
 
@@ -76,7 +78,27 @@ class SettingsViewModel
         /** Emits once the device is unbound and the app must go back to the login. */
         val unbound: Flow<Unit> = unboundEvents.receiveAsFlow()
 
+        private val signedOutEvents = Channel<Unit>(Channel.BUFFERED)
+
+        /** Emits once the session ended (binding and data kept) and the app must go to the login. */
+        val signedOut: Flow<Unit> = signedOutEvents.receiveAsFlow()
+
         private var unbinding = false
+        private var signingOut = false
+
+        /** "Sair": always allowed. Keeps the binding and the local data, so only the same user signs in again. */
+        fun signOut() {
+            if (signingOut) return
+            signingOut = true
+            viewModelScope.launch {
+                try {
+                    signOutUseCase.signOut()
+                } finally {
+                    signingOut = false
+                }
+                signedOutEvents.send(Unit)
+            }
+        }
 
         /**
          * Deletes the local data, the binding and the session, so another user can sign in. The

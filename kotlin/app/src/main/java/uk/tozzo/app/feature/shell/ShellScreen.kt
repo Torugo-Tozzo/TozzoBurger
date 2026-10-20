@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -20,13 +22,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -39,15 +41,18 @@ import kotlinx.coroutines.launch
 import uk.tozzo.app.R
 import uk.tozzo.app.core.session.Binding
 import uk.tozzo.app.domain.AppDestination
+import uk.tozzo.app.domain.Role
 import uk.tozzo.app.domain.navigationItems
 import uk.tozzo.app.domain.resolveNavigationModules
+import uk.tozzo.app.ui.icons.TozzoIcons
 import uk.tozzo.app.ui.theme.TozzoColors
 
 internal const val SHELL_TITLE_TAG = "shell_title"
 private const val REJECTIONS_ROUTE = "rejections"
 
 /**
- * The signed-in app: drawer, top bar with the sync badge, and one route per [AppDestination].
+ * The signed-in app: top bar with the sync badge, and one route per [AppDestination]. The roles with
+ * a single module (COOK, DRIVER) have no drawer: a ⋮ menu offers Settings and Sign out instead.
  * [settingsContent] and [rejectionsContent] are slots so the screen stays testable without view models.
  */
 @Composable
@@ -56,14 +61,13 @@ fun ShellScreen(
     start: AppDestination,
     badge: SyncBadgeState,
     paymentRequired: Boolean,
+    onSignOut: () -> Unit,
     settingsContent: @Composable () -> Unit,
     rejectionsContent: @Composable () -> Unit,
 ) {
     val items = remember(binding) { navigationItems(resolveNavigationModules(binding.role, binding.modules)) }
     val labels = remember(items) { items.associate { it.destination to it.label } }
     val navController = rememberNavController()
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
     val route =
         navController
             .currentBackStackEntryAsState()
@@ -71,47 +75,86 @@ fun ShellScreen(
             ?.destination
             ?.route ?: start.name
     val current = AppDestination.entries.firstOrNull { it.name == route }
-    val title = if (current == null) R.string.rejections_title else labels[current] ?: R.string.app_name
-
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        gesturesEnabled = true,
-        drawerContent = {
-            AppDrawer(drawerState, binding, items, current) { destination ->
-                navController.openTopLevel(destination, start)
-                scope.launch { drawerState.close() }
-            }
-        },
-    ) {
+    val title =
+        when {
+            current == null -> R.string.rejections_title
+            current == AppDestination.SETTINGS -> R.string.nav_settings
+            else -> labels[current] ?: R.string.app_name
+        }
+    val content: @Composable (navigation: ShellNavigation) -> Unit = { navigation ->
         Scaffold(
             topBar = {
                 ShellTopBar(
                     title = title,
                     badge = badge,
                     paymentRequired = paymentRequired,
-                    onOpenMenu = { scope.launch { drawerState.open() } },
+                    navigation = navigation,
                     onOpenRejections = { navController.navigate(REJECTIONS_ROUTE) { launchSingleTop = true } },
                 )
             },
         ) { padding ->
-            NavHost(
-                navController = navController,
-                startDestination = start.name,
-                modifier = Modifier.fillMaxSize().padding(padding),
-            ) {
-                AppDestination.entries.forEach { destination ->
-                    composable(destination.name) {
-                        if (destination == AppDestination.SETTINGS) {
-                            settingsContent()
-                        } else {
-                            ModulePlaceholderScreen(labels[destination] ?: R.string.app_name)
-                        }
-                    }
-                }
-                composable(REJECTIONS_ROUTE) { rejectionsContent() }
-            }
+            ShellNavHost(navController, start, labels, Modifier.padding(padding), settingsContent, rejectionsContent)
         }
     }
+
+    if (binding.role == Role.COOK || binding.role == Role.DRIVER) {
+        content(
+            ShellNavigation.MoreMenu(
+                onOpenSettings = { navController.openTopLevel(AppDestination.SETTINGS, start) },
+                onSignOut = onSignOut,
+            ),
+        )
+    } else {
+        val drawerState = rememberDrawerState(DrawerValue.Closed)
+        val scope = rememberCoroutineScope()
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            gesturesEnabled = true,
+            drawerContent = {
+                AppDrawer(drawerState, binding, items, current) { destination ->
+                    navController.openTopLevel(destination, start)
+                    scope.launch { drawerState.close() }
+                }
+            },
+        ) {
+            content(ShellNavigation.Drawer(onOpenMenu = { scope.launch { drawerState.open() } }))
+        }
+    }
+}
+
+@Composable
+private fun ShellNavHost(
+    navController: NavHostController,
+    start: AppDestination,
+    labels: Map<AppDestination, Int>,
+    modifier: Modifier,
+    settingsContent: @Composable () -> Unit,
+    rejectionsContent: @Composable () -> Unit,
+) {
+    NavHost(navController = navController, startDestination = start.name, modifier = modifier.fillMaxSize()) {
+        AppDestination.entries.forEach { destination ->
+            composable(destination.name) {
+                if (destination == AppDestination.SETTINGS) {
+                    settingsContent()
+                } else {
+                    ModulePlaceholderScreen(labels[destination] ?: R.string.app_name)
+                }
+            }
+        }
+        composable(REJECTIONS_ROUTE) { rejectionsContent() }
+    }
+}
+
+/** How the user moves around: the drawer's ☰ button, or the ⋮ menu of the roles without a drawer. */
+private sealed interface ShellNavigation {
+    data class Drawer(
+        val onOpenMenu: () -> Unit,
+    ) : ShellNavigation
+
+    data class MoreMenu(
+        val onOpenSettings: () -> Unit,
+        val onSignOut: () -> Unit,
+    ) : ShellNavigation
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -120,24 +163,55 @@ private fun ShellTopBar(
     @StringRes title: Int,
     badge: SyncBadgeState,
     paymentRequired: Boolean,
-    onOpenMenu: () -> Unit,
+    navigation: ShellNavigation,
     onOpenRejections: () -> Unit,
 ) {
     Column {
         TopAppBar(
             title = { Text(stringResource(title), modifier = Modifier.testTag(SHELL_TITLE_TAG)) },
             navigationIcon = {
-                IconButton(onClick = onOpenMenu) {
-                    Icon(MenuIcon, contentDescription = stringResource(R.string.nav_open_menu))
+                if (navigation is ShellNavigation.Drawer) {
+                    IconButton(onClick = navigation.onOpenMenu) {
+                        Icon(TozzoIcons.Menu, contentDescription = stringResource(R.string.nav_open_menu))
+                    }
                 }
             },
             actions = {
                 SyncBadge(badge, onOpenRejections)
-                Spacer(Modifier.width(12.dp))
+                if (navigation is ShellNavigation.MoreMenu) {
+                    MoreMenu(navigation)
+                } else {
+                    Spacer(Modifier.width(12.dp))
+                }
             },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
         )
         if (paymentRequired) PaymentRequiredBanner()
+    }
+}
+
+/** ⋮ with "Settings" and "Sign out". */
+@Composable
+private fun MoreMenu(navigation: ShellNavigation.MoreMenu) {
+    var expanded by remember { mutableStateOf(false) }
+    IconButton(onClick = { expanded = true }) {
+        Icon(TozzoIcons.MoreVertical, contentDescription = stringResource(R.string.nav_more_options))
+    }
+    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.nav_settings)) },
+            onClick = {
+                expanded = false
+                navigation.onOpenSettings()
+            },
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.action_logout)) },
+            onClick = {
+                expanded = false
+                navigation.onSignOut()
+            },
+        )
     }
 }
 
@@ -163,26 +237,3 @@ private fun PaymentRequiredBanner() {
         )
     }
 }
-
-private val MenuIcon: ImageVector =
-    ImageVector
-        .Builder("Menu", 24.dp, 24.dp, 24f, 24f)
-        .apply {
-            path(fill = SolidColor(Color.Black)) {
-                moveTo(3f, 6f)
-                horizontalLineTo(21f)
-                verticalLineTo(8f)
-                horizontalLineTo(3f)
-                close()
-                moveTo(3f, 11f)
-                horizontalLineTo(21f)
-                verticalLineTo(13f)
-                horizontalLineTo(3f)
-                close()
-                moveTo(3f, 16f)
-                horizontalLineTo(21f)
-                verticalLineTo(18f)
-                horizontalLineTo(3f)
-                close()
-            }
-        }.build()

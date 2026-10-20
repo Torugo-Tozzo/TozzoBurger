@@ -27,10 +27,10 @@ fun NoticeScreen(
     val (title, message) = notice.texts()
     Surface(modifier = Modifier.fillMaxSize()) {
         Box(contentAlignment = Alignment.Center) {
-            EmptyState(title = stringResource(title), message = stringResource(message)) {
+            EmptyState(title = title, message = message) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     when (notice) {
-                        Notice.NEEDS_WEB_SETUP -> {
+                        Notice.NeedsWebSetup -> {
                             TozzoButton(
                                 text = stringResource(R.string.notice_open_web),
                                 onClick = { context.openWebPath("/login") },
@@ -43,18 +43,31 @@ fun NoticeScreen(
                                 variant = ButtonVariant.Outline,
                             )
                         }
-                        Notice.NO_ACCESS, Notice.ROLE_NOT_YET_SUPPORTED ->
+                        Notice.NoAccess ->
                             TozzoButton(
                                 text = stringResource(R.string.action_logout),
                                 onClick = onBackToLogin,
                                 modifier = Modifier.fillMaxWidth(),
                             )
-                        Notice.ESTABLISHMENT_DELETED ->
+                        Notice.EstablishmentDeleted ->
                             TozzoButton(
                                 text = stringResource(R.string.action_ok),
                                 onClick = onBackToLogin,
                                 modifier = Modifier.fillMaxWidth(),
                             )
+                        is Notice.DeviceLimitReached, Notice.PaymentRequired -> {
+                            TozzoButton(
+                                text = stringResource(R.string.notice_open_plan),
+                                onClick = { context.openWebPath(PLAN_PATH) },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            TozzoButton(
+                                text = stringResource(R.string.action_ok),
+                                onClick = onBackToLogin,
+                                modifier = Modifier.fillMaxWidth(),
+                                variant = ButtonVariant.Outline,
+                            )
+                        }
                     }
                 }
             }
@@ -62,10 +75,26 @@ fun NoticeScreen(
     }
 }
 
-private fun Notice.texts(): Pair<Int, Int> =
+/** The website's plan selection page (`/plan` in the web router). */
+private const val PLAN_PATH = "/plan"
+
+@Composable
+private fun Notice.texts(): Pair<String, String> =
     when (this) {
-        Notice.NEEDS_WEB_SETUP -> R.string.notice_needs_web_setup_title to R.string.notice_needs_web_setup_message
-        Notice.NO_ACCESS -> R.string.notice_no_access_title to R.string.notice_no_access_message
-        Notice.ROLE_NOT_YET_SUPPORTED -> R.string.notice_role_title to R.string.notice_role_message
-        Notice.ESTABLISHMENT_DELETED -> R.string.notice_deleted_title to R.string.notice_deleted_message
+        Notice.NeedsWebSetup ->
+            stringResource(R.string.notice_needs_web_setup_title) to
+                stringResource(R.string.notice_needs_web_setup_message)
+        Notice.NoAccess ->
+            stringResource(R.string.notice_no_access_title) to stringResource(R.string.notice_no_access_message)
+        Notice.EstablishmentDeleted ->
+            stringResource(R.string.notice_deleted_title) to stringResource(R.string.notice_deleted_message)
+        is Notice.DeviceLimitReached ->
+            stringResource(R.string.notice_device_limit_title) to
+                if (limit != null) {
+                    stringResource(R.string.login_error_device_limit, limit)
+                } else {
+                    stringResource(R.string.login_error_device_limit_generic)
+                }
+        Notice.PaymentRequired ->
+            stringResource(R.string.notice_payment_title) to stringResource(R.string.notice_payment_message)
     }

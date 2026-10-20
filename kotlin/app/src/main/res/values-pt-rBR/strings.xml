@@ -27,7 +27,7 @@
     <string name="login_error_required">Informe seu e-mail e sua senha.</string>
     <string name="login_error_credentials">E-mail ou senha incorretos.</string>
     <string name="login_error_email_not_verified">Confirme seu e-mail antes de entrar.</string>
-    <string name="login_error_other_user">Este aparelho está vinculado a outro usuário.</string>
+    <string name="login_error_other_user">Este aparelho está vinculado a %1$s. Essa pessoa precisa usar \"Desvincular este aparelho\" em Configurações antes que outro usuário entre.</string>
     <string name="login_error_unsent_data">Este aparelho tem alterações não enviadas de uma conta que ele não consegue mais identificar. Para protegê-las, a entrada está bloqueada aqui. Fale com o suporte do Tozzo.</string>
     <string name="login_error_device_limit">Este estabelecimento atingiu o limite de %1$d aparelhos.</string>
     <string name="login_error_offline">Sem conexão com a internet. Tente novamente.</string>
@@ -39,8 +39,6 @@
     <string name="notice_open_web">Abrir o site</string>
     <string name="notice_no_access_title">Sem acesso</string>
     <string name="notice_no_access_message">Sua conta não tem acesso a este app.</string>
-    <string name="notice_role_title">Papel ainda não disponível</string>
-    <string name="notice_role_message">O app ainda não está disponível para o seu papel.</string>
     <string name="notice_deleted_title">Estabelecimento excluído</string>
     <string name="notice_deleted_message">Este estabelecimento foi excluído.</string>
     <string name="action_ok">OK</string>
@@ -122,4 +120,13 @@
         <item quantity="many">%d alterações recusadas serão apagadas com os dados deste aparelho. Confira a lista antes se ainda precisar delas.</item>
         <item quantity="other">%d alterações recusadas serão apagadas com os dados deste aparelho. Confira a lista antes se ainda precisar delas.</item>
     </plurals>
+    <string name="common_cancel">Cancelar</string>
+    <string name="first_sync_failed_title">Não foi possível baixar os dados</string>
+    <string name="first_sync_failed_message">Verifique sua conexão com a internet e tente de novo, ou saia.</string>
+    <string name="notice_device_limit_title">Limite de aparelhos atingido</string>
+    <string name="notice_payment_title">Pagamento pendente</string>
+    <string name="notice_payment_message">Regularize o pagamento do plano no site para continuar usando o Tozzo neste aparelho.</string>
+    <string name="notice_open_plan">Ver planos no site</string>
+    <string name="settings_logout_hint">Sair mantém este aparelho vinculado e os dados guardados. Só o mesmo usuário consegue entrar de novo.</string>
+    <string name="nav_more_options">Mais opções</string>
 </resources>

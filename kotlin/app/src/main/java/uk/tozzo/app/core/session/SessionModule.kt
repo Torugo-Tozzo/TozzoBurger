@@ -10,4 +10,7 @@ import dagger.hilt.components.SingletonComponent
 abstract class SessionModule {
     @Binds
     abstract fun loginService(impl: SessionRepository): LoginService
+
+    @Binds
+    abstract fun signOutService(impl: SessionRepository): SignOutService
 }

@@ -195,7 +195,7 @@ class SessionRepositoryTest {
             tokenStore.save(session("old-access", "refresh-a"))
             loginResponse = { loginOk(userId = USER_B, access = "access-b", refresh = "refresh-b") }
 
-            assertEquals(LoginResult.OtherUserBound, repo.login("b@b.c", "x"))
+            assertEquals(LoginResult.OtherUserBound("Old Name"), repo.login("b@b.c", "x"))
 
             assertEquals(1, count("POST /v1/auth/logout"))
             assertEquals(0, count("POST /v1/devices"))
@@ -216,7 +216,7 @@ class SessionRepositoryTest {
             val seen = mutableListOf<SessionEvent>()
             val job = launch(UnconfinedTestDispatcher(testScheduler)) { events.events.toList(seen) }
 
-            assertEquals(LoginResult.OtherUserBound, repo.login("b@b.c", "x"))
+            assertEquals(LoginResult.OtherUserBound("Old Name"), repo.login("b@b.c", "x"))
 
             job.cancel()
             assertEquals(0, count("POST /v1/auth/refresh"))
@@ -321,15 +321,38 @@ class SessionRepositoryTest {
         }
 
     @Test
-    fun cookAndDriverAreNotYetSupported() =
+    fun cookAndDriverSignIn() =
         runTest {
-            for (role in listOf("COOK", "DRIVER")) {
+            for ((role, expected) in listOf("COOK" to Role.COOK, "DRIVER" to Role.DRIVER)) {
                 loginResponse = { loginOk(role = role) }
 
-                assertEquals(LoginResult.RoleNotYetSupported, repo.login("a@b.c", "x"))
+                val result = repo.login("a@b.c", "x")
+
+                assertEquals(expected, (result as LoginResult.Success).binding.role)
+                assertEquals(expected, binding.current.value?.role)
             }
-            assertNothingSaved()
-            assertEquals(2, count("POST /v1/auth/logout"))
+            assertEquals(0, count("POST /v1/auth/logout"))
+        }
+
+    @Test
+    fun registerPaymentRequiredIsNotice() =
+        runTest {
+            registerResponse = { problem(402, "PAYMENT_REQUIRED") }
+
+            assertEquals(LoginResult.PaymentRequired, repo.login("a@b.c", "x"))
+
+            assertNull(tokenStore.refreshToken())
+            assertNull(tokenStore.accessToken)
+            assertNull(binding.current.value)
+            assertEquals(1, count("POST /v1/auth/logout"))
+        }
+
+    @Test
+    fun registerPaymentRequiredWithoutBodyIsStillNotice() =
+        runTest {
+            registerResponse = { MockResponse().setResponseCode(402) }
+
+            assertEquals(LoginResult.PaymentRequired, repo.login("a@b.c", "x"))
         }
 
     @Test

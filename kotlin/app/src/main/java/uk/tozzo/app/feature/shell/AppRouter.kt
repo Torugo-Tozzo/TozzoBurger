@@ -55,7 +55,9 @@ fun AppRouter(viewModel: RootViewModel = hiltViewModel()) {
         composable(LOGIN_ROUTE) {
             LoginRoute(onLoggedIn = viewModel::onLoggedIn, onNotice = viewModel::onNotice)
         }
-        composable(FIRST_SYNC_ROUTE) { FirstSyncRoute(onDone = viewModel::onFirstSyncDone) }
+        composable(FIRST_SYNC_ROUTE) {
+            FirstSyncRoute(onDone = viewModel::onFirstSyncDone, onSignedOut = viewModel::onSignedOut)
+        }
         composable(BLOCKED_ROUTE) {
             (state as? RootState.Blocked)?.let { BlockedRoute(it.notice, onBackToLogin = viewModel::onBackToLogin) }
         }
@@ -97,7 +99,10 @@ private fun ShellRoute(
             start = ready.start,
             badge = badge,
             paymentRequired = paymentRequired,
-            settingsContent = { SettingsRoute(onUnbound = viewModel::onUnbound) },
+            onSignOut = viewModel::signOut,
+            settingsContent = {
+                SettingsRoute(onUnbound = viewModel::onUnbound, onSignedOut = viewModel::onSignedOut)
+            },
             rejectionsContent = { RejectionsRoute() },
         )
     }

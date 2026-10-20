@@ -5,8 +5,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import uk.tozzo.app.R
 
-/** Confirmation dialog; the cancel label is the platform's own localized "Cancel". */
+/** Confirmation dialog; the cancel label is the app's own translated "Cancel". */
 @Composable
 fun ConfirmDialog(
     title: String,
@@ -31,7 +32,7 @@ fun ConfirmDialog(
         },
         dismissButton = {
             TozzoButton(
-                text = stringResource(android.R.string.cancel),
+                text = stringResource(R.string.common_cancel),
                 onClick = onDismiss,
                 variant = ButtonVariant.Ghost,
             )

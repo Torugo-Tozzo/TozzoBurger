@@ -21,6 +21,7 @@ import uk.tozzo.app.core.session.SessionEvent
 import uk.tozzo.app.core.session.SessionEvents
 import uk.tozzo.app.core.session.TokenStore
 import uk.tozzo.app.core.sync.LocalSyncStatus
+import uk.tozzo.app.core.sync.SignOut
 import uk.tozzo.app.core.sync.SyncController
 import uk.tozzo.app.core.sync.SyncState
 import uk.tozzo.app.domain.AppDestination
@@ -30,6 +31,7 @@ import uk.tozzo.app.domain.Role
 import uk.tozzo.app.feature.login.Notice
 import uk.tozzo.app.testing.FakeConnectivity
 import uk.tozzo.app.testing.FakeLocalDatabase
+import uk.tozzo.app.testing.FakeSignOutService
 import uk.tozzo.app.testing.MemoryStore
 import uk.tozzo.app.testing.foodOwnerBinding
 
@@ -48,8 +50,12 @@ class RootViewModelTest {
     @AfterEach
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun TestScope.viewModel() =
-        RootViewModel(binding, tokens, SyncController(db, connectivity, binding, backgroundScope), events)
+    private val signOutService = FakeSignOutService()
+
+    private fun TestScope.viewModel(): RootViewModel {
+        val sync = SyncController(db, connectivity, binding, backgroundScope)
+        return RootViewModel(binding, tokens, sync, events, SignOut(signOutService, sync))
+    }
 
     private suspend fun signedIn(hasSynced: Boolean?) {
         DeviceBinding(store).save(foodOwnerBinding())
@@ -124,8 +130,35 @@ class RootViewModelTest {
                     modules = EstablishmentModules(null, listOf(BusinessProfile.STORE), null),
                 ),
             )
-            assertEquals(RootState.Blocked(Notice.NO_ACCESS), viewModel().state.value)
+            assertEquals(RootState.Blocked(Notice.NoAccess), viewModel().state.value)
             assertEquals(0, db.connects)
+        }
+
+    @Test
+    fun cookAndDriverStartOnTheirOwnModule() =
+        runTest(UnconfinedTestDispatcher()) {
+            signedIn(hasSynced = true)
+            val starts = listOf(Role.COOK to AppDestination.KITCHEN, Role.DRIVER to AppDestination.DELIVERIES)
+            for ((role, start) in starts) {
+                binding.save(foodOwnerBinding(role))
+                assertEquals(RootState.Ready(foodOwnerBinding(role), start), viewModel().state.value)
+            }
+        }
+
+    @Test
+    fun signOutGoesToLoginKeepingBindingAndData() =
+        runTest(UnconfinedTestDispatcher()) {
+            signedIn(hasSynced = true)
+            val vm = viewModel()
+            assertTrue(vm.state.value is RootState.Ready)
+
+            vm.signOut()
+
+            assertEquals(RootState.Login, vm.state.value)
+            assertEquals(1, signOutService.signOuts)
+            assertEquals(1, db.disconnects)
+            assertEquals(0, db.clears)
+            assertNotNull(binding.current.value)
         }
 
     @Test
@@ -161,7 +194,7 @@ class RootViewModelTest {
             signedIn(hasSynced = true)
             val vm = viewModel()
             events.emit(SessionEvent.EstablishmentDeleted)
-            assertEquals(RootState.Blocked(Notice.ESTABLISHMENT_DELETED), vm.state.value)
+            assertEquals(RootState.Blocked(Notice.EstablishmentDeleted), vm.state.value)
             assertEquals(1, db.clears)
             assertNull(binding.current.value)
             assertNull(DeviceBinding(store).apply { load() }.current.value)
@@ -219,8 +252,8 @@ class RootViewModelTest {
         runTest(UnconfinedTestDispatcher()) {
             db.status.value = LocalSyncStatus(false, false, false, false)
             val vm = viewModel()
-            vm.onNotice(Notice.NEEDS_WEB_SETUP)
-            assertEquals(RootState.Blocked(Notice.NEEDS_WEB_SETUP), vm.state.value)
+            vm.onNotice(Notice.NeedsWebSetup)
+            assertEquals(RootState.Blocked(Notice.NeedsWebSetup), vm.state.value)
             vm.onBackToLogin()
             assertEquals(RootState.Login, vm.state.value)
         }
@@ -241,7 +274,7 @@ class RootViewModelTest {
             val vm = viewModel()
             db.clearFailure = IllegalStateException("sqlite")
             events.emit(SessionEvent.EstablishmentDeleted)
-            assertEquals(RootState.Blocked(Notice.ESTABLISHMENT_DELETED), vm.state.value)
+            assertEquals(RootState.Blocked(Notice.EstablishmentDeleted), vm.state.value)
             assertNull(binding.current.value)
             assertNull(tokens.refreshToken())
             assertTrue(events.events.replayCache.isEmpty())
@@ -256,7 +289,7 @@ class RootViewModelTest {
             signedIn(hasSynced = true)
             val controller = SyncController(db, connectivity, binding, backgroundScope)
             db.statusFailure = IllegalStateException("cannot open")
-            val vm = RootViewModel(binding, tokens, controller, events)
+            val vm = RootViewModel(binding, tokens, controller, events, SignOut(signOutService, controller))
             assertEquals(RootState.FirstSync, vm.state.value)
         }
 

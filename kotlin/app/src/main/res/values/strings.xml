@@ -27,7 +27,7 @@
     <string name="login_error_required">Enter your email and password.</string>
     <string name="login_error_credentials">Wrong email or password.</string>
     <string name="login_error_email_not_verified">Verify your email before signing in.</string>
-    <string name="login_error_other_user">This device is linked to another user.</string>
+    <string name="login_error_other_user">This device is linked to %1$s. That person must use \"Unlink this device\" in Settings before someone else can sign in.</string>
     <string name="login_error_unsent_data">This device has unsent changes from an account it can no longer identify. To keep them safe, sign-in is blocked here. Contact Tozzo support.</string>
     <string name="login_error_device_limit">This establishment reached its limit of %1$d devices.</string>
     <string name="login_error_offline">No internet connection. Try again.</string>
@@ -39,8 +39,6 @@
     <string name="notice_open_web">Open website</string>
     <string name="notice_no_access_title">No access</string>
     <string name="notice_no_access_message">Your account has no access to this app.</string>
-    <string name="notice_role_title">Role not available yet</string>
-    <string name="notice_role_message">The app is not available for your role yet.</string>
     <string name="notice_deleted_title">Establishment deleted</string>
     <string name="notice_deleted_message">This establishment was deleted.</string>
     <string name="action_ok">OK</string>
@@ -120,4 +118,13 @@
         <item quantity="one">%d rejected change will be deleted with the data on this device. Check the list first if you still need it.</item>
         <item quantity="other">%d rejected changes will be deleted with the data on this device. Check the list first if you still need them.</item>
     </plurals>
+    <string name="common_cancel">Cancel</string>
+    <string name="first_sync_failed_title">Could not download the data</string>
+    <string name="first_sync_failed_message">Check your internet connection and try again, or sign out.</string>
+    <string name="notice_device_limit_title">Device limit reached</string>
+    <string name="notice_payment_title">Payment pending</string>
+    <string name="notice_payment_message">Settle the plan payment on the website to keep using Tozzo on this device.</string>
+    <string name="notice_open_plan">Open plans on the website</string>
+    <string name="settings_logout_hint">Signing out keeps this device linked and its data stored. Only the same user can sign in again.</string>
+    <string name="nav_more_options">More options</string>
 </resources>

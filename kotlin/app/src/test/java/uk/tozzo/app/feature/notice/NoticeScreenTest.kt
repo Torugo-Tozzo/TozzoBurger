@@ -25,7 +25,7 @@ class NoticeScreenTest {
 
     @Test
     fun webSetupOpensTheSiteAndCanSignOut() {
-        show(Notice.NEEDS_WEB_SETUP)
+        show(Notice.NeedsWebSetup)
         rule.onNodeWithText("Open website").performClick()
         val app = ApplicationProvider.getApplicationContext<Application>()
         assertEquals("https://dev.tozzo.uk/login", shadowOf(app).nextStartedActivity.data.toString())
@@ -35,21 +35,41 @@ class NoticeScreenTest {
 
     @Test
     fun noAccessOffersSignOut() {
-        show(Notice.NO_ACCESS)
+        show(Notice.NoAccess)
         rule.onNodeWithText("Sign out").performClick()
         assertEquals(1, backs)
     }
 
     @Test
-    fun roleNotYetSupportedOffersSignOut() {
-        show(Notice.ROLE_NOT_YET_SUPPORTED)
-        rule.onNodeWithText("Sign out").performClick()
+    fun deviceLimitNamesTheLimitAndOpensThePlanPage() {
+        show(Notice.DeviceLimitReached(3))
+        rule.onNodeWithText("limit of 3 devices", substring = true).assertExists()
+        rule.onNodeWithText("Open plans on the website").performClick()
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        assertEquals("https://dev.tozzo.uk/plan", shadowOf(app).nextStartedActivity.data.toString())
+        rule.onNodeWithText("OK").performClick()
+        assertEquals(1, backs)
+    }
+
+    @Test
+    fun deviceLimitWithoutANumberStillExplains() {
+        show(Notice.DeviceLimitReached(null))
+        rule.onNodeWithText("reached its device limit", substring = true).assertExists()
+    }
+
+    @Test
+    fun paymentRequiredOpensThePlanPage() {
+        show(Notice.PaymentRequired)
+        rule.onNodeWithText("Open plans on the website").performClick()
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        assertEquals("https://dev.tozzo.uk/plan", shadowOf(app).nextStartedActivity.data.toString())
+        rule.onNodeWithText("OK").performClick()
         assertEquals(1, backs)
     }
 
     @Test
     fun deletedEstablishmentOffersOk() {
-        show(Notice.ESTABLISHMENT_DELETED)
+        show(Notice.EstablishmentDeleted)
         rule.onNodeWithText("OK").performClick()
         assertEquals(1, backs)
     }

@@ -90,20 +90,34 @@ class LoginViewModelTest {
     }
 
     @Test
-    fun `email and password are trimmed before the call`() {
+    fun passwordIsNotTrimmed() {
         val vm = viewModel(LoginResult.InvalidCredentials)
         vm.submit()
-        assertEquals(listOf("ana@x.com" to "secret"), login.calls)
+        assertEquals(listOf("ana@x.com" to " secret "), login.calls)
     }
+
+    @Test
+    fun otherUserMessageNamesBoundUser() {
+        assertError(
+            LoginResult.OtherUserBound("Carla"),
+            UiText(R.string.login_error_other_user, listOf("Carla")),
+        )
+    }
+
+    @Test
+    fun deviceLimitOpensNotice() {
+        assertNotice(LoginResult.DeviceLimitReached(3), Notice.DeviceLimitReached(3))
+        assertNotice(LoginResult.DeviceLimitReached(null), Notice.DeviceLimitReached(null))
+    }
+
+    @Test
+    fun paymentRequiredOpensNotice() = assertNotice(LoginResult.PaymentRequired, Notice.PaymentRequired)
 
     @Test
     fun `errors map to strings`() {
         assertError(LoginResult.InvalidCredentials, UiText(R.string.login_error_credentials))
         assertError(LoginResult.EmailNotVerified, UiText(R.string.login_error_email_not_verified))
-        assertError(LoginResult.OtherUserBound, UiText(R.string.login_error_other_user))
         assertError(LoginResult.UnsentDataOfUnknownUser, UiText(R.string.login_error_unsent_data))
-        assertError(LoginResult.DeviceLimitReached(3), UiText(R.string.login_error_device_limit, listOf(3)))
-        assertError(LoginResult.DeviceLimitReached(null), UiText(R.string.login_error_device_limit_generic))
         assertError(LoginResult.Offline, UiText(R.string.login_error_offline))
         assertError(LoginResult.Failed(null), UiText(R.string.login_error_generic))
         assertError(LoginResult.Failed(ApiProblem(500, "X", "t", null)), UiText(R.string.login_error_generic))
@@ -111,10 +125,9 @@ class LoginViewModelTest {
 
     @Test
     fun `refusals map to notices`() {
-        assertNotice(LoginResult.NoAccess, Notice.NO_ACCESS)
-        assertNotice(LoginResult.RoleNotYetSupported, Notice.ROLE_NOT_YET_SUPPORTED)
-        assertNotice(LoginResult.NeedsWebSetup, Notice.NEEDS_WEB_SETUP)
-        assertNotice(LoginResult.EstablishmentDeleted, Notice.ESTABLISHMENT_DELETED)
+        assertNotice(LoginResult.NoAccess, Notice.NoAccess)
+        assertNotice(LoginResult.NeedsWebSetup, Notice.NeedsWebSetup)
+        assertNotice(LoginResult.EstablishmentDeleted, Notice.EstablishmentDeleted)
     }
 
     @Test
@@ -150,7 +163,7 @@ class LoginViewModelTest {
     fun `typing clears the error and a new submit clears the notice`() {
         val vm = viewModel(LoginResult.NoAccess)
         vm.submit()
-        assertEquals(Notice.NO_ACCESS, vm.state.value.notice)
+        assertEquals(Notice.NoAccess, vm.state.value.notice)
         vm.dismissNotice()
         assertNull(vm.state.value.notice)
         vm.onEmail("b@c.d")

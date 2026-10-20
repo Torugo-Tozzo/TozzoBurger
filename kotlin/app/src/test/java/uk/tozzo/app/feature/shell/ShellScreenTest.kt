@@ -16,6 +16,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,7 +25,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import uk.tozzo.app.core.sync.SyncState
 import uk.tozzo.app.domain.AppDestination
+import uk.tozzo.app.domain.Role
 import uk.tozzo.app.testing.foodOwnerBinding
+import uk.tozzo.app.ui.icons.TozzoIcons
 import uk.tozzo.app.ui.theme.TozzoTheme
 
 @RunWith(RobolectricTestRunner::class)
@@ -34,19 +38,25 @@ class ShellScreenTest {
 
     private var badge by mutableStateOf(SyncBadgeState(SyncState.SYNCED, rejections = 0))
 
-    private fun show(paymentRequired: Boolean = false) =
-        rule.setContent {
-            TozzoTheme {
-                ShellScreen(
-                    binding = foodOwnerBinding(),
-                    start = AppDestination.SELL,
-                    badge = badge,
-                    paymentRequired = paymentRequired,
-                    settingsContent = { Text("settings-content") },
-                    rejectionsContent = { Text("rejections-content") },
-                )
-            }
+    private var signOuts = 0
+
+    private fun show(
+        paymentRequired: Boolean = false,
+        role: Role = Role.OWNER,
+        start: AppDestination = AppDestination.SELL,
+    ) = rule.setContent {
+        TozzoTheme {
+            ShellScreen(
+                binding = foodOwnerBinding(role),
+                start = start,
+                badge = badge,
+                paymentRequired = paymentRequired,
+                onSignOut = { signOuts++ },
+                settingsContent = { Text("settings-content") },
+                rejectionsContent = { Text("rejections-content") },
+            )
         }
+    }
 
     private fun openDrawer() = rule.onNodeWithContentDescription("Abrir menu").performClick()
 
@@ -126,5 +136,63 @@ class ShellScreenTest {
         rule
             .onNodeWithText("Pagamento pendente. Regularize no site para continuar usando o Tozzo.")
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun drawerItemsHaveIcons() {
+        show()
+        openDrawer()
+        val items = rule.onAllNodesWithTag(DRAWER_ITEM_TAG).fetchSemanticsNodes().size
+        assertTrue(items > 1)
+        val icons = rule.onAllNodesWithTag(DRAWER_ICON_TAG, useUnmergedTree = true).fetchSemanticsNodes().size
+        assertEquals(items, icons)
+    }
+
+    @Test
+    fun everyDestinationHasItsOwnIcon() {
+        val icons = AppDestination.entries.map { TozzoIcons.forDestination(it) }
+        assertEquals(AppDestination.entries.size, icons.size)
+        icons.forEach { assertTrue(it.defaultWidth.value == 24f && it.root.size > 0) }
+    }
+
+    @Test
+    fun cookHasNoDrawer() = noDrawerFor(Role.COOK, AppDestination.KITCHEN, "Cozinha")
+
+    @Test
+    fun driverHasNoDrawer() = noDrawerFor(Role.DRIVER, AppDestination.DELIVERIES, "Entregas")
+
+    private fun noDrawerFor(
+        role: Role,
+        start: AppDestination,
+        title: String,
+    ) {
+        show(role = role, start = start)
+        rule.onNodeWithContentDescription("Abrir menu").assertDoesNotExist()
+        rule.onNodeWithTag(DRAWER_TAG).assertDoesNotExist()
+        rule.onNodeWithTag(SHELL_TITLE_TAG).assertTextEquals(title)
+        rule.onNodeWithTag(SYNC_BADGE_TAG).assertIsDisplayed()
+
+        rule.onNodeWithContentDescription("Mais opções").performClick()
+        rule.onNodeWithText("Configurações").assertIsDisplayed()
+        rule.onNodeWithText("Sair").assertIsDisplayed()
+
+        rule.onNodeWithText("Sair").performClick()
+        assertEquals(1, signOuts)
+    }
+
+    @Test
+    fun cookMenuOpensTheSettings() {
+        show(role = Role.COOK, start = AppDestination.KITCHEN)
+        rule.onNodeWithContentDescription("Mais opções").performClick()
+        rule.onNodeWithText("Configurações").performClick()
+        rule.onNodeWithText("settings-content").assertIsDisplayed()
+        rule.onNodeWithTag(SHELL_TITLE_TAG).assertTextEquals("Configurações")
+    }
+
+    @Test
+    fun ownerKeepsTheDrawerAndHasNoMoreMenu() {
+        show()
+        rule.onNodeWithContentDescription("Abrir menu").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Mais opções").assertDoesNotExist()
     }
 }

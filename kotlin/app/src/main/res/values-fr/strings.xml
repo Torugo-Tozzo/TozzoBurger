@@ -27,7 +27,7 @@
     <string name="login_error_required">Saisissez votre e-mail et votre mot de passe.</string>
     <string name="login_error_credentials">E-mail ou mot de passe incorrect.</string>
     <string name="login_error_email_not_verified">Vérifiez votre e-mail avant de vous connecter.</string>
-    <string name="login_error_other_user">Cet appareil est lié à un autre utilisateur.</string>
+    <string name="login_error_other_user">Cet appareil est lié à %1$s. Cette personne doit utiliser \"Dissocier cet appareil\" dans les paramètres avant qu\'un autre utilisateur puisse se connecter.</string>
     <string name="login_error_unsent_data">Cet appareil contient des modifications non envoyées d’un compte qu’il ne peut plus identifier. Pour les protéger, la connexion est bloquée ici. Contactez le support Tozzo.</string>
     <string name="login_error_device_limit">Cet établissement a atteint la limite de %1$d appareils.</string>
     <string name="login_error_offline">Pas de connexion internet. Réessayez.</string>
@@ -39,8 +39,6 @@
     <string name="notice_open_web">Ouvrir le site</string>
     <string name="notice_no_access_title">Aucun accès</string>
     <string name="notice_no_access_message">Votre compte n\'a pas accès à cette application.</string>
-    <string name="notice_role_title">Rôle pas encore disponible</string>
-    <string name="notice_role_message">L\'application n\'est pas encore disponible pour votre rôle.</string>
     <string name="notice_deleted_title">Établissement supprimé</string>
     <string name="notice_deleted_message">Cet établissement a été supprimé.</string>
     <string name="action_ok">OK</string>
@@ -122,4 +120,13 @@
         <item quantity="many">%d modifications refusées seront supprimées avec les données de cet appareil. Consultez la liste avant si vous en avez encore besoin.</item>
         <item quantity="other">%d modifications refusées seront supprimées avec les données de cet appareil. Consultez la liste avant si vous en avez encore besoin.</item>
     </plurals>
+    <string name="common_cancel">Annuler</string>
+    <string name="first_sync_failed_title">Impossible de télécharger les données</string>
+    <string name="first_sync_failed_message">Vérifiez votre connexion internet et réessayez, ou déconnectez-vous.</string>
+    <string name="notice_device_limit_title">Limite d\'appareils atteinte</string>
+    <string name="notice_payment_title">Paiement en attente</string>
+    <string name="notice_payment_message">Réglez le paiement du forfait sur le site pour continuer à utiliser Tozzo sur cet appareil.</string>
+    <string name="notice_open_plan">Voir les forfaits sur le site</string>
+    <string name="settings_logout_hint">Se déconnecter garde cet appareil lié et ses données enregistrées. Seul le même utilisateur peut se reconnecter.</string>
+    <string name="nav_more_options">Plus d\'options</string>
 </resources>
