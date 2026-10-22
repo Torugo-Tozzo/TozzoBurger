@@ -230,4 +230,17 @@
     <string name="item_status_in_preparation">तैयार हो रहा है</string>
     <string name="item_status_ready">तैयार</string>
     <string name="item_status_delivered">डिलीवर हुआ</string>
+    <string name="kitchen_tab_in_preparation">तैयार हो रहा है (%1$d)</string>
+    <string name="kitchen_tab_ready">तैयार (%1$d)</string>
+    <string name="kitchen_mark_ready">तैयार चिह्नित करें</string>
+    <string name="kitchen_back_to_preparation">तैयारी में वापस</string>
+    <string name="kitchen_unavailable_product">उत्पाद उपलब्ध नहीं</string>
+    <string name="kitchen_order_fallback">ऑर्डर %1$s</string>
+    <string name="kitchen_view_info">आइटम की जानकारी देखें</string>
+    <string name="kitchen_info_title">ऑर्डर की जानकारी</string>
+    <string name="kitchen_info_customer">ग्राहक</string>
+    <string name="kitchen_info_order">ऑर्डर</string>
+    <string name="kitchen_info_opened_at">बनाया गया</string>
+    <string name="kitchen_info_item">आइटम</string>
+    <string name="kitchen_info_stage">स्थिति</string>
 </resources>

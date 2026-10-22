@@ -195,15 +195,40 @@ class OrderWriter
         suspend fun setItemStatus(
             itemId: String,
             status: ItemStatus,
+        ) = setItemsStatus(listOf(itemId), status)
+
+        /**
+         * The kitchen status of every item in [ids], in one transaction, under the same guard as [setItemStatus]
+         * (each item exists and its order is open and not out for delivery); nothing is written otherwise.
+         * Back to IN_PREPARATION also clears the local `kitchen_ready_at`, as the server does, so the card
+         * leaves "Pronto". The upload still sends only `{status}`.
+         */
+        suspend fun setItemsStatus(
+            ids: List<String>,
+            status: ItemStatus,
         ) {
-            val orderId =
-                sql
-                    .getAll("SELECT order_id FROM order_items WHERE id = ? AND deleted_at IS NULL", listOf(itemId)) {
-                        it.string("order_id")
-                    }.firstOrNull()
-            checkNotNull(orderId) { "the item does not exist" }
-            editableState(orderId)
-            sql.execute("UPDATE order_items SET status = ? WHERE id = ?", listOf(status.name, itemId))
+            if (ids.isEmpty()) return
+            val orderIds =
+                ids.map { itemId ->
+                    sql
+                        .getAll(
+                            "SELECT order_id FROM order_items WHERE id = ? AND deleted_at IS NULL",
+                            listOf(itemId),
+                        ) {
+                            it.string("order_id")
+                        }.firstOrNull()
+                        .also { checkNotNull(it) { "the item does not exist" } }
+                }
+            orderIds.filterNotNull().distinct().forEach { editableState(it) }
+            val clearReady = if (status == ItemStatus.IN_PREPARATION) ", kitchen_ready_at = NULL" else ""
+            sql.writeTransaction { tx ->
+                ids.forEach {
+                    tx.execute(
+                        "UPDATE order_items SET status = ?$clearReady WHERE id = ?",
+                        listOf(status.name, it),
+                    )
+                }
+            }
         }
 
         /**

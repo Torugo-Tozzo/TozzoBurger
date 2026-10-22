@@ -232,4 +232,17 @@
     <string name="item_status_in_preparation">En preparación</string>
     <string name="item_status_ready">Listo</string>
     <string name="item_status_delivered">Entregado</string>
+    <string name="kitchen_tab_in_preparation">En preparación (%1$d)</string>
+    <string name="kitchen_tab_ready">Listo (%1$d)</string>
+    <string name="kitchen_mark_ready">Marcar listo</string>
+    <string name="kitchen_back_to_preparation">Volver a preparación</string>
+    <string name="kitchen_unavailable_product">Producto no disponible</string>
+    <string name="kitchen_order_fallback">Pedido %1$s</string>
+    <string name="kitchen_view_info">Ver información del artículo</string>
+    <string name="kitchen_info_title">Información del pedido</string>
+    <string name="kitchen_info_customer">Cliente</string>
+    <string name="kitchen_info_order">Pedido</string>
+    <string name="kitchen_info_opened_at">Hecho el</string>
+    <string name="kitchen_info_item">Artículo</string>
+    <string name="kitchen_info_stage">Estado</string>
 </resources>

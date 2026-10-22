@@ -15,6 +15,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import uk.tozzo.app.feature.firstsync.FirstSyncRoute
+import uk.tozzo.app.feature.kitchen.KitchenRoute
 import uk.tozzo.app.feature.login.LoginRoute
 import uk.tozzo.app.feature.login.Notice
 import uk.tozzo.app.feature.notice.NoticeScreen
@@ -112,6 +113,7 @@ private fun ShellRoute(
             sellContent = { SellRoute() },
             ordersContent = { onNewOrder, onEdit -> OrdersRoute(onNewOrder = onNewOrder, onEdit = onEdit) },
             orderEditContent = { onExit -> OrderEditRoute(onExit = onExit) },
+            kitchenContent = { KitchenRoute() },
         )
     }
 }

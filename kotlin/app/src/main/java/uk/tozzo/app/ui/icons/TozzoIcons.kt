@@ -34,6 +34,10 @@ object TozzoIcons {
         )
     }
 
+    val Info: ImageVector by lazy {
+        lucide("Info", "M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0", "M12 16v-4", "M12 8h.01")
+    }
+
     val Plus: ImageVector by lazy { lucide("Plus", "M5 12h14", "M12 5v14") }
 
     val Minus: ImageVector by lazy { lucide("Minus", "M5 12h14") }

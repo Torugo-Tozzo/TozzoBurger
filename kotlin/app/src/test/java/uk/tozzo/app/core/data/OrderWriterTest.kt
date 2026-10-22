@@ -267,6 +267,46 @@ class OrderWriterTest {
         }
 
     @Test
+    fun setItemsStatusWritesEveryItemAndBackToPreparationClearsKitchenReadyAt() =
+        runTest {
+            val (id, existing) = seeded()
+            val ids = existing.map { it.id }
+            sql.execute(
+                "UPDATE order_items SET kitchen_ready_at = '2026-10-20 12:00:00.000' WHERE order_id = ?",
+                listOf(id),
+            )
+
+            writer.setItemsStatus(ids, ItemStatus.READY)
+            assertEquals(listOf("READY", "READY"), itemRows(id).map { it.status })
+            assertEquals(2, readyAtCount(id))
+
+            writer.setItemsStatus(ids, ItemStatus.IN_PREPARATION)
+            assertEquals(listOf("IN_PREPARATION", "IN_PREPARATION"), itemRows(id).map { it.status })
+            assertEquals(0, readyAtCount(id))
+        }
+
+    @Test
+    fun setItemsStatusChangesNothingWhenOneItemIsRefused() =
+        runTest {
+            val (id, existing) = seeded()
+
+            assertThrows(IllegalStateException::class.java) {
+                kotlinx.coroutines.runBlocking {
+                    writer.setItemsStatus(listOf(existing[0].id, "missing"), ItemStatus.READY)
+                }
+            }
+            assertEquals(listOf("IN_PREPARATION", "IN_PREPARATION"), itemRows(id).map { it.status })
+        }
+
+    private suspend fun readyAtCount(orderId: String) =
+        sql
+            .getAll(
+                "SELECT COUNT(*) AS n FROM order_items WHERE order_id = ? AND kitchen_ready_at IS NOT NULL",
+                listOf(orderId),
+            ) { it.long("n")?.toInt() }
+            .single()
+
+    @Test
     fun closeWritesCloseJsonOnly() =
         runTest {
             val (id, _) = seeded()

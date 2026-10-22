@@ -54,9 +54,9 @@ private const val ORDER_EDIT_ROUTE = "order_edit/{orderId}"
 /**
  * The signed-in app: top bar with the sync badge, and one route per [AppDestination]. The roles with
  * a single module (COOK, DRIVER) have no drawer: a ⋮ menu offers Settings and Sign out instead.
- * [settingsContent], [rejectionsContent], [productsContent], [sellContent], [ordersContent] and
- * [orderEditContent] (the placeholder when absent) are slots, so the screen stays testable without view
- * models. The orders list opens the edit route of an order; "Novo pedido" opens Sell.
+ * [settingsContent], [rejectionsContent], [productsContent], [sellContent], [ordersContent],
+ * [orderEditContent] and [kitchenContent] (the placeholder when absent) are slots, so the screen stays
+ * testable without view models. The orders list opens the edit route of an order; "Novo pedido" opens Sell.
  */
 @Suppress("LongMethod")
 @Composable
@@ -72,6 +72,7 @@ fun ShellScreen(
     sellContent: (@Composable () -> Unit)? = null,
     ordersContent: (@Composable (onNewOrder: () -> Unit, onEdit: (String) -> Unit) -> Unit)? = null,
     orderEditContent: (@Composable (onExit: () -> Unit) -> Unit)? = null,
+    kitchenContent: (@Composable () -> Unit)? = null,
 ) {
     val items = remember(binding) { navigationItems(resolveNavigationModules(binding.role, binding.modules)) }
     val labels = remember(items) { items.associate { it.destination to it.label } }
@@ -109,7 +110,7 @@ fun ShellScreen(
                 Modifier.padding(padding),
                 settingsContent,
                 rejectionsContent,
-                ShellSlots(productsContent, sellContent, ordersContent, orderEditContent),
+                ShellSlots(productsContent, sellContent, ordersContent, orderEditContent, kitchenContent),
             )
         }
     }
@@ -163,6 +164,8 @@ private fun ShellNavHost(
                         { navController.openTopLevel(AppDestination.SELL, start) },
                         { id -> navController.navigate("order_edit/$id") { launchSingleTop = true } },
                     )
+                } else if (destination == AppDestination.KITCHEN && slots.kitchen != null) {
+                    slots.kitchen()
                 } else {
                     ModulePlaceholderScreen(labels[destination] ?: R.string.app_name)
                 }
@@ -181,6 +184,7 @@ private class ShellSlots(
     val sell: (@Composable () -> Unit)?,
     val orders: (@Composable (onNewOrder: () -> Unit, onEdit: (String) -> Unit) -> Unit)?,
     val orderEdit: (@Composable (onExit: () -> Unit) -> Unit)?,
+    val kitchen: (@Composable () -> Unit)? = null,
 )
 
 /** How the user moves around: the drawer's ☰ button, or the ⋮ menu of the roles without a drawer. */

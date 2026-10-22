@@ -216,6 +216,11 @@ class UploadMapperTest {
         assertNull(UploadMapper.toJson(patch("quantity" to 3L), DEVICE))
         assertNull(UploadMapper.toJson(patch("kitchen_ready_at" to "2026-10-20 12:00:00.000"), DEVICE))
         assertEquals(
+            """{"status":"IN_PREPARATION"}""",
+            dataOf(UploadMapper.toJson(patch("status" to "IN_PREPARATION", "kitchen_ready_at" to null), DEVICE))
+                .toString(),
+        )
+        assertEquals(
             """{"status":"READY"}""",
             dataOf(UploadMapper.toJson(patch("status" to "READY"), DEVICE)).toString(),
         )

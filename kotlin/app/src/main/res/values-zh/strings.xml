@@ -228,4 +228,17 @@
     <string name="item_status_in_preparation">制作中</string>
     <string name="item_status_ready">已就绪</string>
     <string name="item_status_delivered">已送达</string>
+    <string name="kitchen_tab_in_preparation">制作中 (%1$d)</string>
+    <string name="kitchen_tab_ready">已完成 (%1$d)</string>
+    <string name="kitchen_mark_ready">标记为完成</string>
+    <string name="kitchen_back_to_preparation">退回制作</string>
+    <string name="kitchen_unavailable_product">商品不可用</string>
+    <string name="kitchen_order_fallback">订单 %1$s</string>
+    <string name="kitchen_view_info">查看商品信息</string>
+    <string name="kitchen_info_title">订单信息</string>
+    <string name="kitchen_info_customer">客户</string>
+    <string name="kitchen_info_order">订单</string>
+    <string name="kitchen_info_opened_at">下单时间</string>
+    <string name="kitchen_info_item">商品</string>
+    <string name="kitchen_info_stage">状态</string>
 </resources>

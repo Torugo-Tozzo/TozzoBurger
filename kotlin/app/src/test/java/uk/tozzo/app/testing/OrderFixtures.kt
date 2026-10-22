@@ -39,8 +39,9 @@ suspend fun RobolectricSql.seedItem(
     unitPrice: String? = "10.00",
     status: String = "IN_PREPARATION",
     deletedAt: String? = null,
+    kitchenReadyAt: String? = null,
 ) = execute(
-    "INSERT INTO order_items (id, order_id, product_id, quantity, status, unit_price, deleted_at) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-    listOf(id, orderId, productId, quantity, status, unitPrice, deletedAt),
+    "INSERT INTO order_items (id, order_id, product_id, quantity, status, unit_price, deleted_at, " +
+        "kitchen_ready_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    listOf(id, orderId, productId, quantity, status, unitPrice, deletedAt, kitchenReadyAt),
 )
