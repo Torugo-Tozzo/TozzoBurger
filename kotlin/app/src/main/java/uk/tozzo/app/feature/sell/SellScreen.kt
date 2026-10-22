@@ -13,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -21,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import uk.tozzo.app.R
 import uk.tozzo.app.domain.Product
 import uk.tozzo.app.domain.ProductType
@@ -40,24 +42,13 @@ fun SellRoute(viewModel: SellViewModel = hiltViewModel()) {
     val result by viewModel.result.collectAsStateWithLifecycle()
     var sheetOpen by rememberSaveable { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
-    val saleSaved = stringResource(R.string.sell_sale_saved)
-    val orderCreated = stringResource(R.string.sell_order_created)
-    val failed = stringResource(R.string.sell_failed)
-
-    LaunchedEffect(result) {
-        val message =
-            when (result) {
-                SellResult.SALE_SAVED -> saleSaved
-                SellResult.ORDER_CREATED -> orderCreated
-                SellResult.FAILED -> failed
-                null -> return@LaunchedEffect
-            }
+    SellResultEffect(
+        result = result,
+        snackbar = snackbar,
+        onConsumed = viewModel::consumeResult,
         // The sheet closes on success; on a failure it stays open so nothing typed is lost.
-        if (result != SellResult.FAILED) sheetOpen = false
-        viewModel.consumeResult()
-        // "Ver venda" joins the sale snackbar when the sale detail exists (a later task).
-        snackbar.showSnackbar(message)
-    }
+        onSuccess = { sheetOpen = false },
+    )
     // An emptied cart leaves nothing to show in the sheet.
     LaunchedEffect(cart.isEmpty()) { if (cart.isEmpty()) sheetOpen = false }
 
@@ -118,5 +109,37 @@ fun SellScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+}
+
+/**
+ * Shows the snackbar for [result], then hands it back through [onConsumed];
+ * [onSuccess] runs for a sale or an order.
+ */
+@Composable
+internal fun SellResultEffect(
+    result: SellResult?,
+    snackbar: SnackbarHostState,
+    onConsumed: () -> Unit,
+    onSuccess: () -> Unit,
+) {
+    val saleSaved = stringResource(R.string.sell_sale_saved)
+    val orderCreated = stringResource(R.string.sell_order_created)
+    val failed = stringResource(R.string.sell_failed)
+    // The snackbar runs in its own scope: consuming the result restarts the effect below, which would
+    // cancel a showSnackbar launched from it.
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(result) {
+        val message =
+            when (result) {
+                SellResult.SALE_SAVED -> saleSaved
+                SellResult.ORDER_CREATED -> orderCreated
+                SellResult.FAILED -> failed
+                null -> return@LaunchedEffect
+            }
+        if (result != SellResult.FAILED) onSuccess()
+        onConsumed()
+        // "Ver venda" joins the sale snackbar when the sale detail exists (a later task).
+        scope.launch { snackbar.showSnackbar(message) }
     }
 }
