@@ -34,6 +34,8 @@ data class OrderView(
     val externalDriverName: String?,
     val externalDriverPhone: String?,
     val items: List<OrderItemView>,
+    /** Name of the internal driver, when the `users` row is known. */
+    val driverName: String? = null,
 )
 
 /** The filters of the list, as the user typed them; all optional, applied together. */
@@ -51,9 +53,10 @@ private const val ORDER_CAP = 2000
 private const val ORDERS_SQL =
     "SELECT o.id, o.customer_name, o.is_delivery, o.delivery_address, o.delivery_started_at, o.opened_at, " +
         "o.updated_at, o.driver_id, o.external_driver_name, o.external_driver_phone, u.name AS seller_name, " +
+        "d.name AS driver_name, " +
         "i.id AS item_id, i.product_id AS item_product_id, i.quantity AS item_quantity, i.status AS item_status, " +
         "i.unit_price AS item_price, p.name AS product_name, p.price AS product_price " +
-        "FROM orders o LEFT JOIN users u ON u.id = o.seller_id " +
+        "FROM orders o LEFT JOIN users u ON u.id = o.seller_id LEFT JOIN users d ON d.id = o.driver_id " +
         "LEFT JOIN order_items i ON i.order_id = o.id AND i.deleted_at IS NULL " +
         "LEFT JOIN products p ON p.id = i.product_id " +
         "WHERE o.id IN (SELECT id FROM orders WHERE is_open = 1 AND deleted_at IS NULL %s LIMIT ?) " +
@@ -90,6 +93,14 @@ class OrderRepository
                 .watch(ORDERS_SQL.format("AND id = ?"), listOf(id, ORDER_CAP), ::toRow)
                 .map { group(it).firstOrNull() }
 
+        /** Open delivery orders (waiting and out for delivery), oldest first. */
+        internal fun deliveryOrders(): Flow<List<OrderView>> =
+            sql
+                .watch(ORDERS_SQL.format("AND is_delivery = 1"), listOf(ORDER_CAP), ::toRow)
+                .map { rows ->
+                    group(rows).sortedWith(compareBy<OrderView> { it.openedAt ?: Instant.EPOCH }.thenBy { it.id })
+                }
+
         private fun group(rows: List<Row>): List<OrderView> =
             rows.groupBy { it.id }.values.map { group ->
                 val head = group.first()
@@ -124,6 +135,7 @@ class OrderRepository
                     externalDriverName = head.externalDriverName,
                     externalDriverPhone = head.externalDriverPhone,
                     items = items,
+                    driverName = head.driverName,
                 )
             }
 
@@ -140,6 +152,7 @@ class OrderRepository
                 externalDriverName = row.string("external_driver_name"),
                 externalDriverPhone = row.string("external_driver_phone"),
                 sellerName = row.string("seller_name"),
+                driverName = row.string("driver_name"),
                 itemId = row.string("item_id"),
                 itemProductId = row.string("item_product_id"),
                 itemQuantity = row.long("item_quantity")?.toInt() ?: 0,
@@ -162,6 +175,7 @@ class OrderRepository
             val externalDriverName: String?,
             val externalDriverPhone: String?,
             val sellerName: String?,
+            val driverName: String?,
             val itemId: String?,
             val itemProductId: String?,
             val itemQuantity: Int,

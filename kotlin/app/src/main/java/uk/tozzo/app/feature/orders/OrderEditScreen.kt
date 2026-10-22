@@ -186,18 +186,26 @@ fun OrderEditScreen(
     var confirmClose by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     val readOnly = !state.canSave
+
+    // An order out for delivery or opened with "Ver pedido" cannot be typed into either.
+    val locked = state.readOnly || state.delivering
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (state.delivering) {
+        if (state.delivering && !state.readOnly) {
             Text(
                 stringResource(R.string.orders_delivering_blocked),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
             )
         }
-        TozzoTextField(state.customer, actions.onCustomer, stringResource(R.string.cart_customer))
+        TozzoTextField(
+            state.customer,
+            actions.onCustomer,
+            stringResource(R.string.cart_customer),
+            enabled = !locked,
+        )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(state.isDelivery, actions.onDelivery, enabled = !readOnly)
             Text(stringResource(R.string.cart_delivery))
@@ -207,7 +215,9 @@ fun OrderEditScreen(
                 state.address,
                 actions.onAddress,
                 stringResource(R.string.cart_address),
-                error = if (state.address.isBlank()) stringResource(R.string.cart_address_required) else null,
+                error =
+                    if (state.address.isBlank() && !locked) stringResource(R.string.cart_address_required) else null,
+                enabled = !locked,
             )
         }
         Text(stringResource(R.string.orders_items), style = MaterialTheme.typography.titleMedium)
@@ -229,13 +239,15 @@ fun OrderEditScreen(
             Text(stringResource(R.string.cart_total), style = MaterialTheme.typography.titleMedium)
             MoneyText(state.totalCents, style = MaterialTheme.typography.titleLarge)
         }
-        TozzoButton(
-            stringResource(if (state.busy) R.string.common_saving else R.string.common_save),
-            actions.onSave,
-            Modifier.fillMaxWidth(),
-            enabled = state.canSave,
-            loading = state.busy,
-        )
+        if (!state.readOnly) {
+            TozzoButton(
+                stringResource(if (state.busy) R.string.common_saving else R.string.common_save),
+                actions.onSave,
+                Modifier.fillMaxWidth(),
+                enabled = state.canSave,
+                loading = state.busy,
+            )
+        }
         if (state.showClose) {
             Text(stringResource(R.string.payment_method_label), style = MaterialTheme.typography.labelLarge)
             PaymentMethodSelector(state.payment, actions.onPayment, allowNone = true)
@@ -247,13 +259,15 @@ fun OrderEditScreen(
                 enabled = state.canClose,
             )
         }
-        TozzoButton(
-            stringResource(R.string.common_delete),
-            { confirmDelete = true },
-            Modifier.fillMaxWidth(),
-            variant = ButtonVariant.Destructive,
-            enabled = state.canDelete,
-        )
+        if (!state.readOnly) {
+            TozzoButton(
+                stringResource(R.string.common_delete),
+                { confirmDelete = true },
+                Modifier.fillMaxWidth(),
+                variant = ButtonVariant.Destructive,
+                enabled = state.canDelete,
+            )
+        }
     }
     if (confirmClose) {
         ConfirmDialog(

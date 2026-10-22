@@ -33,10 +33,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import kotlinx.coroutines.launch
 import uk.tozzo.app.R
 import uk.tozzo.app.core.session.Binding
@@ -49,14 +51,16 @@ import uk.tozzo.app.ui.theme.TozzoColors
 
 internal const val SHELL_TITLE_TAG = "shell_title"
 private const val REJECTIONS_ROUTE = "rejections"
-private const val ORDER_EDIT_ROUTE = "order_edit/{orderId}"
+private const val ORDER_EDIT_ROUTE = "order_edit/{orderId}?readOnly={readOnly}"
+private const val READ_ONLY_ARG = "readOnly"
 
 /**
  * The signed-in app: top bar with the sync badge, and one route per [AppDestination]. The roles with
  * a single module (COOK, DRIVER) have no drawer: a ⋮ menu offers Settings and Sign out instead.
  * [settingsContent], [rejectionsContent], [productsContent], [sellContent], [ordersContent],
- * [orderEditContent] and [kitchenContent] (the placeholder when absent) are slots, so the screen stays
- * testable without view models. The orders list opens the edit route of an order; "Novo pedido" opens Sell.
+ * [orderEditContent], [kitchenContent] and [deliveriesContent] (the placeholder when absent) are slots, so the
+ * screen stays testable without view models. The orders list opens the edit route of an order; "Novo pedido"
+ * opens Sell; Deliveries opens the same route read-only ("Ver pedido").
  */
 @Suppress("LongMethod")
 @Composable
@@ -73,19 +77,18 @@ fun ShellScreen(
     ordersContent: (@Composable (onNewOrder: () -> Unit, onEdit: (String) -> Unit) -> Unit)? = null,
     orderEditContent: (@Composable (onExit: () -> Unit) -> Unit)? = null,
     kitchenContent: (@Composable () -> Unit)? = null,
+    deliveriesContent: (@Composable (onView: (String) -> Unit) -> Unit)? = null,
 ) {
     val items = remember(binding) { navigationItems(resolveNavigationModules(binding.role, binding.modules)) }
     val labels = remember(items) { items.associate { it.destination to it.label } }
     val navController = rememberNavController()
-    val route =
-        navController
-            .currentBackStackEntryAsState()
-            .value
-            ?.destination
-            ?.route ?: start.name
+    val entry = navController.currentBackStackEntryAsState().value
+    val route = entry?.destination?.route ?: start.name
+    val readOnly = entry?.arguments?.getBoolean(READ_ONLY_ARG) == true
     val current = AppDestination.entries.firstOrNull { it.name == route }
     val title =
         when {
+            route == ORDER_EDIT_ROUTE && readOnly -> R.string.deliveries_details_title
             route == ORDER_EDIT_ROUTE -> R.string.orders_edit_title
             current == null -> R.string.rejections_title
             current == AppDestination.SETTINGS -> R.string.nav_settings
@@ -110,7 +113,14 @@ fun ShellScreen(
                 Modifier.padding(padding),
                 settingsContent,
                 rejectionsContent,
-                ShellSlots(productsContent, sellContent, ordersContent, orderEditContent, kitchenContent),
+                ShellSlots(
+                    productsContent,
+                    sellContent,
+                    ordersContent,
+                    orderEditContent,
+                    kitchenContent,
+                    deliveriesContent,
+                ),
             )
         }
     }
@@ -166,13 +176,26 @@ private fun ShellNavHost(
                     )
                 } else if (destination == AppDestination.KITCHEN && slots.kitchen != null) {
                     slots.kitchen()
+                } else if (destination == AppDestination.DELIVERIES && slots.deliveries != null) {
+                    slots.deliveries { id ->
+                        navController.navigate("order_edit/$id?$READ_ONLY_ARG=true") { launchSingleTop = true }
+                    }
                 } else {
                     ModulePlaceholderScreen(labels[destination] ?: R.string.app_name)
                 }
             }
         }
         composable(REJECTIONS_ROUTE) { rejectionsContent() }
-        composable(ORDER_EDIT_ROUTE) {
+        composable(
+            ORDER_EDIT_ROUTE,
+            arguments =
+                listOf(
+                    navArgument(READ_ONLY_ARG) {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    },
+                ),
+        ) {
             slots.orderEdit?.invoke { navController.popBackStack() }
         }
     }
@@ -185,6 +208,7 @@ private class ShellSlots(
     val orders: (@Composable (onNewOrder: () -> Unit, onEdit: (String) -> Unit) -> Unit)?,
     val orderEdit: (@Composable (onExit: () -> Unit) -> Unit)?,
     val kitchen: (@Composable () -> Unit)? = null,
+    val deliveries: (@Composable (onView: (String) -> Unit) -> Unit)? = null,
 )
 
 /** How the user moves around: the drawer's ☰ button, or the ⋮ menu of the roles without a drawer. */

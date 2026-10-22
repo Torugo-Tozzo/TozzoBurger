@@ -51,6 +51,8 @@ data class OrderEditState(
     val lines: List<EditLine> = emptyList(),
     val payment: PaymentMethod? = null,
     val busy: Boolean = false,
+    /** "Ver pedido": nothing can be changed, the fields included. */
+    val readOnly: Boolean = false,
 ) {
     val delivering: Boolean get() = order?.delivering == true
 
@@ -66,7 +68,7 @@ data class OrderEditState(
                 lines != stored.toLines()
         }
 
-    private val editable: Boolean get() = loaded && order != null && !delivering
+    private val editable: Boolean get() = loaded && order != null && !delivering && !readOnly
 
     /** An order out for delivery cannot be edited, deleted or have an item's status changed. */
     val canSave: Boolean get() = editable && !busy
@@ -74,7 +76,7 @@ data class OrderEditState(
     val canChangeStatus: Boolean get() = editable && !busy
 
     /** A delivery order is closed in Deliveries, so it has no close button. */
-    val showClose: Boolean get() = order?.isDelivery == false
+    val showClose: Boolean get() = order?.isDelivery == false && !readOnly
 
     /** Closing takes the order as stored: nothing to close when empty, and unsaved changes are saved first. */
     val canClose: Boolean get() = showClose && editable && !busy && !dirty && order?.items?.isNotEmpty() == true
@@ -108,7 +110,8 @@ class OrderEditViewModel
         private val messageState = MutableStateFlow<OrderEditMessage?>(null)
         private val searchState = MutableStateFlow("")
         private val typeState = MutableStateFlow<String?>(null)
-        private val stateFlow = MutableStateFlow(OrderEditState())
+        private val stateFlow =
+            MutableStateFlow(OrderEditState(readOnly = handle.get<Boolean>(READ_ONLY_KEY) == true))
 
         // Set before this device closes or deletes the order, so the order going away is not taken for a warning.
         private var leaving = false
@@ -293,5 +296,6 @@ class OrderEditViewModel
 
         private companion object {
             const val ORDER_ID_KEY = "orderId"
+            const val READ_ONLY_KEY = "readOnly"
         }
     }

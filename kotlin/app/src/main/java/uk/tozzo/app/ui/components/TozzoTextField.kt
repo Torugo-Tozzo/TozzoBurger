@@ -17,6 +17,7 @@ fun TozzoTextField(
     label: String,
     modifier: Modifier = Modifier,
     error: String? = null,
+    enabled: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
@@ -26,6 +27,7 @@ fun TozzoTextField(
         onValueChange = onValueChange,
         modifier = modifier.fillMaxWidth(),
         label = { Text(label) },
+        enabled = enabled,
         isError = error != null,
         supportingText = error?.let { { Text(it) } },
         keyboardOptions = keyboardOptions,

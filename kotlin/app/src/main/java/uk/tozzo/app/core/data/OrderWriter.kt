@@ -1,5 +1,6 @@
 package uk.tozzo.app.core.data
 
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -30,6 +31,34 @@ data class EditLine(
     val quantity: Int,
 )
 
+/** The API refuses a driver name or phone longer than these. */
+private const val MAX_DRIVER_NAME = 120
+private const val MAX_DRIVER_PHONE = 40
+
+/** Why a delivery action is refused locally, the way the server would refuse it. */
+enum class DeliveryRefusal {
+    /** Items not READY or DELIVERED and not confirmed, or no items (ORDER_NOT_READY). */
+    NOT_READY,
+
+    /** The driver is out with another order, or is not a driver (DRIVER_BUSY, DRIVER_NOT_FOUND). */
+    DRIVER_BUSY,
+
+    /** The order is gone, closed, not a delivery, or in the wrong stage for the action. */
+    CONFLICT,
+}
+
+class DeliveryRefused(
+    val reason: DeliveryRefusal,
+    message: String,
+) : IllegalStateException(message)
+
+private data class DeliveryState(
+    val isOpen: Boolean,
+    val isDelivery: Boolean,
+    val started: Boolean,
+    val driverId: String?,
+)
+
 private data class OrderState(
     val isOpen: Boolean,
     val isDelivery: Boolean,
@@ -38,7 +67,8 @@ private data class OrderState(
     val address: String?,
 )
 
-/** Writes orders (comandas) to the local database. */
+/** Writes orders (comandas) and their delivery actions to the local database. */
+@Suppress("TooManyFunctions")
 class OrderWriter
     @Inject
     constructor(
@@ -233,18 +263,111 @@ class OrderWriter
 
         /**
          * Closes the order into a sale: `is_open` 0 and `close_json` (`{"payment_method":"PIX"}`, or `{}`
-         * without payment), which the upload sends alone as the close. A delivery closes in Deliveries.
+         * without payment), which the upload sends alone as the close. As on the server, the order must be open
+         * and a delivery order closes only while out for delivery (a waiting one is refused).
          */
         suspend fun closeOrder(
             id: String,
             payment: PaymentMethod?,
         ) {
-            check(!editableState(id).isDelivery) { "a delivery order is closed from the deliveries" }
+            val state = deliveryState(id)
+            check(state.isOpen) { "the order is closed" }
+            check(state.isDelivery == state.started) {
+                if (state.isDelivery) "the delivery has not started" else "the order is out for delivery"
+            }
             val close =
                 buildJsonObject { payment?.let { put("payment_method", it.name) } }.toString()
             sql.execute(
                 "UPDATE orders SET is_open = 0, close_json = ?, updated_at = ? WHERE id = ?",
                 listOf(close, DbTime.format(clock.instant()), id),
+            )
+        }
+
+        /**
+         * Gives the order an internal driver, who must be a DRIVER with no other order out for delivery. Writes
+         * `delivery_json` (the only thing the upload sends) and the visible driver columns, in one transaction.
+         *
+         * @throws DeliveryRefused when the order cannot take it or the driver is busy.
+         */
+        suspend fun assignDriver(
+            orderId: String,
+            driverId: String,
+        ) {
+            requireNotStarted(orderId)
+            checkDriverFree(driverId, orderId)
+            writeDelivery(orderId, deliveryJson("ASSIGN") { put("driver_id", driverId) }, driverId, null, null)
+        }
+
+        /**
+         * Gives the order an external driver: a name of 1..120 characters and an optional phone of up to 40.
+         *
+         * @throws IllegalArgumentException for a blank name or a name or phone over the limit.
+         * @throws DeliveryRefused when the delivery already left.
+         */
+        suspend fun assignExternal(
+            orderId: String,
+            name: String,
+            phone: String?,
+        ) {
+            val cleanName = name.trim()
+            val cleanPhone = phone.trimmedOrNull()
+            require(cleanName.isNotEmpty()) { "the driver needs a name" }
+            require(cleanName.length <= MAX_DRIVER_NAME) { "the driver name is too long" }
+            require(cleanPhone == null || cleanPhone.length <= MAX_DRIVER_PHONE) { "the driver phone is too long" }
+            requireNotStarted(orderId)
+            val json =
+                deliveryJson("ASSIGN") {
+                    put("external_driver_name", cleanName)
+                    cleanPhone?.let { put("external_driver_phone", it) }
+                }
+            writeDelivery(orderId, json, null, cleanName, cleanPhone)
+        }
+
+        /** Removes the driver, internal or external; only before the delivery leaves. */
+        suspend fun unassign(orderId: String) {
+            requireNotStarted(orderId)
+            writeDelivery(orderId, deliveryJson("UNASSIGN"), null, null, null)
+        }
+
+        /**
+         * Sends the order out: `delivery_started_at` now. Only `orders` is written: the server marks the pending
+         * items READY and the download brings that (an `order_items` PATCH from a DRIVER would be refused).
+         *
+         * @throws DeliveryRefused when the order has no item, an item is not ready and [confirmReady] is false,
+         * the assigned driver is busy, or the delivery already left.
+         */
+        suspend fun startDelivery(
+            orderId: String,
+            confirmReady: Boolean,
+        ) {
+            val state = requireNotStarted(orderId)
+            val statuses =
+                sql.getAll(
+                    "SELECT status FROM order_items WHERE order_id = ? AND deleted_at IS NULL",
+                    listOf(orderId),
+                ) { ItemStatus.parse(it.string("status")) }
+            val pending = statuses.any { it != ItemStatus.READY && it != ItemStatus.DELIVERED }
+            if (statuses.isEmpty() || (pending && !confirmReady)) {
+                throw DeliveryRefused(DeliveryRefusal.NOT_READY, "the items are not ready")
+            }
+            state.driverId?.let { checkDriverFree(it, orderId) }
+            val json =
+                deliveryJson("START") { if (pending) put("confirm_ready", true) }
+            val now = DbTime.format(clock.instant())
+            sql.execute(
+                "UPDATE orders SET delivery_json = ?, delivery_started_at = ?, updated_at = ? WHERE id = ?",
+                listOf(json, now, now, orderId),
+            )
+        }
+
+        /** Brings the order back to waiting; only while it is out for delivery. */
+        suspend fun waitDelivery(orderId: String) {
+            val state = deliveryState(orderId)
+            requireDeliverable(state)
+            if (!state.started) throw DeliveryRefused(DeliveryRefusal.CONFLICT, "the delivery has not started")
+            sql.execute(
+                "UPDATE orders SET delivery_json = ?, delivery_started_at = NULL, updated_at = ? WHERE id = ?",
+                listOf(deliveryJson("WAIT"), DbTime.format(clock.instant()), orderId),
             )
         }
 
@@ -277,6 +400,93 @@ class OrderWriter
             check(state.isOpen) { "the order is closed" }
             check(!state.delivering) { "the order is out for delivery" }
             return state
+        }
+
+        private suspend fun deliveryState(id: String): DeliveryState {
+            val state =
+                sql
+                    .getAll(
+                        "SELECT is_open, is_delivery, delivery_started_at, driver_id " +
+                            "FROM orders WHERE id = ? AND deleted_at IS NULL",
+                        listOf(id),
+                    ) {
+                        DeliveryState(
+                            isOpen = it.long("is_open") == 1L,
+                            isDelivery = it.long("is_delivery") == 1L,
+                            started = !it.string("delivery_started_at").isNullOrBlank(),
+                            driverId = it.string("driver_id")?.takeIf { driver -> driver.isNotBlank() },
+                        )
+                    }.firstOrNull()
+            return state ?: throw DeliveryRefused(DeliveryRefusal.CONFLICT, "the order does not exist")
+        }
+
+        private fun requireDeliverable(state: DeliveryState) {
+            if (!state.isOpen || !state.isDelivery) {
+                throw DeliveryRefused(DeliveryRefusal.CONFLICT, "the order is closed or not a delivery")
+            }
+        }
+
+        private suspend fun requireNotStarted(orderId: String): DeliveryState {
+            val state = deliveryState(orderId)
+            requireDeliverable(state)
+            if (state.started) throw DeliveryRefused(DeliveryRefusal.CONFLICT, "the delivery already started")
+            return state
+        }
+
+        // The user must be a DRIVER, and no other open order of theirs may be out for delivery.
+        private suspend fun checkDriverFree(
+            driverId: String,
+            orderId: String,
+        ) {
+            val isDriver =
+                sql
+                    .getAll(
+                        "SELECT 1 AS x FROM users WHERE id = ? AND role = 'DRIVER'",
+                        listOf(driverId),
+                    ) { it.long("x") }
+                    .isNotEmpty()
+            val busy =
+                sql
+                    .getAll(
+                        "SELECT 1 AS x FROM orders WHERE driver_id = ? AND id <> ? AND is_open = 1 " +
+                            "AND deleted_at IS NULL AND delivery_started_at IS NOT NULL AND delivery_started_at <> ''",
+                        listOf(driverId, orderId),
+                    ) { it.long("x") }
+                    .isNotEmpty()
+            if (!isDriver || busy) throw DeliveryRefused(DeliveryRefusal.DRIVER_BUSY, "the driver is not free")
+        }
+
+        private fun deliveryJson(
+            action: String,
+            extra: JsonObjectBuilder.() -> Unit = {},
+        ): String =
+            buildJsonObject {
+                put("action", action)
+                extra()
+            }.toString()
+
+        // The upload sends only `delivery_json`; the driver columns are for the screen until the download.
+        private suspend fun writeDelivery(
+            orderId: String,
+            json: String,
+            driverId: String?,
+            externalName: String?,
+            externalPhone: String?,
+        ) {
+            sql.writeTransaction { tx ->
+                tx.execute(
+                    "UPDATE orders SET delivery_json = ?, driver_id = ?, external_driver_name = ?, " +
+                        "external_driver_phone = ?, updated_at = ? WHERE id = ?",
+                    listOf(
+                        json,
+                        driverId,
+                        externalName,
+                        externalPhone,
+                        DbTime.format(clock.instant()),
+                        orderId,
+                    ),
+                )
+            }
         }
 
         private suspend fun storedItems(orderId: String): Map<String, Int> =

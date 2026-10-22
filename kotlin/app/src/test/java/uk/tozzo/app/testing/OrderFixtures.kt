@@ -4,7 +4,8 @@ package uk.tozzo.app.testing
 suspend fun RobolectricSql.seedUser(
     id: String,
     name: String,
-) = execute("INSERT INTO users (id, name, role) VALUES (?, ?, 'EMPLOYEE')", listOf(id, name))
+    role: String = "EMPLOYEE",
+) = execute("INSERT INTO users (id, name, role) VALUES (?, ?, ?)", listOf(id, name, role))
 
 suspend fun RobolectricSql.seedProduct(
     id: String,
@@ -24,10 +25,28 @@ suspend fun RobolectricSql.seedOrder(
     openedAt: String = "2026-10-20 12:00:00.000",
     updatedAt: String = openedAt,
     sellerId: String? = "u1",
+    driverId: String? = null,
+    externalDriverName: String? = null,
+    externalDriverPhone: String? = null,
 ) = execute(
     "INSERT INTO orders (id, customer_name, is_open, deleted_at, is_delivery, delivery_address, " +
-        "delivery_started_at, opened_at, updated_at, seller_id, total) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '0.00')",
-    listOf(id, customer, isOpen, deletedAt, isDelivery, address, deliveryStartedAt, openedAt, updatedAt, sellerId),
+        "delivery_started_at, opened_at, updated_at, seller_id, driver_id, external_driver_name, " +
+        "external_driver_phone, total) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '0.00')",
+    listOf(
+        id,
+        customer,
+        isOpen,
+        deletedAt,
+        isDelivery,
+        address,
+        deliveryStartedAt,
+        openedAt,
+        updatedAt,
+        sellerId,
+        driverId,
+        externalDriverName,
+        externalDriverPhone,
+    ),
 )
 
 @Suppress("LongParameterList")
