@@ -8,6 +8,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import uk.tozzo.app.R
@@ -55,11 +56,13 @@ fun TypeChip(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val scheme = MaterialTheme.colorScheme
     Surface(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.alpha(if (enabled) 1f else DISABLED_ALPHA),
+        enabled = enabled,
         shape = MaterialTheme.shapes.medium,
         color = if (selected) scheme.primary else scheme.background,
         contentColor = if (selected) scheme.onPrimary else scheme.onBackground,
@@ -72,3 +75,5 @@ fun TypeChip(
         )
     }
 }
+
+private const val DISABLED_ALPHA = 0.5f

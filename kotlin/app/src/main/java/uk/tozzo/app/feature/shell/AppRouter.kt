@@ -18,6 +18,8 @@ import uk.tozzo.app.feature.firstsync.FirstSyncRoute
 import uk.tozzo.app.feature.login.LoginRoute
 import uk.tozzo.app.feature.login.Notice
 import uk.tozzo.app.feature.notice.NoticeScreen
+import uk.tozzo.app.feature.orders.OrderEditRoute
+import uk.tozzo.app.feature.orders.OrdersRoute
 import uk.tozzo.app.feature.products.ProductsRoute
 import uk.tozzo.app.feature.rejections.RejectionsRoute
 import uk.tozzo.app.feature.sell.SellRoute
@@ -108,6 +110,8 @@ private fun ShellRoute(
             rejectionsContent = { RejectionsRoute() },
             productsContent = { ProductsRoute() },
             sellContent = { SellRoute() },
+            ordersContent = { onNewOrder, onEdit -> OrdersRoute(onNewOrder = onNewOrder, onEdit = onEdit) },
+            orderEditContent = { onExit -> OrderEditRoute(onExit = onExit) },
         )
     }
 }

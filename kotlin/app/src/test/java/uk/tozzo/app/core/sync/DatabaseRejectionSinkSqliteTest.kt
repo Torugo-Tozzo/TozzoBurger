@@ -34,6 +34,8 @@ class DatabaseRejectionSinkSqliteTest {
         db.execSQL("ALTER TABLE sync_rejections ADD COLUMN summary TEXT")
         db.execSQL("CREATE TABLE orders (id TEXT PRIMARY KEY, customer_name TEXT)")
         db.execSQL("INSERT INTO orders VALUES ('o-1', 'Bia')")
+        db.execSQL("CREATE TABLE order_items (id TEXT PRIMARY KEY, order_id TEXT)")
+        db.execSQL("INSERT INTO order_items VALUES ('i-1', 'o-1')")
     }
 
     @After
@@ -91,6 +93,18 @@ class DatabaseRejectionSinkSqliteTest {
             sink.record(PendingOp(3, "PATCH", "products", "o-1", mapOf("price" to "1")), "op-3", result("op-3"))
 
             assertEquals(listOf("Bia", null), rows().map { it[7] })
+        }
+
+    @Test
+    fun anItemOpTakesTheCustomerOfItsOrder() =
+        runTest {
+            sink.record(PendingOp(5, "PATCH", "order_items", "i-1", mapOf("status" to "READY")), "op-5", result("op-5"))
+            // An item whose row is gone, or another table with the same id, has no customer to show.
+            sink.record(PendingOp(6, "PATCH", "order_items", "i-9", mapOf("status" to "READY")), "op-6", result("op-6"))
+            sink.record(PendingOp(7, "PATCH", "products", "i-1", mapOf("price" to "1")), "op-7", result("op-7"))
+
+            assertEquals(listOf("Bia", null, null), rows().map { it[7] })
+            assertEquals("""{"status":"READY"}""", rows()[0][6])
         }
 
     @Test

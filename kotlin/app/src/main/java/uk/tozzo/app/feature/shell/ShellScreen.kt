@@ -49,12 +49,14 @@ import uk.tozzo.app.ui.theme.TozzoColors
 
 internal const val SHELL_TITLE_TAG = "shell_title"
 private const val REJECTIONS_ROUTE = "rejections"
+private const val ORDER_EDIT_ROUTE = "order_edit/{orderId}"
 
 /**
  * The signed-in app: top bar with the sync badge, and one route per [AppDestination]. The roles with
  * a single module (COOK, DRIVER) have no drawer: a ⋮ menu offers Settings and Sign out instead.
- * [settingsContent], [rejectionsContent], [productsContent] and [sellContent] (the placeholder when absent)
- * are slots, so the screen stays testable without view models.
+ * [settingsContent], [rejectionsContent], [productsContent], [sellContent], [ordersContent] and
+ * [orderEditContent] (the placeholder when absent) are slots, so the screen stays testable without view
+ * models. The orders list opens the edit route of an order; "Novo pedido" opens Sell.
  */
 @Suppress("LongMethod")
 @Composable
@@ -68,6 +70,8 @@ fun ShellScreen(
     rejectionsContent: @Composable () -> Unit,
     productsContent: (@Composable () -> Unit)? = null,
     sellContent: (@Composable () -> Unit)? = null,
+    ordersContent: (@Composable (onNewOrder: () -> Unit, onEdit: (String) -> Unit) -> Unit)? = null,
+    orderEditContent: (@Composable (onExit: () -> Unit) -> Unit)? = null,
 ) {
     val items = remember(binding) { navigationItems(resolveNavigationModules(binding.role, binding.modules)) }
     val labels = remember(items) { items.associate { it.destination to it.label } }
@@ -81,6 +85,7 @@ fun ShellScreen(
     val current = AppDestination.entries.firstOrNull { it.name == route }
     val title =
         when {
+            route == ORDER_EDIT_ROUTE -> R.string.orders_edit_title
             current == null -> R.string.rejections_title
             current == AppDestination.SETTINGS -> R.string.nav_settings
             else -> labels[current] ?: R.string.app_name
@@ -104,8 +109,7 @@ fun ShellScreen(
                 Modifier.padding(padding),
                 settingsContent,
                 rejectionsContent,
-                productsContent,
-                sellContent,
+                ShellSlots(productsContent, sellContent, ordersContent, orderEditContent),
             )
         }
     }
@@ -143,26 +147,41 @@ private fun ShellNavHost(
     modifier: Modifier,
     settingsContent: @Composable () -> Unit,
     rejectionsContent: @Composable () -> Unit,
-    productsContent: (@Composable () -> Unit)?,
-    sellContent: (@Composable () -> Unit)?,
+    slots: ShellSlots,
 ) {
     NavHost(navController = navController, startDestination = start.name, modifier = modifier.fillMaxSize()) {
         AppDestination.entries.forEach { destination ->
             composable(destination.name) {
                 if (destination == AppDestination.SETTINGS) {
                     settingsContent()
-                } else if (destination == AppDestination.PRODUCTS && productsContent != null) {
-                    productsContent()
-                } else if (destination == AppDestination.SELL && sellContent != null) {
-                    sellContent()
+                } else if (destination == AppDestination.PRODUCTS && slots.products != null) {
+                    slots.products()
+                } else if (destination == AppDestination.SELL && slots.sell != null) {
+                    slots.sell()
+                } else if (destination == AppDestination.ORDERS && slots.orders != null) {
+                    slots.orders(
+                        { navController.openTopLevel(AppDestination.SELL, start) },
+                        { id -> navController.navigate("order_edit/$id") { launchSingleTop = true } },
+                    )
                 } else {
                     ModulePlaceholderScreen(labels[destination] ?: R.string.app_name)
                 }
             }
         }
         composable(REJECTIONS_ROUTE) { rejectionsContent() }
+        composable(ORDER_EDIT_ROUTE) {
+            slots.orderEdit?.invoke { navController.popBackStack() }
+        }
     }
 }
+
+/** The screens of the modules that exist; a module without one shows the placeholder. */
+private class ShellSlots(
+    val products: (@Composable () -> Unit)?,
+    val sell: (@Composable () -> Unit)?,
+    val orders: (@Composable (onNewOrder: () -> Unit, onEdit: (String) -> Unit) -> Unit)?,
+    val orderEdit: (@Composable (onExit: () -> Unit) -> Unit)?,
+)
 
 /** How the user moves around: the drawer's ☰ button, or the ⋮ menu of the roles without a drawer. */
 private sealed interface ShellNavigation {

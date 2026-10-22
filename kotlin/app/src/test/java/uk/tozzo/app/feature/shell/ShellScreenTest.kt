@@ -1,9 +1,12 @@
 package uk.tozzo.app.feature.shell
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
@@ -40,6 +43,8 @@ class ShellScreenTest {
 
     private var signOuts = 0
 
+    private var exits = 0
+
     private fun show(
         paymentRequired: Boolean = false,
         role: Role = Role.OWNER,
@@ -54,6 +59,22 @@ class ShellScreenTest {
                 onSignOut = { signOuts++ },
                 settingsContent = { Text("settings-content") },
                 rejectionsContent = { Text("rejections-content") },
+                sellContent = { Text("sell-content") },
+                ordersContent = { onNew, onEdit ->
+                    Column {
+                        Text("new-order", Modifier.clickable(onClick = onNew))
+                        Text("edit-order", Modifier.clickable { onEdit("o-1") })
+                    }
+                },
+                orderEditContent = { onExit ->
+                    Text(
+                        "edit-content",
+                        Modifier.clickable {
+                            exits++
+                            onExit()
+                        },
+                    )
+                },
             )
         }
     }
@@ -86,7 +107,23 @@ class ShellScreenTest {
         rule.waitForIdle()
         rule.onNodeWithTag(DRAWER_TAG).assertIsNotDisplayed()
         rule.onNodeWithTag(SHELL_TITLE_TAG).assertTextEquals("Pedidos")
-        rule.onNodeWithText("Disponível em breve").assertIsDisplayed()
+        rule.onNodeWithText("new-order").assertIsDisplayed()
+    }
+
+    @Test
+    fun theOrdersListOpensTheEditorAndSell() {
+        show(start = AppDestination.ORDERS)
+
+        rule.onNodeWithText("edit-order").performClick()
+        rule.onNodeWithTag(SHELL_TITLE_TAG).assertTextEquals("Editar pedido")
+        rule.onNodeWithText("edit-content").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(SHELL_TITLE_TAG).assertTextEquals("Pedidos")
+        assertEquals(1, exits)
+
+        rule.onNodeWithText("new-order").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(SHELL_TITLE_TAG).assertTextEquals("Vender")
     }
 
     @Test

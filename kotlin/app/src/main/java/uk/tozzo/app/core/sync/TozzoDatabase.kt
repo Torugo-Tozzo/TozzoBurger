@@ -168,12 +168,15 @@ class DatabaseRejectionSink(
         // The detail is for the log: the screen shows a translated message.
         Log.w(TAG, "rejected ${op.op} ${op.table}/${op.id}: ${result.code} ${result.detail}")
         val values = op.data.orEmpty().filterKeys { it != ITEMS_JSON }
-        // An order op without the customer name (a close, a delivery action) takes the name the order row has now.
+        // An op without a name takes the customer of the order row as it is now: the order itself (a close, a
+        // delivery action) or, for an item (a status change), the order the item belongs to.
         execute(
             "INSERT INTO $SYNC_REJECTIONS_TABLE " +
                 "(id, op_id, table_name, row_id, op, code, detail, op_data, summary, created_at) " +
                 "SELECT uuid(), ?, ?, ?, ?, ?, ?, ?, " +
-                "COALESCE(?, (SELECT customer_name FROM orders WHERE id = ? AND ? = 'orders')), ? " +
+                "COALESCE(?, (SELECT customer_name FROM orders WHERE id = ? AND ? = 'orders'), " +
+                "(SELECT o.customer_name FROM order_items i JOIN orders o ON o.id = i.order_id " +
+                "WHERE i.id = ? AND ? = 'order_items')), ? " +
                 "WHERE NOT EXISTS (SELECT 1 FROM $SYNC_REJECTIONS_TABLE WHERE op_id = ?)",
             listOf(
                 opId,
@@ -184,6 +187,8 @@ class DatabaseRejectionSink(
                 result.detail,
                 opDataJson(values),
                 summaryOf(values),
+                op.id,
+                op.table,
                 op.id,
                 op.table,
                 Instant.now().toString(),
