@@ -232,6 +232,7 @@
     <string name="item_status_delivered">डिलीवर हुआ</string>
     <string name="kitchen_tab_in_preparation">तैयार हो रहा है (%1$d)</string>
     <string name="kitchen_tab_ready">तैयार (%1$d)</string>
+    <string name="kitchen_conflict">ऑर्डर बदल गया है। सूची जल्द अपडेट होगी।</string>
     <string name="kitchen_mark_ready">तैयार चिह्नित करें</string>
     <string name="kitchen_back_to_preparation">तैयारी में वापस</string>
     <string name="kitchen_unavailable_product">उत्पाद उपलब्ध नहीं</string>

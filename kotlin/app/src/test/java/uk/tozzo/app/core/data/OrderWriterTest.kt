@@ -1,5 +1,6 @@
 package uk.tozzo.app.core.data
 
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -18,6 +19,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import uk.tozzo.app.core.session.DeviceBinding
 import uk.tozzo.app.domain.ItemStatus
+import uk.tozzo.app.domain.KitchenStage
 import uk.tozzo.app.domain.PaymentMethod
 import uk.tozzo.app.testing.MemoryStore
 import uk.tozzo.app.testing.RobolectricSql
@@ -175,6 +177,7 @@ class OrderWriterTest {
                 " Mesa 2 ",
                 false,
                 null,
+                existing,
                 listOf(existing[0], EditLine("", "p3", "Fries", 800, 2)),
             )
 
@@ -198,7 +201,14 @@ class OrderWriterTest {
             val (id, existing) = seeded()
             sql.execute("UPDATE order_items SET status = 'READY' WHERE order_id = ?", listOf(id))
 
-            writer.updateOrder(id, "Mesa 1", false, null, listOf(existing[0].copy(quantity = 3), existing[1]))
+            writer.updateOrder(
+                id,
+                "Mesa 1",
+                false,
+                null,
+                existing,
+                listOf(existing[0].copy(quantity = 3), existing[1]),
+            )
 
             val rows = itemRows(id).associateBy { it.productId }
             assertEquals(3L, rows.getValue("p1").quantity)
@@ -207,12 +217,38 @@ class OrderWriterTest {
         }
 
     @Test
+    fun aQuantityChangeTakesAReadyItemOutOfTheKitchenReadyTab() =
+        runTest {
+            val (id, existing) = seeded()
+            sql.execute(
+                "UPDATE order_items SET status = 'READY', kitchen_ready_at = '2026-10-20 12:00:00.000' " +
+                    "WHERE order_id = ?",
+                listOf(id),
+            )
+
+            writer.updateOrder(
+                id,
+                "Mesa 1",
+                false,
+                null,
+                existing,
+                listOf(existing[0].copy(quantity = 3), existing[1]),
+            )
+
+            val board = KitchenRepository(sql).board().first()
+            val preparing = board[KitchenStage.IN_PREPARATION].orEmpty()
+            assertEquals(listOf("p1"), preparing.map { it.productId })
+            assertEquals(3, preparing.single().quantity)
+            assertEquals(listOf("p2"), board[KitchenStage.READY].orEmpty().map { it.productId })
+        }
+
+    @Test
     fun savingWithoutChangesWritesNothing() =
         runTest {
             val (id, existing) = seeded()
             sql.execute("UPDATE orders SET updated_at = '2026-01-01 00:00:00.000' WHERE id = ?", listOf(id))
 
-            writer.updateOrder(id, "Mesa 1", false, null, existing)
+            writer.updateOrder(id, "Mesa 1", false, null, existing, existing)
 
             assertEquals("2026-01-01 00:00:00.000", column(id, "updated_at"))
         }
@@ -222,11 +258,11 @@ class OrderWriterTest {
         runTest {
             val (id, existing) = seeded()
             assertThrows(IllegalArgumentException::class.java) {
-                kotlinx.coroutines.runBlocking { writer.updateOrder(id, null, true, "  ", existing) }
+                kotlinx.coroutines.runBlocking { writer.updateOrder(id, null, true, "  ", existing, existing) }
             }
             assertThrows(IllegalArgumentException::class.java) {
                 kotlinx.coroutines.runBlocking {
-                    writer.updateOrder(id, null, false, null, listOf(existing[0].copy(quantity = 0)))
+                    writer.updateOrder(id, null, false, null, existing, listOf(existing[0].copy(quantity = 0)))
                 }
             }
             assertEquals(2, itemRows(id).size)
@@ -235,9 +271,9 @@ class OrderWriterTest {
     @Test
     fun updateOrderCanEmptyTheOrder() =
         runTest {
-            val (id, _) = seeded()
+            val (id, existing) = seeded()
 
-            writer.updateOrder(id, "Mesa 1", false, null, emptyList())
+            writer.updateOrder(id, "Mesa 1", false, null, existing, emptyList())
 
             assertEquals(0, itemRows(id).size)
             assertEquals("[]", column(id, "items_json"))
@@ -251,7 +287,7 @@ class OrderWriterTest {
             sql.execute("UPDATE orders SET delivery_started_at = '2026-10-20 13:00:00.000' WHERE id = ?", listOf(id))
 
             assertThrows(IllegalStateException::class.java) {
-                kotlinx.coroutines.runBlocking { writer.updateOrder(id, "X", false, null, existing) }
+                kotlinx.coroutines.runBlocking { writer.updateOrder(id, "X", false, null, existing, existing) }
             }
             assertThrows(IllegalStateException::class.java) {
                 kotlinx.coroutines.runBlocking { writer.setItemStatus(existing[0].id, ItemStatus.READY) }

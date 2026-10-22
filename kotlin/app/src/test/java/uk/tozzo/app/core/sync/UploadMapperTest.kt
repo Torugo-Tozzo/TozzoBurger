@@ -227,6 +227,25 @@ class UploadMapperTest {
     }
 
     @Test
+    fun aLegacyReadyCardMovedBackUploadsInPreparation() {
+        fun patch(vararg data: Pair<String, Any?>) = PendingOp(6, "PATCH", "order_items", "i1", data.toMap())
+
+        // IN_PREPARATION + kitchen_ready_at (an older client) moved back: only kitchen_ready_at changes locally.
+        assertEquals(
+            """{"status":"IN_PREPARATION"}""",
+            dataOf(UploadMapper.toJson(patch("kitchen_ready_at" to null), DEVICE)).toString(),
+        )
+        // A quantity change also clears it, but it travels in the orders items.
+        assertNull(
+            UploadMapper.toJson(
+                patch("quantity" to 2L, "status" to "IN_PREPARATION", "kitchen_ready_at" to null),
+                DEVICE,
+            ),
+        )
+        assertNull(UploadMapper.toJson(patch("quantity" to 2L, "kitchen_ready_at" to null), DEVICE))
+    }
+
+    @Test
     fun soldAtGoesAsRfc3339() {
         val sale = salePut.copy(data = mapOf("sold_at" to "2026-10-20 12:00:00.000"))
         assertEquals(JsonPrimitive("2026-10-20T12:00:00.000Z"), dataOf(UploadMapper.toJson(sale, DEVICE))["sold_at"])

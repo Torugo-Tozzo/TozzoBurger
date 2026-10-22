@@ -63,6 +63,12 @@ class RobolectricSql(
                             sql: String,
                             params: List<Any?>,
                         ) = db.execSQL(sql, params.toTypedArray())
+
+                        override suspend fun <R> getAll(
+                            sql: String,
+                            params: List<Any?>,
+                            map: (SqlRow) -> R,
+                        ): List<R> = this@RobolectricSql.getAll(sql, params, map)
                     },
                 )
             db.setTransactionSuccessful()

@@ -78,9 +78,6 @@ class TozzoConnector
             }
         }
 
-        private fun CrudEntry.toPendingOp() =
-            PendingOp(clientId, op.toJson(), table, id, opData?.typed, previousValues?.typed)
-
         private companion object {
             const val BATCH_SIZE = 200
             const val GONE = 410
@@ -88,3 +85,6 @@ class TozzoConnector
             const val ESTABLISHMENT_DELETED = "ESTABLISHMENT_DELETED"
         }
     }
+
+/** The [PendingOp] of a PowerSync queue entry, with its typed values. */
+internal fun CrudEntry.toPendingOp() = PendingOp(clientId, op.toJson(), table, id, opData?.typed, previousValues?.typed)

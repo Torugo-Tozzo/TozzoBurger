@@ -14,6 +14,7 @@ import uk.tozzo.app.core.network.SyncApi
 import uk.tozzo.app.core.network.UploadRequest
 import uk.tozzo.app.core.network.UploadResult
 import uk.tozzo.app.domain.DbTime
+import uk.tozzo.app.domain.ItemStatus
 import uk.tozzo.app.domain.Money
 import java.util.UUID
 
@@ -43,6 +44,10 @@ object UploadMapper {
     private const val CLOSE_JSON = "close_json"
     private const val DELIVERY_JSON = "delivery_json"
     private const val BOOLEAN_PREFIX = "is_"
+    private const val QUANTITY = "quantity"
+    private const val STATUS = "status"
+    private const val KITCHEN_READY_AT = "kitchen_ready_at"
+    private val IN_PREPARATION = ItemStatus.IN_PREPARATION.name
 
     // The other orders columns belong to the server (totals, dates, driver) and never go up.
     private val ORDER_WRITABLE = setOf("customer_name", "is_delivery", "delivery_address")
@@ -87,13 +92,23 @@ object UploadMapper {
         }
     }
 
-    /** Only a kitchen status change goes up; a quantity change travels in the orders `items`. */
+    /**
+     * Only a kitchen status change goes up; a quantity change travels in the orders `items`. An item an older
+     * client marked ready as IN_PREPARATION + `kitchen_ready_at` changes only `kitchen_ready_at` when moved back,
+     * so clearing it alone goes up as IN_PREPARATION (the server then clears its ready time).
+     */
     private fun orderItemData(
         op: PendingOp,
         values: Map<String, Any?>,
     ): JsonObject? {
-        if (op.op != PATCH || "quantity" in values || "status" !in values) return null
-        return buildJsonObject { put("status", values["status"].toJson()) }
+        val status =
+            when {
+                op.op != PATCH || QUANTITY in values -> null
+                STATUS in values -> values[STATUS].toJson()
+                KITCHEN_READY_AT in values && values[KITCHEN_READY_AT] == null -> JsonPrimitive(IN_PREPARATION)
+                else -> null
+            }
+        return status?.let { buildJsonObject { put(STATUS, it) } }
     }
 
     private fun orderData(

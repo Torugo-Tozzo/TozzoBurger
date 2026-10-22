@@ -67,6 +67,40 @@ private data class OrderState(
     val address: String?,
 )
 
+private data class StoredItem(
+    val id: String,
+    val productId: String,
+    val quantity: Int,
+    val priceCents: Long,
+)
+
+/** What the user changed in the lines of an order against the lines the screen loaded. */
+private data class LineEdit(
+    val added: List<EditLine>,
+    val removed: Set<String>,
+    /** The new quantity of each loaded line whose quantity the user changed. */
+    val quantities: Map<String, Int>,
+) {
+    fun isEmpty() = added.isEmpty() && removed.isEmpty() && quantities.isEmpty()
+
+    companion object {
+        fun of(
+            snapshot: List<EditLine>,
+            lines: List<EditLine>,
+        ): LineEdit {
+            val before = snapshot.associate { it.id to it.quantity }
+            return LineEdit(
+                added = lines.filterNot { it.id in before },
+                removed = before.keys - lines.map { it.id }.toSet(),
+                quantities =
+                    lines
+                        .filter { it.id in before && before[it.id] != it.quantity }
+                        .associate { it.id to it.quantity },
+            )
+        }
+    }
+}
+
 /** Writes orders (comandas) and their delivery actions to the local database. */
 @Suppress("TooManyFunctions")
 class OrderWriter
@@ -141,20 +175,26 @@ class OrderWriter
         }
 
         /**
-         * Rewrites an open order that is not out for delivery, in one transaction: the customer and delivery,
-         * `items_json` with the complete item list (existing items keep their id, new ones get a UUID), the
-         * `order_items` rows (an item whose quantity changed goes back to IN_PREPARATION, as on the server) and
-         * the total. A save that changes nothing writes nothing, so no empty op is queued.
+         * Saves the edit of an open order that is not out for delivery, in one transaction. The items are a diff
+         * of [lines] against [snapshot] (the items as the screen loaded them): the lines the user added, removed
+         * or whose quantity they changed are applied to the items stored now, so an item another device added
+         * meanwhile stays and one it removed is not inserted again (a quantity change on it is dropped). A
+         * changed quantity sends the item back to preparation (IN_PREPARATION, `kitchen_ready_at` cleared, as
+         * on the server). `items_json` (the complete list now stored) and `order_items` are written only when
+         * the user changed a line; the customer and delivery only when they changed. A save that changes
+         * nothing writes nothing, so no empty op is queued.
          *
          * @throws IllegalArgumentException for a delivery without address, an address over 500 or a quantity
          * outside 1..10000.
          * @throws IllegalStateException when the order is closed, gone or out for delivery.
          */
+        @Suppress("LongParameterList")
         suspend fun updateOrder(
             id: String,
             customerName: String?,
             isDelivery: Boolean,
             deliveryAddress: String?,
+            snapshot: List<EditLine>,
             lines: List<EditLine>,
         ) {
             val address = if (isDelivery) deliveryAddress.trimmedOrNull() else null
@@ -162,63 +202,89 @@ class OrderWriter
             require(address == null || address.length <= MAX_DELIVERY_ADDRESS) { "the address is too long" }
             require(lines.all { it.quantity in 1..MAX_LINE_QUANTITY }) { "a quantity must be from 1 to 10000" }
             val state = editableState(id)
-            val stored = storedItems(id)
-            val resolved = lines.map { if (it.id.isBlank()) it.copy(id = newId()) else it }
-            val itemsChanged = resolved.size != stored.size || resolved.any { stored[it.id] != it.quantity }
+            val edit = LineEdit.of(snapshot, lines.map { if (it.id.isBlank()) it.copy(id = newId()) else it })
             val customer = customerName?.trim().orEmpty()
             val orderChanged = customer != state.customer || isDelivery != state.isDelivery || address != state.address
-            if (!itemsChanged && !orderChanged) return
+            if (edit.isEmpty() && !orderChanged) return
             val now = DbTime.format(clock.instant())
             sql.writeTransaction { tx ->
-                writeItems(tx, id, stored, resolved)
-                val total = Money.centsToDecimal(resolved.sumOf { it.unitPriceCents * it.quantity })
                 // Only what changed is written, so the queued op carries only that.
-                val sets = mutableListOf("updated_at = ?", "total = ?")
-                val params = mutableListOf<Any?>(now, total)
+                val sets = mutableListOf("updated_at = ?")
+                val params = mutableListOf<Any?>(now)
                 if (orderChanged) {
                     sets += listOf("customer_name = ?", "is_delivery = ?", "delivery_address = ?")
                     params.addAll(listOf(customer, if (isDelivery) 1 else 0, address))
                 }
-                if (itemsChanged) {
-                    sets += "items_json = ?"
-                    params.add(itemsJson(resolved.map { Triple(it.id, it.productId, it.quantity) }))
+                if (!edit.isEmpty()) {
+                    val items = writeItems(tx, id, edit)
+                    sets += listOf("total = ?", "items_json = ?")
+                    params.add(Money.centsToDecimal(items.sumOf { it.priceCents * it.quantity }))
+                    params.add(itemsJson(items.map { Triple(it.id, it.productId, it.quantity) }))
                 }
                 tx.execute("UPDATE orders SET ${sets.joinToString()} WHERE id = ?", params + id)
             }
         }
 
-        /** Deletes the items that left, inserts the new ones and resets those whose quantity changed. */
+        /**
+         * Applies [edit] to the items stored now: deletes the removed ones, resets those whose quantity
+         * changed and inserts the new ones. Returns the items of the order afterwards (the stored ones by id,
+         * then the new ones).
+         */
         private suspend fun writeItems(
             tx: SqlTx,
             orderId: String,
-            stored: Map<String, Int>,
-            resolved: List<EditLine>,
-        ) {
-            (stored.keys - resolved.map { it.id }.toSet()).forEach {
-                tx.execute("DELETE FROM order_items WHERE id = ?", listOf(it))
-            }
-            resolved.forEach { line ->
-                val old = stored[line.id]
-                if (old == null) {
-                    tx.execute(
-                        "INSERT INTO order_items (id, order_id, product_id, quantity, status, unit_price) " +
-                            "VALUES (?, ?, ?, ?, ?, ?)",
-                        listOf(
-                            line.id,
-                            orderId,
-                            line.productId,
-                            line.quantity,
-                            ItemStatus.IN_PREPARATION.name,
-                            Money.centsToDecimal(line.unitPriceCents),
-                        ),
-                    )
-                } else if (old != line.quantity) {
-                    tx.execute(
-                        "UPDATE order_items SET quantity = ?, status = ? WHERE id = ?",
-                        listOf(line.quantity, ItemStatus.IN_PREPARATION.name, line.id),
+            edit: LineEdit,
+        ): List<StoredItem> {
+            val stored =
+                tx.getAll(
+                    "SELECT i.id, i.product_id, i.quantity, i.unit_price, p.price AS product_price " +
+                        "FROM order_items i LEFT JOIN products p ON p.id = i.product_id " +
+                        "WHERE i.order_id = ? AND i.deleted_at IS NULL ORDER BY i.id",
+                    listOf(orderId),
+                ) {
+                    StoredItem(
+                        id = it.string("id").orEmpty(),
+                        productId = it.string("product_id").orEmpty(),
+                        quantity = it.long("quantity")?.toInt() ?: 0,
+                        // As the order screens price it.
+                        priceCents =
+                            Money.parseDecimalToCents(it.string("unit_price"))
+                                ?: Money.parseDecimalToCents(it.string("product_price"))
+                                ?: 0L,
                     )
                 }
+            val kept = mutableListOf<StoredItem>()
+            for (item in stored) {
+                val quantity = edit.quantities[item.id]
+                when {
+                    item.id in edit.removed -> tx.execute("DELETE FROM order_items WHERE id = ?", listOf(item.id))
+                    quantity != null && quantity != item.quantity -> {
+                        tx.execute(
+                            "UPDATE order_items SET quantity = ?, status = ?, kitchen_ready_at = NULL WHERE id = ?",
+                            listOf(quantity, ItemStatus.IN_PREPARATION.name, item.id),
+                        )
+                        kept += item.copy(quantity = quantity)
+                    }
+                    else -> kept += item
+                }
             }
+            val storedIds = stored.map { it.id }.toSet()
+            edit.added.filterNot { it.id in storedIds }.forEach { line ->
+                tx.execute(
+                    "INSERT INTO order_items (id, order_id, product_id, quantity, status, unit_price) " +
+                        "VALUES (?, ?, ?, ?, ?, ?)",
+                    listOf(
+                        line.id,
+                        orderId,
+                        line.productId,
+                        line.quantity,
+                        ItemStatus.IN_PREPARATION.name,
+                        Money.centsToDecimal(line.unitPriceCents),
+                    ),
+                )
+                kept += StoredItem(line.id, line.productId, line.quantity, line.unitPriceCents)
+            }
+            return kept
         }
 
         /** The kitchen status of one item, written at once; the upload sends `{status}` of the `order_items` row. */
@@ -493,15 +559,6 @@ class OrderWriter
                 )
             }
         }
-
-        private suspend fun storedItems(orderId: String): Map<String, Int> =
-            sql
-                .getAll(
-                    "SELECT id, quantity FROM order_items WHERE order_id = ? AND deleted_at IS NULL",
-                    listOf(orderId),
-                ) {
-                    it.string("id").orEmpty() to (it.long("quantity")?.toInt() ?: 0)
-                }.toMap()
 
         private fun newId() = UUID.randomUUID().toString()
 

@@ -33,7 +33,10 @@ class KitchenViewModel
         private val failed = MutableStateFlow(false)
         private val shownInfo = MutableStateFlow<KitchenCard?>(null)
 
-        /** The last move was refused (the order closed or left for delivery meanwhile). */
+        /**
+         * The last move was refused (the order closed or left for delivery meanwhile). The screen shows it once
+         * and clears it with [dismissError].
+         */
         val moveFailed: StateFlow<Boolean> = failed.asStateFlow()
 
         /** The card whose order information is open. */

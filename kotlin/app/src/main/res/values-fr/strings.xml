@@ -234,6 +234,7 @@
     <string name="item_status_delivered">Livré</string>
     <string name="kitchen_tab_in_preparation">En préparation (%1$d)</string>
     <string name="kitchen_tab_ready">Prêt (%1$d)</string>
+    <string name="kitchen_conflict">La commande a changé. La file sera bientôt actualisée.</string>
     <string name="kitchen_mark_ready">Marquer prêt</string>
     <string name="kitchen_back_to_preparation">Retour en préparation</string>
     <string name="kitchen_unavailable_product">Produit indisponible</string>

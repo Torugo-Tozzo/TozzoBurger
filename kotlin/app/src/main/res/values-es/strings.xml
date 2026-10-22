@@ -234,6 +234,7 @@
     <string name="item_status_delivered">Entregado</string>
     <string name="kitchen_tab_in_preparation">En preparación (%1$d)</string>
     <string name="kitchen_tab_ready">Listo (%1$d)</string>
+    <string name="kitchen_conflict">El pedido cambió. La cola se actualizará en breve.</string>
     <string name="kitchen_mark_ready">Marcar listo</string>
     <string name="kitchen_back_to_preparation">Volver a preparación</string>
     <string name="kitchen_unavailable_product">Producto no disponible</string>

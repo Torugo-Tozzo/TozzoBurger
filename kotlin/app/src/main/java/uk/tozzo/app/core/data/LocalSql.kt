@@ -51,6 +51,13 @@ interface SqlTx {
         sql: String,
         params: List<Any?> = emptyList(),
     )
+
+    /** Reads inside the transaction, so it sees the transaction's own writes and nothing else meanwhile. */
+    suspend fun <T> getAll(
+        sql: String,
+        params: List<Any?> = emptyList(),
+        map: (SqlRow) -> T,
+    ): List<T>
 }
 
 /** [LocalSql] on the PowerSync database; every call runs on [Dispatchers.IO]. */
@@ -96,6 +103,12 @@ class PowerSyncLocalSql
                             ) {
                                 tx.execute(sql, params)
                             }
+
+                            override suspend fun <T> getAll(
+                                sql: String,
+                                params: List<Any?>,
+                                map: (SqlRow) -> T,
+                            ): List<T> = tx.getAll(sql, params) { Boxed(map(PowerSyncRow(it))) }.map { it.value }
                         },
                     )
                 }

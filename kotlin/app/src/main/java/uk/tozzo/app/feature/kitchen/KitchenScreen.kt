@@ -18,11 +18,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -32,6 +37,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import uk.tozzo.app.R
 import uk.tozzo.app.core.data.KitchenCard
 import uk.tozzo.app.domain.KitchenStage
@@ -49,6 +55,8 @@ data class KitchenActions(
     val onMove: (KitchenCard, KitchenStage) -> Unit,
     val onInfo: (KitchenCard) -> Unit,
     val onDismissInfo: () -> Unit,
+    /** The refused move was shown; it is shown once. */
+    val onErrorShown: () -> Unit = {},
 )
 
 @Composable
@@ -60,7 +68,7 @@ fun KitchenRoute(viewModel: KitchenViewModel = hiltViewModel()) {
         board = board,
         moveFailed = failed,
         info = info,
-        actions = KitchenActions(viewModel::move, viewModel::showInfo, viewModel::dismissInfo),
+        actions = KitchenActions(viewModel::move, viewModel::showInfo, viewModel::dismissInfo, viewModel::dismissError),
     )
 }
 
@@ -77,28 +85,57 @@ fun KitchenScreen(
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingState() }
         return
     }
+    val snackbar = remember { SnackbarHostState() }
+    MoveFailedEffect(moveFailed, snackbar, actions.onErrorShown)
     var selected by rememberSaveable { mutableStateOf(0) }
     val stage = KitchenStage.entries[selected]
     val inPreparation = board[KitchenStage.IN_PREPARATION].orEmpty()
     val ready = board[KitchenStage.READY].orEmpty()
-    Column(modifier.fillMaxSize()) {
-        PrimaryTabRow(selectedTabIndex = selected, containerColor = MaterialTheme.colorScheme.background) {
+    Box(modifier.fillMaxSize()) {
+        Board(stage, inPreparation, ready, actions, onSelect = { selected = it.ordinal })
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
+    }
+    if (info != null) InfoDialog(info, actions.onDismissInfo)
+}
+
+/**
+ * A refused move ("A comanda mudou…", the web's text) shows once as a snackbar. It runs in its own scope:
+ * clearing the error restarts the effect, which would cancel a showSnackbar launched from it.
+ */
+@Composable
+private fun MoveFailedEffect(
+    moveFailed: Boolean,
+    snackbar: SnackbarHostState,
+    onShown: () -> Unit,
+) {
+    val message = stringResource(R.string.kitchen_conflict)
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(moveFailed) {
+        if (!moveFailed) return@LaunchedEffect
+        onShown()
+        scope.launch { snackbar.showSnackbar(message) }
+    }
+}
+
+@Composable
+private fun Board(
+    stage: KitchenStage,
+    inPreparation: List<KitchenCard>,
+    ready: List<KitchenCard>,
+    actions: KitchenActions,
+    onSelect: (KitchenStage) -> Unit,
+) {
+    Column(Modifier.fillMaxSize()) {
+        PrimaryTabRow(selectedTabIndex = stage.ordinal, containerColor = MaterialTheme.colorScheme.background) {
             Tab(
                 selected = stage == KitchenStage.IN_PREPARATION,
-                onClick = { selected = KitchenStage.IN_PREPARATION.ordinal },
+                onClick = { onSelect(KitchenStage.IN_PREPARATION) },
                 text = { Text(stringResource(R.string.kitchen_tab_in_preparation, inPreparation.size)) },
             )
             Tab(
                 selected = stage == KitchenStage.READY,
-                onClick = { selected = KitchenStage.READY.ordinal },
+                onClick = { onSelect(KitchenStage.READY) },
                 text = { Text(stringResource(R.string.kitchen_tab_ready, ready.size)) },
-            )
-        }
-        if (moveFailed) {
-            Text(
-                stringResource(R.string.orders_status_failed),
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(16.dp),
             )
         }
         LazyColumn(
@@ -112,7 +149,6 @@ fun KitchenScreen(
             item(key = "end") { Box(Modifier.padding(bottom = 8.dp)) }
         }
     }
-    if (info != null) InfoDialog(info, actions.onDismissInfo)
 }
 
 @OptIn(ExperimentalFoundationApi::class)

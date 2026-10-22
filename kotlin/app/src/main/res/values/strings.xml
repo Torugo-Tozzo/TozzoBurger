@@ -232,6 +232,7 @@
     <string name="item_status_delivered">Delivered</string>
     <string name="kitchen_tab_in_preparation">In preparation (%1$d)</string>
     <string name="kitchen_tab_ready">Ready (%1$d)</string>
+    <string name="kitchen_conflict">The order changed. The queue will update shortly.</string>
     <string name="kitchen_mark_ready">Mark ready</string>
     <string name="kitchen_back_to_preparation">Back to preparation</string>
     <string name="kitchen_unavailable_product">Product unavailable</string>

@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performClick
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -17,7 +18,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import uk.tozzo.app.core.data.KitchenRepository
+import uk.tozzo.app.core.data.LocalSql
 import uk.tozzo.app.core.data.OrderWriter
+import uk.tozzo.app.core.data.SqlTx
 import uk.tozzo.app.core.session.DeviceBinding
 import uk.tozzo.app.testing.MemoryStore
 import uk.tozzo.app.testing.RobolectricSql
@@ -51,11 +54,12 @@ class KitchenScreenTest {
     @After
     fun tearDown() = sql.close()
 
-    private fun show() {
+    private fun show(writes: LocalSql = sql): KitchenViewModel {
         val binding = DeviceBinding(MemoryStore())
         runBlocking { binding.save(foodOwnerBinding()) }
-        val viewModel = KitchenViewModel(KitchenRepository(sql), OrderWriter(sql, binding, Clock.systemUTC()))
+        val viewModel = KitchenViewModel(KitchenRepository(sql), OrderWriter(writes, binding, Clock.systemUTC()))
         rule.setContent { TozzoTheme { KitchenRoute(viewModel = viewModel) } }
+        return viewModel
     }
 
     @Test
@@ -86,5 +90,22 @@ class KitchenScreenTest {
 
         rule.onNodeWithText("Informações do pedido").assertIsDisplayed()
         rule.onNodeWithText("abcdef123").assertIsDisplayed()
+    }
+
+    @Test
+    fun aRefusedMoveShowsTheWebTextOnceAndClears() {
+        // The order changed on the server meanwhile: the write is refused and the card stays on screen.
+        val refusing =
+            object : LocalSql by sql {
+                override suspend fun <T> writeTransaction(block: suspend (SqlTx) -> T): T =
+                    throw IllegalStateException("the order is closed")
+            }
+        val viewModel = show(refusing)
+
+        rule.onAllNodesWithText("Marcar pronto")[0].performClick()
+        rule.waitForIdle()
+
+        rule.onNodeWithText("A comanda mudou. A fila será atualizada em breve.").assertIsDisplayed()
+        assertFalse(viewModel.moveFailed.value)
     }
 }

@@ -270,4 +270,81 @@ class OrderEditViewModelTest {
                     ?.status,
             )
         }
+
+    private suspend fun items() =
+        sql.getAll("SELECT id, quantity FROM order_items ORDER BY id", emptyList()) {
+            it.string("id") to it.long("quantity")
+        }
+
+    private suspend fun itemsJson() =
+        sql.getAll("SELECT items_json FROM orders WHERE id = 'o1'", emptyList()) { it.string("items_json") }.single()
+
+    @Test
+    fun anItemAddedElsewhereSurvivesASaveOfTheCustomerOnly() =
+        runTest {
+            seedPlain()
+            val vm = viewModel("o1")
+            // The web adds an item while the screen is open; the download writes it.
+            sql.seedItem("i2", "o1", "p1", 1, "12.50")
+
+            vm.setCustomer("Mesa 2")
+            assertTrue(vm.state.value.dirty)
+            vm.save()
+
+            assertEquals(listOf("i1" to 2L, "i2" to 1L), items())
+            assertNull(itemsJson())
+        }
+
+    @Test
+    fun theDraftIsNotDirtyBecauseOfAnItemAddedElsewhere() =
+        runTest {
+            seedPlain()
+            val vm = viewModel("o1")
+
+            sql.seedItem("i2", "o1", "p1", 1, "12.50")
+            sql.execute("UPDATE products SET name = 'X-Bacon', price = '15.00'")
+
+            assertFalse(vm.state.value.dirty)
+        }
+
+    @Test
+    fun anItemRemovedElsewhereIsNotInsertedAgain() =
+        runTest {
+            seedPlain()
+            sql.seedItem("i2", "o1", "p1", 1, "12.50")
+            val vm = viewModel("o1")
+            sql.execute("DELETE FROM order_items WHERE id = 'i2'")
+
+            vm.increase("i1")
+            vm.save()
+
+            assertEquals(listOf("i1" to 3L), items())
+            val json =
+                kotlinx.serialization.json.Json
+                    .parseToJsonElement(itemsJson()!!)
+                    .toString()
+            assertEquals("""[{"id":"i1","product_id":"p1","quantity":3}]""", json)
+        }
+
+    @Test
+    fun aQuantityChangeStillSendsTheItemBackToPreparation() =
+        runTest {
+            seedPlain()
+            sql.execute("UPDATE order_items SET status = 'READY', kitchen_ready_at = '2026-10-20 12:30:00.000'")
+            val vm = viewModel("o1")
+            sql.seedItem("i2", "o1", "p1", 1, "12.50", status = "READY")
+
+            vm.decrease("i1")
+            vm.save()
+
+            assertEquals("IN_PREPARATION", status("i1"))
+            assertEquals("READY", status("i2"))
+            assertEquals(listOf("i1" to 1L, "i2" to 1L), items())
+            assertNull(
+                sql
+                    .getAll("SELECT kitchen_ready_at FROM order_items WHERE id = 'i1'", emptyList()) {
+                        it.string("kitchen_ready_at")
+                    }.single(),
+            )
+        }
 }

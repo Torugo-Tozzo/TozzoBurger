@@ -230,6 +230,7 @@
     <string name="item_status_delivered">已送达</string>
     <string name="kitchen_tab_in_preparation">制作中 (%1$d)</string>
     <string name="kitchen_tab_ready">已完成 (%1$d)</string>
+    <string name="kitchen_conflict">订单已更改。队列将很快更新。</string>
     <string name="kitchen_mark_ready">标记为完成</string>
     <string name="kitchen_back_to_preparation">退回制作</string>
     <string name="kitchen_unavailable_product">商品不可用</string>

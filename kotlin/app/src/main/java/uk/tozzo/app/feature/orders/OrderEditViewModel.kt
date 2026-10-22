@@ -49,6 +49,8 @@ data class OrderEditState(
     val isDelivery: Boolean = false,
     val address: String = "",
     val lines: List<EditLine> = emptyList(),
+    /** The items as the screen loaded them; "Salvar" writes what the user changed against these. */
+    val snapshot: List<EditLine> = emptyList(),
     val payment: PaymentMethod? = null,
     val busy: Boolean = false,
     /** "Ver pedido": nothing can be changed, the fields included. */
@@ -58,14 +60,17 @@ data class OrderEditState(
 
     val totalCents: Long get() = lines.sumOf { it.unitPriceCents * it.quantity }
 
-    /** The form differs from the stored order. */
+    /**
+     * The form differs from the stored order, or the user changed the lines since the screen loaded them (an
+     * item added elsewhere, or a product renamed or repriced by the sync, does not count).
+     */
     val dirty: Boolean
         get() {
             val stored = order ?: return false
             return customer.trim() != stored.customerName.orEmpty() ||
                 isDelivery != stored.isDelivery ||
                 (isDelivery && address.trim() != stored.deliveryAddress.orEmpty().trim()) ||
-                lines != stored.toLines()
+                lines.map { it.key() } != snapshot.map { it.key() }
         }
 
     private val editable: Boolean get() = loaded && order != null && !delivering && !readOnly
@@ -81,6 +86,8 @@ data class OrderEditState(
     /** Closing takes the order as stored: nothing to close when empty, and unsaved changes are saved first. */
     val canClose: Boolean get() = showClose && editable && !busy && !dirty && order?.items?.isNotEmpty() == true
 }
+
+private fun EditLine.key() = Triple(id, productId, quantity)
 
 internal fun OrderView.toLines(): List<EditLine> =
     items.map { EditLine(it.id, it.productId, it.productName.orEmpty(), it.unitPriceCents, it.quantity) }
@@ -158,6 +165,7 @@ class OrderEditViewModel
                         isDelivery = order.isDelivery,
                         address = order.deliveryAddress.orEmpty(),
                         lines = order.toLines(),
+                        snapshot = order.toLines(),
                     )
                 }
             }
@@ -251,7 +259,7 @@ class OrderEditViewModel
                 return
             }
             run(OrderEditMessage.SAVE_FAILED, OrderEditExit.SAVED, goingAway = false) {
-                writer.updateOrder(orderId, s.customer, s.isDelivery, s.address, s.lines)
+                writer.updateOrder(orderId, s.customer, s.isDelivery, s.address, s.snapshot, s.lines)
             }
         }
 
