@@ -185,4 +185,22 @@
     <string name="products_image_save_first">पहले उत्पाद सहेजें, फिर छवि जोड़ने के लिए उसे संपादित करें।</string>
     <string name="products_save_failed">सहेजा नहीं जा सका। फिर से कोशिश करें।</string>
     <string name="products_price_missing">कीमत नहीं</string>
+    <string name="cart_title">बिल</string>
+    <string name="cart_customer">ग्राहक / टेबल</string>
+    <string name="cart_delivery">डिलीवरी ऑर्डर</string>
+    <string name="cart_address">डिलीवरी का पता</string>
+    <string name="cart_address_required">डिलीवरी का पता भरें।</string>
+    <string name="cart_total">कुल</string>
+    <string name="cart_create_order">ऑर्डर बनाएँ</string>
+    <string name="cart_direct_sale">सीधी बिक्री</string>
+    <string name="cart_clear">साफ़ करें</string>
+    <string name="cart_clear_title">बिल साफ़ करें</string>
+    <string name="cart_clear_message">बिल से सभी आइटम हटाएँ?</string>
+    <string name="cart_remove_item">आइटम हटाएँ</string>
+    <string name="cart_decrease_item">मात्रा घटाएँ</string>
+    <string name="cart_increase_item">मात्रा बढ़ाएँ</string>
+    <string name="sell_view_cart">बिल देखें (%1$d)</string>
+    <string name="sell_sale_saved">बिक्री दर्ज हुई</string>
+    <string name="sell_order_created">ऑर्डर बन गया</string>
+    <string name="sell_failed">सहेजा नहीं जा सका। फिर से कोशिश करें।</string>
 </resources>

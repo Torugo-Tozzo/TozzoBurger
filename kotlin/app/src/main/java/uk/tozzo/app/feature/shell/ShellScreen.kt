@@ -53,8 +53,8 @@ private const val REJECTIONS_ROUTE = "rejections"
 /**
  * The signed-in app: top bar with the sync badge, and one route per [AppDestination]. The roles with
  * a single module (COOK, DRIVER) have no drawer: a ⋮ menu offers Settings and Sign out instead.
- * [settingsContent], [rejectionsContent] and [productsContent] (the placeholder when absent) are slots, so
- * the screen stays testable without view models.
+ * [settingsContent], [rejectionsContent], [productsContent] and [sellContent] (the placeholder when absent)
+ * are slots, so the screen stays testable without view models.
  */
 @Suppress("LongMethod")
 @Composable
@@ -67,6 +67,7 @@ fun ShellScreen(
     settingsContent: @Composable () -> Unit,
     rejectionsContent: @Composable () -> Unit,
     productsContent: (@Composable () -> Unit)? = null,
+    sellContent: (@Composable () -> Unit)? = null,
 ) {
     val items = remember(binding) { navigationItems(resolveNavigationModules(binding.role, binding.modules)) }
     val labels = remember(items) { items.associate { it.destination to it.label } }
@@ -104,6 +105,7 @@ fun ShellScreen(
                 settingsContent,
                 rejectionsContent,
                 productsContent,
+                sellContent,
             )
         }
     }
@@ -142,6 +144,7 @@ private fun ShellNavHost(
     settingsContent: @Composable () -> Unit,
     rejectionsContent: @Composable () -> Unit,
     productsContent: (@Composable () -> Unit)?,
+    sellContent: (@Composable () -> Unit)?,
 ) {
     NavHost(navController = navController, startDestination = start.name, modifier = modifier.fillMaxSize()) {
         AppDestination.entries.forEach { destination ->
@@ -150,6 +153,8 @@ private fun ShellNavHost(
                     settingsContent()
                 } else if (destination == AppDestination.PRODUCTS && productsContent != null) {
                     productsContent()
+                } else if (destination == AppDestination.SELL && sellContent != null) {
+                    sellContent()
                 } else {
                     ModulePlaceholderScreen(labels[destination] ?: R.string.app_name)
                 }

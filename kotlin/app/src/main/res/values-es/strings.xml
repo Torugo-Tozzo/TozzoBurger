@@ -187,4 +187,22 @@
     <string name="products_image_save_first">Guarda el producto y luego edítalo para subir una imagen.</string>
     <string name="products_save_failed">No se pudo guardar. Inténtalo de nuevo.</string>
     <string name="products_price_missing">Sin precio</string>
+    <string name="cart_title">Cuenta</string>
+    <string name="cart_customer">Cliente / Mesa</string>
+    <string name="cart_delivery">Pedido para entrega</string>
+    <string name="cart_address">Dirección de entrega</string>
+    <string name="cart_address_required">Indica la dirección de entrega.</string>
+    <string name="cart_total">Total</string>
+    <string name="cart_create_order">Generar pedido</string>
+    <string name="cart_direct_sale">Venta directa</string>
+    <string name="cart_clear">Limpiar</string>
+    <string name="cart_clear_title">Limpiar cuenta</string>
+    <string name="cart_clear_message">¿Quitar todos los artículos de la cuenta?</string>
+    <string name="cart_remove_item">Quitar artículo</string>
+    <string name="cart_decrease_item">Disminuir cantidad</string>
+    <string name="cart_increase_item">Aumentar cantidad</string>
+    <string name="sell_view_cart">Ver cuenta (%1$d)</string>
+    <string name="sell_sale_saved">Venta registrada</string>
+    <string name="sell_order_created">Pedido creado</string>
+    <string name="sell_failed">No se pudo guardar. Inténtalo de nuevo.</string>
 </resources>

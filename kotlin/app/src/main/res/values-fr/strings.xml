@@ -187,4 +187,22 @@
     <string name="products_image_save_first">Enregistrez le produit, puis modifiez-le pour ajouter une image.</string>
     <string name="products_save_failed">Impossible d\'enregistrer. Réessayez.</string>
     <string name="products_price_missing">Sans prix</string>
+    <string name="cart_title">Addition</string>
+    <string name="cart_customer">Client / Table</string>
+    <string name="cart_delivery">Commande à livrer</string>
+    <string name="cart_address">Adresse de livraison</string>
+    <string name="cart_address_required">Indiquez l\'adresse de livraison.</string>
+    <string name="cart_total">Total</string>
+    <string name="cart_create_order">Créer la commande</string>
+    <string name="cart_direct_sale">Vente directe</string>
+    <string name="cart_clear">Vider</string>
+    <string name="cart_clear_title">Vider l\'addition</string>
+    <string name="cart_clear_message">Retirer tous les articles de l\'addition ?</string>
+    <string name="cart_remove_item">Retirer l\'article</string>
+    <string name="cart_decrease_item">Diminuer la quantité</string>
+    <string name="cart_increase_item">Augmenter la quantité</string>
+    <string name="sell_view_cart">Voir l\'addition (%1$d)</string>
+    <string name="sell_sale_saved">Vente enregistrée</string>
+    <string name="sell_order_created">Commande créée</string>
+    <string name="sell_failed">Enregistrement impossible. Réessayez.</string>
 </resources>

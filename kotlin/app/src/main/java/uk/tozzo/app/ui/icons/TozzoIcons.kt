@@ -34,6 +34,21 @@ object TozzoIcons {
         )
     }
 
+    val Plus: ImageVector by lazy { lucide("Plus", "M5 12h14", "M12 5v14") }
+
+    val Minus: ImageVector by lazy { lucide("Minus", "M5 12h14") }
+
+    val Trash: ImageVector by lazy {
+        lucide(
+            "Trash",
+            "M3 6h18",
+            "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6",
+            "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2",
+            "M10 11v6",
+            "M14 11v6",
+        )
+    }
+
     val Sell: ImageVector by lazy {
         lucide(
             "Sell",

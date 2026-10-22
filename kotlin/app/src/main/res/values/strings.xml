@@ -185,4 +185,22 @@
     <string name="products_image_save_first">Save the product first, then edit it to add an image.</string>
     <string name="products_save_failed">Could not save. Try again.</string>
     <string name="products_price_missing">No price</string>
+    <string name="cart_title">Bill</string>
+    <string name="cart_customer">Customer / Table</string>
+    <string name="cart_delivery">Delivery order</string>
+    <string name="cart_address">Delivery address</string>
+    <string name="cart_address_required">Enter the delivery address.</string>
+    <string name="cart_total">Total</string>
+    <string name="cart_create_order">Create order</string>
+    <string name="cart_direct_sale">Direct sale</string>
+    <string name="cart_clear">Clear</string>
+    <string name="cart_clear_title">Clear bill</string>
+    <string name="cart_clear_message">Remove all items from the bill?</string>
+    <string name="cart_remove_item">Remove item</string>
+    <string name="cart_decrease_item">Decrease quantity</string>
+    <string name="cart_increase_item">Increase quantity</string>
+    <string name="sell_view_cart">View bill (%1$d)</string>
+    <string name="sell_sale_saved">Sale recorded</string>
+    <string name="sell_order_created">Order created</string>
+    <string name="sell_failed">Could not save. Try again.</string>
 </resources>

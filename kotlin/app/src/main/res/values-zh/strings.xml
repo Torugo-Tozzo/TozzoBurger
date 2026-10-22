@@ -183,4 +183,22 @@
     <string name="products_image_save_first">请先保存产品，再编辑它以添加图片。</string>
     <string name="products_save_failed">无法保存，请重试。</string>
     <string name="products_price_missing">无价格</string>
+    <string name="cart_title">账单</string>
+    <string name="cart_customer">顾客 / 桌号</string>
+    <string name="cart_delivery">外送订单</string>
+    <string name="cart_address">送货地址</string>
+    <string name="cart_address_required">请填写送货地址。</string>
+    <string name="cart_total">合计</string>
+    <string name="cart_create_order">生成订单</string>
+    <string name="cart_direct_sale">直接销售</string>
+    <string name="cart_clear">清空</string>
+    <string name="cart_clear_title">清空账单</string>
+    <string name="cart_clear_message">要移除账单中的所有商品吗？</string>
+    <string name="cart_remove_item">移除商品</string>
+    <string name="cart_decrease_item">减少数量</string>
+    <string name="cart_increase_item">增加数量</string>
+    <string name="sell_view_cart">查看账单（%1$d）</string>
+    <string name="sell_sale_saved">销售已记录</string>
+    <string name="sell_order_created">订单已创建</string>
+    <string name="sell_failed">无法保存，请重试。</string>
 </resources>

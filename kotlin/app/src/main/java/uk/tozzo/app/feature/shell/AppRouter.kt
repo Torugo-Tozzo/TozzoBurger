@@ -20,6 +20,7 @@ import uk.tozzo.app.feature.login.Notice
 import uk.tozzo.app.feature.notice.NoticeScreen
 import uk.tozzo.app.feature.products.ProductsRoute
 import uk.tozzo.app.feature.rejections.RejectionsRoute
+import uk.tozzo.app.feature.sell.SellRoute
 import uk.tozzo.app.feature.settings.SettingsRoute
 import uk.tozzo.app.ui.components.LoadingState
 
@@ -106,6 +107,7 @@ private fun ShellRoute(
             },
             rejectionsContent = { RejectionsRoute() },
             productsContent = { ProductsRoute() },
+            sellContent = { SellRoute() },
         )
     }
 }
