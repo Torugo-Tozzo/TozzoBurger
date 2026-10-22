@@ -36,6 +36,7 @@ import javax.inject.Inject
 /** The list grows by this much each time the user reaches its end. */
 internal const val SALES_PAGE_SIZE = 50
 private const val STOP_TIMEOUT_MS = 5_000L
+private val DEFAULT_PERIOD: Duration = Duration.ofHours(24)
 private const val MAX_MONEY_DIGITS = 12
 private const val LAST_SECOND = 59
 private val END_OF_DAY: LocalTime = LocalTime.of(23, 59)
@@ -66,12 +67,11 @@ class SalesViewModel
     @Inject
     constructor(
         repository: SaleRepository,
-        clock: Clock,
+        private val clock: Clock,
     ) : ViewModel() {
         private val zone: ZoneId get() = ZoneId.systemDefault()
-        private val defaultFrom = clock.instant().minus(Duration.ofHours(24))
         private val formState = MutableStateFlow(defaultForm())
-        private val appliedState = MutableStateFlow(SaleFilter(from = defaultFrom))
+        private val appliedState = MutableStateFlow(SaleFilter(from = defaultFrom()))
         private val limitState = MutableStateFlow(SALES_PAGE_SIZE)
         private val errorState = MutableStateFlow(false)
 
@@ -134,7 +134,7 @@ class SalesViewModel
         fun clear() {
             formState.value = defaultForm()
             errorState.value = false
-            appliedState.value = SaleFilter(from = defaultFrom)
+            appliedState.value = SaleFilter(from = defaultFrom())
             limitState.value = SALES_PAGE_SIZE
         }
 
@@ -142,8 +142,11 @@ class SalesViewModel
             formState.update { it.block() }
         }
 
+        /** 24 hours before now, read at each use: this view model outlives long idle stretches on a till. */
+        private fun defaultFrom(): Instant = clock.instant().minus(DEFAULT_PERIOD)
+
         private fun defaultForm(): SalesFilterForm {
-            val start = LocalDateTime.ofInstant(defaultFrom, zone)
+            val start = LocalDateTime.ofInstant(defaultFrom(), zone)
             return SalesFilterForm(
                 fromDate = DATE_FORMAT.format(start),
                 fromTime = "%02d:%02d".format(start.hour, start.minute),

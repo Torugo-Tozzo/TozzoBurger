@@ -32,7 +32,15 @@ class SalesViewModelTest {
     private lateinit var sql: RobolectricSql
     private lateinit var viewModel: SalesViewModel
 
-    private val clock = Clock.fixed(Instant.parse("2026-10-20T15:00:00Z"), ZoneOffset.UTC)
+    private var now = Instant.parse("2026-10-20T15:00:00Z")
+    private val clock =
+        object : Clock() {
+            override fun getZone() = ZoneOffset.UTC
+
+            override fun withZone(zone: java.time.ZoneId) = this
+
+            override fun instant() = now
+        }
 
     @Before
     fun setUp() =
@@ -107,5 +115,16 @@ class SalesViewModelTest {
         viewModel.clear()
         assertEquals(null, viewModel.applied.value.to)
         assertEquals("", viewModel.form.value.toDate)
+    }
+
+    @Test
+    fun clearMovesTheStartToTheNewNowMinus24Hours() {
+        now = Instant.parse("2026-10-21T20:30:00Z")
+
+        viewModel.clear()
+
+        assertEquals(Instant.parse("2026-10-20T20:30:00Z"), viewModel.applied.value.from)
+        assertEquals("2026-10-20", viewModel.form.value.fromDate)
+        assertEquals("20:30", viewModel.form.value.fromTime)
     }
 }
