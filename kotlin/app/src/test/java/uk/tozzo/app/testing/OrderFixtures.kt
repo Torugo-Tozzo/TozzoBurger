@@ -64,3 +64,29 @@ suspend fun RobolectricSql.seedItem(
         "kitchen_ready_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     listOf(id, orderId, productId, quantity, status, unitPrice, deletedAt, kitchenReadyAt),
 )
+
+@Suppress("LongParameterList")
+suspend fun RobolectricSql.seedSale(
+    id: String,
+    soldAt: String = "2026-10-20 12:00:00.000",
+    total: String = "10.00",
+    customer: String? = null,
+    sellerId: String? = "u1",
+    payment: String? = null,
+    cancelled: Int = 0,
+) = execute(
+    "INSERT INTO sales (id, total, sold_at, customer_name, is_cancelled, payment_method, seller_id) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+    listOf(id, total, soldAt, customer, cancelled, payment, sellerId),
+)
+
+suspend fun RobolectricSql.seedSaleItem(
+    id: String,
+    saleId: String,
+    productId: String,
+    quantity: Int,
+    unitPrice: String?,
+) = execute(
+    "INSERT INTO sale_items (id, sale_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?, ?)",
+    listOf(id, saleId, productId, quantity, unitPrice),
+)

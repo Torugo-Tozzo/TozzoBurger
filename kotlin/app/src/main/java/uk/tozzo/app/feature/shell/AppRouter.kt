@@ -24,6 +24,8 @@ import uk.tozzo.app.feature.orders.OrderEditRoute
 import uk.tozzo.app.feature.orders.OrdersRoute
 import uk.tozzo.app.feature.products.ProductsRoute
 import uk.tozzo.app.feature.rejections.RejectionsRoute
+import uk.tozzo.app.feature.sales.SaleDetailRoute
+import uk.tozzo.app.feature.sales.SalesRoute
 import uk.tozzo.app.feature.sell.SellRoute
 import uk.tozzo.app.feature.settings.SettingsRoute
 import uk.tozzo.app.ui.components.LoadingState
@@ -111,11 +113,13 @@ private fun ShellRoute(
             },
             rejectionsContent = { RejectionsRoute() },
             productsContent = { ProductsRoute() },
-            sellContent = { SellRoute() },
+            sellContent = { onViewSale -> SellRoute(onViewSale = onViewSale) },
             ordersContent = { onNewOrder, onEdit -> OrdersRoute(onNewOrder = onNewOrder, onEdit = onEdit) },
             orderEditContent = { onExit -> OrderEditRoute(onExit = onExit) },
             kitchenContent = { KitchenRoute() },
             deliveriesContent = { onView -> DeliveriesRoute(onView = onView) },
+            salesContent = { onNewSale, onOpen -> SalesRoute(onNewSale = onNewSale, onOpen = onOpen) },
+            saleDetailContent = { onExit -> SaleDetailRoute(onExit = onExit) },
         )
     }
 }

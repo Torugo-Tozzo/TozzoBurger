@@ -280,4 +280,30 @@
     <string name="deliveries_error_change">No se pudo actualizar la entrega.</string>
     <string name="deliveries_error_close">No se pudo cerrar el pedido.</string>
     <string name="deliveries_details_title">Detalles del pedido</string>
+    <string name="sales_closing">Cierre del período</string>
+    <string name="sales_total_records">Total de registros: %1$d</string>
+    <string name="sales_filters">Filtros</string>
+    <string name="sales_apply">Aplicar</string>
+    <string name="sales_clear">Limpiar</string>
+    <string name="sales_new">Nueva venta</string>
+    <string name="sales_empty">No se encontraron ventas en el período.</string>
+    <string name="sales_date_from">Fecha inicial (AAAA-MM-DD)</string>
+    <string name="sales_time_from">Hora inicial (HH:mm)</string>
+    <string name="sales_date_to">Fecha final (AAAA-MM-DD)</string>
+    <string name="sales_time_to">Hora final (HH:mm)</string>
+    <string name="sales_filter_invalid">Revisa las fechas y horas.</string>
+    <string name="sales_detail_title">Detalles de la venta</string>
+    <string name="sales_cancel">Cancelar venta</string>
+    <string name="sales_cancel_confirm">¿Seguro que quieres cancelar esta venta?</string>
+    <string name="sales_cancelling">Cancelando...</string>
+    <string name="sales_cancel_failed">Error al cancelar la venta.</string>
+    <string name="sales_view">Ver venta</string>
+    <string name="sales_payment">Pago</string>
+    <string name="sales_date">Fecha</string>
+    <string name="sales_total">Total</string>
+    <string name="sales_not_found">Venta no encontrada.</string>
+    <plurals name="sales_units">
+        <item quantity="one">%1$d unidad</item>
+        <item quantity="other">%1$d unidades</item>
+    </plurals>
 </resources>

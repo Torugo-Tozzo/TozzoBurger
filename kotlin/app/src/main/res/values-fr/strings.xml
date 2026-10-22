@@ -280,4 +280,30 @@
     <string name="deliveries_error_change">Impossible de mettre à jour la livraison.</string>
     <string name="deliveries_error_close">Impossible de clôturer la commande.</string>
     <string name="deliveries_details_title">Détails de la commande</string>
+    <string name="sales_closing">Clôture de la période</string>
+    <string name="sales_total_records">Total des enregistrements : %1$d</string>
+    <string name="sales_filters">Filtres</string>
+    <string name="sales_apply">Appliquer</string>
+    <string name="sales_clear">Effacer</string>
+    <string name="sales_new">Nouvelle vente</string>
+    <string name="sales_empty">Aucune vente trouvée sur la période.</string>
+    <string name="sales_date_from">Date de début (AAAA-MM-JJ)</string>
+    <string name="sales_time_from">Heure de début (HH:mm)</string>
+    <string name="sales_date_to">Date de fin (AAAA-MM-JJ)</string>
+    <string name="sales_time_to">Heure de fin (HH:mm)</string>
+    <string name="sales_filter_invalid">Vérifiez les dates et les heures.</string>
+    <string name="sales_detail_title">Détails de la vente</string>
+    <string name="sales_cancel">Annuler la vente</string>
+    <string name="sales_cancel_confirm">Voulez-vous vraiment annuler cette vente ?</string>
+    <string name="sales_cancelling">Annulation...</string>
+    <string name="sales_cancel_failed">Erreur lors de l\'annulation de la vente.</string>
+    <string name="sales_view">Voir la vente</string>
+    <string name="sales_payment">Paiement</string>
+    <string name="sales_date">Date</string>
+    <string name="sales_total">Total</string>
+    <string name="sales_not_found">Vente introuvable.</string>
+    <plurals name="sales_units">
+        <item quantity="one">%1$d unité</item>
+        <item quantity="other">%1$d unités</item>
+    </plurals>
 </resources>

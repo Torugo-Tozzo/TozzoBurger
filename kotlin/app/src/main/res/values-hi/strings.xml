@@ -278,4 +278,30 @@
     <string name="deliveries_error_change">डिलीवरी अपडेट नहीं हो सकी।</string>
     <string name="deliveries_error_close">ऑर्डर बंद नहीं हो सका।</string>
     <string name="deliveries_details_title">ऑर्डर का विवरण</string>
+    <string name="sales_closing">अवधि का समापन</string>
+    <string name="sales_total_records">कुल रिकॉर्ड: %1$d</string>
+    <string name="sales_filters">फ़िल्टर</string>
+    <string name="sales_apply">लागू करें</string>
+    <string name="sales_clear">साफ़ करें</string>
+    <string name="sales_new">नई बिक्री</string>
+    <string name="sales_empty">इस अवधि में कोई बिक्री नहीं मिली।</string>
+    <string name="sales_date_from">प्रारंभ तिथि (YYYY-MM-DD)</string>
+    <string name="sales_time_from">प्रारंभ समय (HH:mm)</string>
+    <string name="sales_date_to">अंतिम तिथि (YYYY-MM-DD)</string>
+    <string name="sales_time_to">अंतिम समय (HH:mm)</string>
+    <string name="sales_filter_invalid">तिथियाँ और समय जाँचें।</string>
+    <string name="sales_detail_title">बिक्री का विवरण</string>
+    <string name="sales_cancel">बिक्री रद्द करें</string>
+    <string name="sales_cancel_confirm">क्या आप वाकई इस बिक्री को रद्द करना चाहते हैं?</string>
+    <string name="sales_cancelling">रद्द हो रही है...</string>
+    <string name="sales_cancel_failed">बिक्री रद्द करने में त्रुटि।</string>
+    <string name="sales_view">बिक्री देखें</string>
+    <string name="sales_payment">भुगतान</string>
+    <string name="sales_date">तिथि</string>
+    <string name="sales_total">कुल</string>
+    <string name="sales_not_found">बिक्री नहीं मिली।</string>
+    <plurals name="sales_units">
+        <item quantity="one">%1$d इकाई</item>
+        <item quantity="other">%1$d इकाइयाँ</item>
+    </plurals>
 </resources>

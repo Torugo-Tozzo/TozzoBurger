@@ -276,4 +276,30 @@
     <string name="deliveries_error_change">无法更新配送。</string>
     <string name="deliveries_error_close">无法关闭订单。</string>
     <string name="deliveries_details_title">订单详情</string>
+    <string name="sales_closing">期间结算</string>
+    <string name="sales_total_records">记录总数：%1$d</string>
+    <string name="sales_filters">筛选</string>
+    <string name="sales_apply">应用</string>
+    <string name="sales_clear">清除</string>
+    <string name="sales_new">新建销售</string>
+    <string name="sales_empty">该期间没有找到销售。</string>
+    <string name="sales_date_from">开始日期 (YYYY-MM-DD)</string>
+    <string name="sales_time_from">开始时间 (HH:mm)</string>
+    <string name="sales_date_to">结束日期 (YYYY-MM-DD)</string>
+    <string name="sales_time_to">结束时间 (HH:mm)</string>
+    <string name="sales_filter_invalid">请检查日期和时间。</string>
+    <string name="sales_detail_title">销售详情</string>
+    <string name="sales_cancel">取消销售</string>
+    <string name="sales_cancel_confirm">确定要取消这笔销售吗？</string>
+    <string name="sales_cancelling">正在取消...</string>
+    <string name="sales_cancel_failed">取消销售时出错。</string>
+    <string name="sales_view">查看销售</string>
+    <string name="sales_payment">付款方式</string>
+    <string name="sales_date">日期</string>
+    <string name="sales_total">合计</string>
+    <string name="sales_not_found">未找到销售。</string>
+    <plurals name="sales_units">
+        <item quantity="one">%1$d 件</item>
+        <item quantity="other">%1$d 件</item>
+    </plurals>
 </resources>

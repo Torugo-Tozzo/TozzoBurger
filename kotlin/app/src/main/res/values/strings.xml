@@ -278,4 +278,30 @@
     <string name="deliveries_error_change">Could not update the delivery.</string>
     <string name="deliveries_error_close">Could not close the order.</string>
     <string name="deliveries_details_title">Order details</string>
+    <string name="sales_closing">Period total</string>
+    <string name="sales_total_records">Total records: %1$d</string>
+    <string name="sales_filters">Filters</string>
+    <string name="sales_apply">Apply</string>
+    <string name="sales_clear">Clear</string>
+    <string name="sales_new">New sale</string>
+    <string name="sales_empty">No sales found in the period.</string>
+    <string name="sales_date_from">Start date (YYYY-MM-DD)</string>
+    <string name="sales_time_from">Start time (HH:mm)</string>
+    <string name="sales_date_to">End date (YYYY-MM-DD)</string>
+    <string name="sales_time_to">End time (HH:mm)</string>
+    <string name="sales_filter_invalid">Check the dates and times.</string>
+    <string name="sales_detail_title">Sale details</string>
+    <string name="sales_cancel">Cancel sale</string>
+    <string name="sales_cancel_confirm">Are you sure you want to cancel this sale?</string>
+    <string name="sales_cancelling">Cancelling...</string>
+    <string name="sales_cancel_failed">Error cancelling sale.</string>
+    <string name="sales_view">View sale</string>
+    <string name="sales_payment">Payment</string>
+    <string name="sales_date">Date</string>
+    <string name="sales_total">Total</string>
+    <string name="sales_not_found">Sale not found.</string>
+    <plurals name="sales_units">
+        <item quantity="one">%1$d unit</item>
+        <item quantity="other">%1$d units</item>
+    </plurals>
 </resources>

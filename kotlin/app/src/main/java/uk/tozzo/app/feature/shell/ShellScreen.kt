@@ -53,14 +53,16 @@ internal const val SHELL_TITLE_TAG = "shell_title"
 private const val REJECTIONS_ROUTE = "rejections"
 private const val ORDER_EDIT_ROUTE = "order_edit/{orderId}?readOnly={readOnly}"
 private const val READ_ONLY_ARG = "readOnly"
+private const val SALE_DETAIL_ROUTE = "sale_detail/{saleId}"
 
 /**
  * The signed-in app: top bar with the sync badge, and one route per [AppDestination]. The roles with
  * a single module (COOK, DRIVER) have no drawer: a ⋮ menu offers Settings and Sign out instead.
  * [settingsContent], [rejectionsContent], [productsContent], [sellContent], [ordersContent],
- * [orderEditContent], [kitchenContent] and [deliveriesContent] (the placeholder when absent) are slots, so the
- * screen stays testable without view models. The orders list opens the edit route of an order; "Novo pedido"
- * opens Sell; Deliveries opens the same route read-only ("Ver pedido").
+ * [orderEditContent], [kitchenContent], [deliveriesContent], [salesContent] and [saleDetailContent] (the placeholder
+ * when absent) are slots, so the screen stays testable without view models. The orders list opens the edit route of an
+ * order; "Novo pedido" opens Sell; Deliveries opens the same route read-only ("Ver pedido"). The sales list opens
+ * the sale detail, "Nova venda" opens Sell, and Sell's "Ver venda" opens the detail of the sale just made.
  */
 @Suppress("LongMethod")
 @Composable
@@ -73,11 +75,13 @@ fun ShellScreen(
     settingsContent: @Composable () -> Unit,
     rejectionsContent: @Composable () -> Unit,
     productsContent: (@Composable () -> Unit)? = null,
-    sellContent: (@Composable () -> Unit)? = null,
+    sellContent: (@Composable (onViewSale: (String) -> Unit) -> Unit)? = null,
     ordersContent: (@Composable (onNewOrder: () -> Unit, onEdit: (String) -> Unit) -> Unit)? = null,
     orderEditContent: (@Composable (onExit: () -> Unit) -> Unit)? = null,
     kitchenContent: (@Composable () -> Unit)? = null,
     deliveriesContent: (@Composable (onView: (String) -> Unit) -> Unit)? = null,
+    salesContent: (@Composable (onNewSale: () -> Unit, onOpen: (String) -> Unit) -> Unit)? = null,
+    saleDetailContent: (@Composable (onExit: () -> Unit) -> Unit)? = null,
 ) {
     val items = remember(binding) { navigationItems(resolveNavigationModules(binding.role, binding.modules)) }
     val labels = remember(items) { items.associate { it.destination to it.label } }
@@ -90,6 +94,7 @@ fun ShellScreen(
         when {
             route == ORDER_EDIT_ROUTE && readOnly -> R.string.deliveries_details_title
             route == ORDER_EDIT_ROUTE -> R.string.orders_edit_title
+            route == SALE_DETAIL_ROUTE -> R.string.sales_detail_title
             current == null -> R.string.rejections_title
             current == AppDestination.SETTINGS -> R.string.nav_settings
             else -> labels[current] ?: R.string.app_name
@@ -120,6 +125,8 @@ fun ShellScreen(
                     orderEditContent,
                     kitchenContent,
                     deliveriesContent,
+                    salesContent,
+                    saleDetailContent,
                 ),
             )
         }
@@ -163,29 +170,11 @@ private fun ShellNavHost(
     NavHost(navController = navController, startDestination = start.name, modifier = modifier.fillMaxSize()) {
         AppDestination.entries.forEach { destination ->
             composable(destination.name) {
-                if (destination == AppDestination.SETTINGS) {
-                    settingsContent()
-                } else if (destination == AppDestination.PRODUCTS && slots.products != null) {
-                    slots.products()
-                } else if (destination == AppDestination.SELL && slots.sell != null) {
-                    slots.sell()
-                } else if (destination == AppDestination.ORDERS && slots.orders != null) {
-                    slots.orders(
-                        { navController.openTopLevel(AppDestination.SELL, start) },
-                        { id -> navController.navigate("order_edit/$id") { launchSingleTop = true } },
-                    )
-                } else if (destination == AppDestination.KITCHEN && slots.kitchen != null) {
-                    slots.kitchen()
-                } else if (destination == AppDestination.DELIVERIES && slots.deliveries != null) {
-                    slots.deliveries { id ->
-                        navController.navigate("order_edit/$id?$READ_ONLY_ARG=true") { launchSingleTop = true }
-                    }
-                } else {
-                    ModulePlaceholderScreen(labels[destination] ?: R.string.app_name)
-                }
+                DestinationContent(destination, navController, start, labels[destination], settingsContent, slots)
             }
         }
         composable(REJECTIONS_ROUTE) { rejectionsContent() }
+        composable(SALE_DETAIL_ROUTE) { slots.saleDetail?.invoke { navController.popBackStack() } }
         composable(
             ORDER_EDIT_ROUTE,
             arguments =
@@ -201,14 +190,54 @@ private fun ShellNavHost(
     }
 }
 
+/** The screen of a top-level [destination]: its slot, or the placeholder while the module has none. */
+@Composable
+private fun DestinationContent(
+    destination: AppDestination,
+    navController: NavHostController,
+    start: AppDestination,
+    label: Int?,
+    settingsContent: @Composable () -> Unit,
+    slots: ShellSlots,
+) {
+    val title = label ?: R.string.app_name
+    val openSell = { navController.openTopLevel(AppDestination.SELL, start) }
+    when (destination) {
+        AppDestination.SETTINGS -> settingsContent()
+        AppDestination.PRODUCTS -> slots.products.orPlaceholder(title) { it() }
+        AppDestination.SELL -> slots.sell.orPlaceholder(title) { it { id -> navController.openSale(id) } }
+        AppDestination.ORDERS ->
+            slots.orders.orPlaceholder(title) {
+                it(openSell) { id -> navController.navigate("order_edit/$id") { launchSingleTop = true } }
+            }
+        AppDestination.KITCHEN -> slots.kitchen.orPlaceholder(title) { it() }
+        AppDestination.DELIVERIES ->
+            slots.deliveries.orPlaceholder(title) {
+                it { id -> navController.navigate("order_edit/$id?$READ_ONLY_ARG=true") { launchSingleTop = true } }
+            }
+        AppDestination.SALES -> slots.sales.orPlaceholder(title) { it(openSell) { id -> navController.openSale(id) } }
+        else -> ModulePlaceholderScreen(title)
+    }
+}
+
+@Composable
+private fun <T> T?.orPlaceholder(
+    @StringRes title: Int,
+    show: @Composable (T) -> Unit,
+) {
+    if (this != null) show(this) else ModulePlaceholderScreen(title)
+}
+
 /** The screens of the modules that exist; a module without one shows the placeholder. */
 private class ShellSlots(
     val products: (@Composable () -> Unit)?,
-    val sell: (@Composable () -> Unit)?,
+    val sell: (@Composable (onViewSale: (String) -> Unit) -> Unit)?,
     val orders: (@Composable (onNewOrder: () -> Unit, onEdit: (String) -> Unit) -> Unit)?,
     val orderEdit: (@Composable (onExit: () -> Unit) -> Unit)?,
     val kitchen: (@Composable () -> Unit)? = null,
     val deliveries: (@Composable (onView: (String) -> Unit) -> Unit)? = null,
+    val sales: (@Composable (onNewSale: () -> Unit, onOpen: (String) -> Unit) -> Unit)? = null,
+    val saleDetail: (@Composable (onExit: () -> Unit) -> Unit)? = null,
 )
 
 /** How the user moves around: the drawer's ☰ button, or the ⋮ menu of the roles without a drawer. */
@@ -279,6 +308,10 @@ private fun MoreMenu(navigation: ShellNavigation.MoreMenu) {
             },
         )
     }
+}
+
+private fun NavHostController.openSale(id: String) {
+    navigate("sale_detail/$id") { launchSingleTop = true }
 }
 
 /** Top-level modules replace each other, keeping only the start one below. */

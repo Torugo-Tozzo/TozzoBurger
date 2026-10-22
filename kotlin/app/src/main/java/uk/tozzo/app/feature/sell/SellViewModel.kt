@@ -71,6 +71,7 @@ class SellViewModel
         private val paymentState = MutableStateFlow<PaymentMethod?>(null)
         private val submittingState = MutableStateFlow(false)
         private val resultState = MutableStateFlow<SellResult?>(null)
+        private val lastSaleState = MutableStateFlow<String?>(null)
 
         val cart: StateFlow<List<CartLine>> = cartState.asStateFlow()
         val customerName: StateFlow<String> = customerState.asStateFlow()
@@ -81,6 +82,9 @@ class SellViewModel
         val payment: StateFlow<PaymentMethod?> = paymentState.asStateFlow()
         val submitting: StateFlow<Boolean> = submittingState.asStateFlow()
         val result: StateFlow<SellResult?> = resultState.asStateFlow()
+
+        /** The id of the sale behind [SellResult.SALE_SAVED], for the "Ver venda" action; null for any other result. */
+        val lastSaleId: StateFlow<String?> = lastSaleState.asStateFlow()
 
         val cartCount: StateFlow<Int> = derived { lines -> lines.sumOf { it.quantity } }
         val totalCents: StateFlow<Long> = derived { it.totalCents() }
@@ -188,6 +192,7 @@ class SellViewModel
 
         fun consumeResult() {
             resultState.value = null
+            lastSaleState.value = null
         }
 
         // --- submit ---
@@ -195,7 +200,7 @@ class SellViewModel
         fun sellDirect() {
             if (!canSell.value) return
             submit(SellResult.SALE_SAVED) { lines ->
-                sales.createSale(lines, customerState.value, paymentState.value)
+                lastSaleState.value = sales.createSale(lines, customerState.value, paymentState.value)
             }
         }
 
