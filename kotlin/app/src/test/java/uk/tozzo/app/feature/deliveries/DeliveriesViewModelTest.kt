@@ -212,4 +212,23 @@ class DeliveriesViewModelTest {
                 sql.getAll("SELECT close_json AS c FROM orders") { it.string("c") }.single(),
             )
         }
+
+    @Test
+    fun aDriverStartsTheirOwnOrderWithoutAUsersRow() =
+        runTest {
+            sql.seedProduct("p1", "X-Burger", "12.50")
+            sql.seedOrder("o1", isDelivery = 1, address = "Rua A", driverId = "u1")
+            sql.seedItem("i1", "o1", "p1", 2, status = "READY")
+            val vm = viewModel(Role.DRIVER)
+            val order = watch(vm)
+
+            vm.start(order)
+
+            assertNull(vm.error.value)
+            assertNotNull(started())
+            assertEquals(
+                """{"action":"START"}""",
+                sql.getAll("SELECT delivery_json AS j FROM orders") { it.string("j") }.single(),
+            )
+        }
 }

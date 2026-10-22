@@ -294,6 +294,7 @@ class OrderWriter
             driverId: String,
         ) {
             requireNotStarted(orderId)
+            checkDriverIsDriver(driverId)
             checkDriverFree(driverId, orderId)
             writeDelivery(orderId, deliveryJson("ASSIGN") { put("driver_id", driverId) }, driverId, null, null)
         }
@@ -433,18 +434,22 @@ class OrderWriter
             return state
         }
 
-        // The user must be a DRIVER, and no other open order of theirs may be out for delivery.
+        // Only a manager role syncs `users`, so the role lookup belongs to assigning; a START from a DRIVER
+        // device has no users row and the server decides.
+        private suspend fun checkDriverIsDriver(driverId: String) {
+            val isDriver =
+                sql
+                    .getAll("SELECT 1 AS x FROM users WHERE id = ? AND role = 'DRIVER'", listOf(driverId)) {
+                        it.long("x")
+                    }.isNotEmpty()
+            if (!isDriver) throw DeliveryRefused(DeliveryRefusal.DRIVER_BUSY, "the user is not a driver")
+        }
+
+        // No other open order of the driver may be out for delivery (the orders table is enough).
         private suspend fun checkDriverFree(
             driverId: String,
             orderId: String,
         ) {
-            val isDriver =
-                sql
-                    .getAll(
-                        "SELECT 1 AS x FROM users WHERE id = ? AND role = 'DRIVER'",
-                        listOf(driverId),
-                    ) { it.long("x") }
-                    .isNotEmpty()
             val busy =
                 sql
                     .getAll(
@@ -453,7 +458,7 @@ class OrderWriter
                         listOf(driverId, orderId),
                     ) { it.long("x") }
                     .isNotEmpty()
-            if (!isDriver || busy) throw DeliveryRefused(DeliveryRefusal.DRIVER_BUSY, "the driver is not free")
+            if (busy) throw DeliveryRefused(DeliveryRefusal.DRIVER_BUSY, "the driver is out with another order")
         }
 
         private fun deliveryJson(
