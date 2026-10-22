@@ -110,4 +110,19 @@ class KitchenRepositoryTest {
 
             assertNull(board().getValue(KitchenStage.IN_PREPARATION).single().productName)
         }
+
+    @Test
+    fun serverFormatRowsSortByInstantAgainstLocalFormatRows() =
+        runTest {
+            // The server row is older (10:00) but 'T' sorts after ' ' as text; the ids would also put "a" first.
+            sql.seedOrder("b-server", openedAt = "2026-10-20T10:00:00.000000")
+            sql.seedOrder("a-local", openedAt = "2026-10-20 12:00:00.000")
+            sql.seedItem("i1", "b-server", "p1", 1)
+            sql.seedItem("i2", "a-local", "p1", 1)
+
+            val cards = board().getValue(KitchenStage.IN_PREPARATION)
+
+            assertEquals(listOf("b-server", "a-local"), cards.map { it.orderId })
+            assertEquals(Instant.parse("2026-10-20T10:00:00Z"), cards[0].openedAt)
+        }
 }

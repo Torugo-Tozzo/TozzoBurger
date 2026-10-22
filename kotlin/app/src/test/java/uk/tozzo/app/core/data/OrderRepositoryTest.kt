@@ -115,4 +115,14 @@ class OrderRepositoryTest {
             assertEquals("Rua A", byId.getValue("d1").deliveryAddress)
             assertTrue(byId.getValue("d1").isDelivery)
         }
+
+    @Test
+    fun serverFormatRowsSortByInstantAgainstLocalFormatRows() =
+        runTest {
+            sql.seedOrder("a-old-server", updatedAt = "2026-10-20T10:00:00.000000")
+            sql.seedOrder("b-new-local", updatedAt = "2026-10-20 12:00:00.000")
+            sql.seedOrder("c-newest-server", updatedAt = "2026-10-20T13:00:00.000000")
+
+            assertEquals(listOf("c-newest-server", "b-new-local", "a-old-server"), ids())
+        }
 }

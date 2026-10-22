@@ -134,4 +134,15 @@ class SaleRepositoryTest {
             assertEquals(listOf("c"), ids(SaleFilter(from, customer = "n_")))
             assertEquals(SalesSummary(2, 8000L), repo.summary(SaleFilter(from, seller = "Bruno")).first())
         }
+
+    @Test
+    fun serverFormatSalesSortByInstantAgainstLocalFormatSales() =
+        runTest {
+            sql.seedSale("a-old-server", soldAt = "2026-10-20T10:00:00.000000")
+            sql.seedSale("b-new-local", soldAt = "2026-10-20 12:00:00.000")
+            sql.seedSale("c-newest-server", soldAt = "2026-10-20T13:00:00.000000")
+
+            assertEquals(listOf("c-newest-server", "b-new-local", "a-old-server"), ids())
+            assertEquals(listOf("c-newest-server", "b-new-local"), ids(limit = 2))
+        }
 }

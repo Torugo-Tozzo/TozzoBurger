@@ -108,11 +108,17 @@ class ProductsViewModel
         val typeForm: StateFlow<TypeFormState?> = typeFormState.asStateFlow()
         val online: StateFlow<Boolean> = connectivity.online
 
-        /** Only OWNER and MANAGER write products and types (the API refuses the rest); others read. */
+        /** Only OWNER and MANAGER write products (the API refuses the rest); others read. */
         val canEdit: StateFlow<Boolean> =
             deviceBinding.current
                 .map { it.canEditCatalog() }
                 .stateIn(viewModelScope, SharingStarted.Eagerly, deviceBinding.current.value.canEditCatalog())
+
+        /** Only OWNER writes product types (`ownerOnly` in the API); a manager chooses them, read-only. */
+        val canEditTypes: StateFlow<Boolean> =
+            deviceBinding.current
+                .map { it.canEditTypes() }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, deviceBinding.current.value.canEditTypes())
 
         /** A failure to show on the list (a delete that could not be written). */
         val message: StateFlow<Int?> = messageState.asStateFlow()
@@ -272,7 +278,7 @@ class ProductsViewModel
 
         @Suppress("ReturnCount")
         fun openTypeForm(id: String?) {
-            if (!canEdit.value) return
+            if (!canEditTypes.value) return
             if (id == null) {
                 typeFormState.value = TypeFormState()
                 return
@@ -292,6 +298,7 @@ class ProductsViewModel
 
         @Suppress("ReturnCount")
         fun saveType() {
+            if (!canEditTypes.value) return
             val form = typeFormState.value ?: return
             if (form.saving) return
             if (form.description.isBlank()) {
@@ -315,7 +322,9 @@ class ProductsViewModel
             }
         }
 
-        fun deleteType(id: String) = write { writer.deleteType(id) }
+        fun deleteType(id: String) {
+            if (canEditTypes.value) write { writer.deleteType(id) }
+        }
 
         private fun write(block: suspend () -> Unit) {
             if (!canEdit.value) return
@@ -330,5 +339,7 @@ class ProductsViewModel
             }
         }
     }
+
+private fun Binding?.canEditTypes() = this?.role == Role.OWNER
 
 private fun Binding?.canEditCatalog() = this?.role.let { it == Role.OWNER || it == Role.MANAGER }

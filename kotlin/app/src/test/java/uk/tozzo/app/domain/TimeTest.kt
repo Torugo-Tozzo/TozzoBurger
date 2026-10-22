@@ -41,4 +41,14 @@ class TimeTest {
         assertEquals(Instant.parse("2026-10-20T12:00:00Z"), DbTime.parse("2026-10-20T12:00:00+00:00"))
         assertEquals(Instant.parse("2026-10-20T12:00:00Z"), DbTime.parse("2026-10-20T09:00:00-03:00"))
     }
+
+    @Test
+    fun zoneLessIsoFromTheServerReadsAsUtc() {
+        assertEquals(Instant.parse("2026-10-22T16:48:23.775Z"), DbTime.parse("2026-10-22T16:48:23.775000"))
+        assertEquals(Instant.parse("2026-10-22T16:48:23Z"), DbTime.parse("2026-10-22T16:48:23"))
+        assertEquals(Instant.parse("2026-10-22T16:48:23.775Z"), DbTime.parse("2026-10-22T16:48:23.775Z"))
+        assertEquals(Instant.parse("2026-10-22T16:53:07.672Z"), DbTime.parse("2026-10-22 16:53:07.672"))
+        assertEquals(Instant.parse("2026-10-22T19:48:23Z"), DbTime.parse("2026-10-22T16:48:23-03:00"))
+        assertNull(DbTime.parse("2026-10-22T99:48:23"))
+    }
 }

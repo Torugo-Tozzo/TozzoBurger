@@ -115,4 +115,16 @@ class DeliveryRepositoryTest {
             assertFalse(drivers.first { it.id == "d1" }.available)
             assertTrue(drivers.first { it.id == "d3" }.available)
         }
+
+    @Test
+    fun serverFormatRowsSortByInstantAgainstLocalFormatRows() =
+        runTest {
+            sql.seedOrder("a-local", isDelivery = 1, openedAt = "2026-10-20 12:00:00.000")
+            sql.seedOrder("b-server", isDelivery = 1, openedAt = "2026-10-20T13:00:00.000000")
+            sql.seedOrder("c-server", isDelivery = 1, openedAt = "2026-10-20T10:00:00.000000")
+
+            val board = repository.board().first()
+
+            assertEquals(listOf("c-server", "a-local", "b-server"), board[DeliveryStage.WAITING]?.map { it.id })
+        }
 }

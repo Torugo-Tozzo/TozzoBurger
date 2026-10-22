@@ -30,7 +30,7 @@ private const val KITCHEN_SQL =
         "LEFT JOIN products p ON p.id = i.product_id " +
         "WHERE o.is_open = 1 AND o.deleted_at IS NULL " +
         "AND (o.delivery_started_at IS NULL OR o.delivery_started_at = '') " +
-        "ORDER BY o.opened_at, o.id, i.id LIMIT ?"
+        "ORDER BY julianday(o.opened_at), o.id, i.id LIMIT ?"
 
 /** The kitchen board read from the local database. */
 class KitchenRepository

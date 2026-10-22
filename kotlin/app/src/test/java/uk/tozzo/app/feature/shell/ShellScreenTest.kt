@@ -232,4 +232,37 @@ class ShellScreenTest {
         rule.onNodeWithContentDescription("Abrir menu").assertIsDisplayed()
         rule.onNodeWithContentDescription("Mais opções").assertDoesNotExist()
     }
+
+    @Test
+    fun choosingOrdersFromTheDrawerShowsTheListNotTheRejectionsPushedOnIt() {
+        badge = SyncBadgeState(SyncState.SYNCED, rejections = 2)
+        show()
+        openDrawer()
+        rule.onNodeWithText("Pedidos").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(SYNC_BADGE_TAG).performClick()
+        rule.onNodeWithTag(SHELL_TITLE_TAG).assertTextEquals("Recusas")
+
+        openDrawer()
+        rule.onNodeWithText("Pedidos").performClick()
+        rule.waitForIdle()
+
+        rule.onNodeWithTag(SHELL_TITLE_TAG).assertTextEquals("Pedidos")
+        rule.onNodeWithText("new-order").assertIsDisplayed()
+        rule.onNodeWithText("rejections-content").assertDoesNotExist()
+    }
+
+    @Test
+    fun choosingOrdersFromTheDrawerLeavesTheOrderEditor() {
+        show(start = AppDestination.ORDERS)
+        rule.onNodeWithText("edit-order").performClick()
+        rule.onNodeWithTag(SHELL_TITLE_TAG).assertTextEquals("Editar pedido")
+
+        openDrawer()
+        rule.onNodeWithText("Pedidos").performClick()
+        rule.waitForIdle()
+
+        rule.onNodeWithTag(SHELL_TITLE_TAG).assertTextEquals("Pedidos")
+        rule.onNodeWithText("edit-content").assertDoesNotExist()
+    }
 }

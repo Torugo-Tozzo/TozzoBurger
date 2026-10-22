@@ -314,15 +314,18 @@ private fun NavHostController.openSale(id: String) {
     navigate("sale_detail/$id") { launchSingleTop = true }
 }
 
-/** Top-level modules replace each other, keeping only the start one below. */
+/**
+ * Top-level modules replace each other, keeping only the start one below. The destination always shows its
+ * own root screen: no `saveState`/`restoreState`, which would bring back the routes pushed on it (Recusas,
+ * order editor, sale detail). The cost is that the scroll and filters of a tab are not kept across switches.
+ */
 private fun NavHostController.openTopLevel(
     destination: AppDestination,
     start: AppDestination,
 ) {
     navigate(destination.name) {
-        popUpTo(start.name) { saveState = true }
+        popUpTo(start.name)
         launchSingleTop = true
-        restoreState = true
     }
 }
 

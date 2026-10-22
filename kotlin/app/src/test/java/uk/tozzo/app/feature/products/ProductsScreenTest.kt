@@ -42,6 +42,7 @@ class ProductsScreenTest {
     private fun show(
         startTab: ProductsTab = ProductsTab.PRODUCTS,
         canEdit: Boolean = true,
+        canEditTypes: Boolean = canEdit,
     ) = rule.setContent {
         var tab by remember { mutableStateOf(startTab) }
         TozzoTheme {
@@ -60,6 +61,7 @@ class ProductsScreenTest {
                 onEditType = {},
                 onDeleteType = { deletedTypes += it },
                 canEdit = canEdit,
+                canEditTypes = canEditTypes,
             )
         }
     }
@@ -139,6 +141,19 @@ class ProductsScreenTest {
         rule.onNodeWithText("Novo produto").assertExists()
         rule.onAllNodesWithText("Editar")[0].assertExists()
         rule.onAllNodesWithText("Excluir")[0].assertExists()
+    }
+
+    @Test
+    fun aManagerEditsProductsButSeesTheTypesReadOnly() {
+        show(canEdit = true, canEditTypes = false)
+        rule.onNodeWithText("Novo produto").assertExists()
+        rule.onAllNodesWithText("Editar")[0].assertExists()
+
+        rule.onNodeWithText("Tipos").performClick()
+        rule.onNodeWithText("Sazonal (inativo)").assertExists()
+        rule.onNodeWithText("Novo tipo").assertDoesNotExist()
+        rule.onNodeWithText("Editar").assertDoesNotExist()
+        rule.onNodeWithText("Excluir").assertDoesNotExist()
     }
 }
 

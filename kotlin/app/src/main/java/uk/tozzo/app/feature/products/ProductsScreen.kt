@@ -73,6 +73,7 @@ fun ProductsRoute(viewModel: ProductsViewModel = hiltViewModel()) {
     val message by viewModel.message.collectAsStateWithLifecycle()
     val online by viewModel.online.collectAsStateWithLifecycle()
     val canEdit by viewModel.canEdit.collectAsStateWithLifecycle()
+    val canEditTypes by viewModel.canEditTypes.collectAsStateWithLifecycle()
     val productForm by viewModel.productForm.collectAsStateWithLifecycle()
     val typeForm by viewModel.typeForm.collectAsStateWithLifecycle()
     // The Photo Picker needs no permission: it hands back the one image the user chose.
@@ -127,14 +128,15 @@ fun ProductsRoute(viewModel: ProductsViewModel = hiltViewModel()) {
                 message = message,
                 onDismissMessage = viewModel::clearMessage,
                 canEdit = canEdit,
+                canEditTypes = canEditTypes,
             )
     }
 }
 
 /**
  * The Products and Types tabs, each with its search and its "new" button. The Products list pages by
- * scrolling ([onLoadMore]); the Types list is whole, narrowed here by [search]. Every role sees it: the API
- * decides who may write, like the web.
+ * scrolling ([onLoadMore]); the Types list is whole, narrowed here by [search]. Every role sees it: [canEdit]
+ * (OWNER, MANAGER) writes products and [canEditTypes] (OWNER) writes types, as the API allows.
  */
 @Composable
 fun ProductsScreen(
@@ -154,6 +156,7 @@ fun ProductsScreen(
     message: Int? = null,
     onDismissMessage: () -> Unit = {},
     canEdit: Boolean = true,
+    canEditTypes: Boolean = canEdit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         PrimaryTabRow(selectedTabIndex = tab.ordinal, containerColor = MaterialTheme.colorScheme.background) {
@@ -181,7 +184,7 @@ fun ProductsScreen(
                         if (isProducts) R.string.products_search_products else R.string.products_search_types,
                     ),
             )
-            if (canEdit) {
+            if (if (isProducts) canEdit else canEditTypes) {
                 TozzoButton(
                     text =
                         stringResource(
@@ -201,7 +204,7 @@ fun ProductsScreen(
             if (isProducts) {
                 ProductList(products, types.orEmpty(), canEdit, onLoadMore, onEditProduct, onDeleteProduct)
             } else {
-                TypeList(types, search, canEdit, onEditType, onDeleteType)
+                TypeList(types, search, canEditTypes, onEditType, onDeleteType)
             }
         }
     }

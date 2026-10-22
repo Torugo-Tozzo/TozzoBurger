@@ -279,4 +279,29 @@ class ProductsViewModelTest {
             vm.openProductForm(null)
             assertNotNull(vm.productForm.value)
         }
+
+    @Test
+    fun onlyTheOwnerWritesProductTypes() =
+        runTest {
+            sql.execute("INSERT INTO product_types (id, description, color, is_active) VALUES ('t1', 'T', '#fff', 1)")
+            val manager = viewModel(Role.MANAGER)
+            assertTrue(manager.canEdit.value)
+            assertFalse(manager.canEditTypes.value)
+
+            manager.openTypeForm(null)
+            manager.openTypeForm("t1")
+            manager.deleteType("t1")
+            manager.editType { it.copy(description = "Nova") }
+            manager.saveType()
+            manager.openProductForm(null)
+
+            assertNull(manager.typeForm.value)
+            assertNotNull(manager.productForm.value)
+            assertEquals(listOf("t1"), sql.getAll("SELECT id FROM product_types") { it.string("id") })
+
+            val owner = viewModel(Role.OWNER)
+            assertTrue(owner.canEditTypes.value)
+            owner.openTypeForm("t1")
+            assertNotNull(owner.typeForm.value)
+        }
 }

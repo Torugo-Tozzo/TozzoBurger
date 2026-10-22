@@ -26,12 +26,17 @@ object DbTime {
             .appendFraction(ChronoField.NANO_OF_SECOND, 0, NANO_DIGITS, true)
             .toFormatter()
 
-    /** Both the sync format and ISO-8601 with a zone; null when [value] is neither. */
+    // ISO-8601 with or without an offset; zone-less text (PowerSync's Postgres `timestamp`) is UTC.
+    private val isoParse: DateTimeFormatter = DateTimeFormatter.ISO_DATE_TIME
+
+    /** The sync format and ISO-8601, with or without a zone (none means UTC); null when [value] is neither. */
     fun parse(value: String?): Instant? {
         if (value.isNullOrBlank()) return null
         return try {
             if (value.contains('T')) {
-                OffsetDateTime.parse(value, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toInstant()
+                isoParse.parseBest(value, OffsetDateTime::from, LocalDateTime::from).let {
+                    if (it is OffsetDateTime) it.toInstant() else (it as LocalDateTime).toInstant(ZoneOffset.UTC)
+                }
             } else {
                 LocalDateTime.parse(value, syncParse).toInstant(ZoneOffset.UTC)
             }
