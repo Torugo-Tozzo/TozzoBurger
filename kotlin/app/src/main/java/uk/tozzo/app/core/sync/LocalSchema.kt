@@ -3,6 +3,7 @@ package uk.tozzo.app.core.sync
 import com.powersync.db.schema.Column
 import com.powersync.db.schema.Schema
 import com.powersync.db.schema.Table
+import com.powersync.db.schema.TrackPreviousValuesOptions
 
 /** Local-only table with the ops the server rejected: their data is gone once the batch completes. */
 const val SYNC_REJECTIONS_TABLE = "sync_rejections"
@@ -34,6 +35,8 @@ val localSchema: Schema =
             // driver_* come from the server; items_json, close_json and delivery_json never do: they hold
             // what the device changed (the full item list, the closing, a delivery action), which the
             // upload turns into the orders PUT/PATCH.
+            // customer_name is tracked as a previous value: a DELETE carries no data, and the rejection of an order
+            // delete must still name the customer of the row that is already gone.
             Table(
                 "orders",
                 listOf(
@@ -54,6 +57,7 @@ val localSchema: Schema =
                     Column.text("close_json"),
                     Column.text("delivery_json"),
                 ),
+                trackPreviousValues = TrackPreviousValuesOptions(columnFilter = listOf("customer_name")),
             ),
             Table(
                 "order_items",

@@ -78,7 +78,8 @@ class TozzoConnector
             }
         }
 
-        private fun CrudEntry.toPendingOp() = PendingOp(clientId, op.toJson(), table, id, opData?.typed)
+        private fun CrudEntry.toPendingOp() =
+            PendingOp(clientId, op.toJson(), table, id, opData?.typed, previousValues?.typed)
 
         private companion object {
             const val BATCH_SIZE = 200

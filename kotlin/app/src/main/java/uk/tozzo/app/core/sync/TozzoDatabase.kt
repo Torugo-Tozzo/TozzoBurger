@@ -186,7 +186,7 @@ class DatabaseRejectionSink(
                 result.code,
                 result.detail,
                 opDataJson(values),
-                summaryOf(values),
+                summaryOf(values) ?: summaryOf(op.previous.orEmpty()),
                 op.id,
                 op.table,
                 op.id,

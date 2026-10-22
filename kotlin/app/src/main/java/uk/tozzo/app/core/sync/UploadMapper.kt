@@ -24,6 +24,8 @@ data class PendingOp(
     val table: String,
     val id: String,
     val data: Map<String, Any?>?,
+    /** The values the row had before (only `orders.customer_name` is tracked); a DELETE has no [data]. */
+    val previous: Map<String, Any?>? = null,
 )
 
 /** Turns [PendingOp]s into the ops of `POST /v1/sync/upload`. */

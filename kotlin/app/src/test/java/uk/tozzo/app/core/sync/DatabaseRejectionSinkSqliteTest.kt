@@ -108,6 +108,17 @@ class DatabaseRejectionSinkSqliteTest {
         }
 
     @Test
+    fun aDeleteOfAnOrderAlreadyGoneTakesTheTrackedPreviousName() =
+        runTest {
+            // The row is gone locally and a DELETE carries no data: only the tracked previous value names it.
+            val delete = PendingOp(8, "DELETE", "orders", "o-gone", null, mapOf("customer_name" to "Carla"))
+            sink.record(delete, "op-8", result("op-8"))
+            sink.record(PendingOp(9, "DELETE", "orders", "o-gone2", null), "op-9", result("op-9"))
+
+            assertEquals(listOf("Carla", null), rows().map { it[7] })
+        }
+
+    @Test
     fun sameOpIdKeepsOneRow() =
         runTest {
             val op = PendingOp(4, "PATCH", "orders", "o-1", mapOf("customer_name" to "Ana"))
