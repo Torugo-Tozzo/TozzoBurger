@@ -257,3 +257,39 @@ Cada etapa termina com testes passando, o app rodando no emulador contra `dev-ap
 - Com o aparelho vinculado a outro usuário, a mensagem não diz como sair disso (entrar com o usuário vinculado e desvincular, ou o dono remover o aparelho).
 - Antes de publicar: a Play exige pedido de exclusão de conta no app e na web para apps com conta; e conferir a regra de link para pagamento fora da loja (o spec prevê link ao site quando o plano bloqueia algo).
 - Ambiente: o emulador sem limite de memória travou a máquina de dev (RAM e swap esgotadas). Rodar com `-memory 2048 -cores 2` dentro de `systemd-run --user --scope -p MemoryMax=5G -p MemorySwapMax=0`, e o Gradle no mesmo tipo de escopo.
+
+## Registro de execução — etapa 2
+
+**Data:** 2026-10-22. Emulador Pixel_7_Pro (Android 37.2, 2 GB de RAM, 2 núcleos) contra `dev-api.tozzo.uk`, com a API `329adcc` e o PowerSync da VM de dev reiniciado com as regras por papel (aceitas pelo serviço, sem erro no log). App em pt-BR. Build debug a partir de `11bc048` e, depois das correções, de `60b4766`. Contas do estabelecimento "Teste Fase 2" (plano FREE): o gerente vinculado da etapa 1 e "Vitim", promovido a MANAGER pelo usuário.
+
+**Roteiro:**
+
+| # | Item | Resultado |
+|---|---|---|
+| 1 | Gerente: venda direta com Pix; pedido que aparece em Pedidos e na Cozinha | Passou. Venda subiu com PIX e R$ 4,00, "Ver venda" abre o detalhe; os ids dos itens do pedido no servidor são os do aparelho |
+| 2 | Offline: criar pedido, editar (item novo, quantidade), Pronto na Cozinha, venda; religar | Passou: 10 ops subiram sem recusa; no `GET /v1/orders/{id}` os 3 itens têm os ids, quantidades e estados do aparelho |
+| 3 | Entrega: ASSIGN e START com confirmação offline; religar; finalizar com dinheiro | Passou com entregador terceirizado: as duas ações se aplicaram (DELIVERING, item READY pelo servidor); finalizar gerou a venda em dinheiro |
+| 4 | Conflito: pedido fechado fora do app e editado offline no app | Passou: recusa "O pedido já foi fechado." com o cliente, e o pedido voltou ao estado do servidor. Exclusão offline de pedido já fechado: recusa com o nome do cliente (o PowerSync real guarda o valor anterior) |
+| 5 | Produtos: tipo e produto offline; trocar imagem online | Produto offline: passou. Tipo offline: recusado (`ROLE_FORBIDDEN`), ver B3. Imagem: passou ("Imagem atualizada.", `imageUrl` na API) |
+| 6 | COOK | Não executado: o plano FREE não permite criar usuários (`PLAN_UPGRADE_REQUIRED`) |
+| 7 | DRIVER | Não executado, pelo mesmo motivo |
+| 8 | Release assinado com a chave de debug: login e venda | Passou (login do Vitim, primeiro sync, venda no débito) |
+
+**Defeitos achados no roteiro e corrigidos** (commit `60b4766`, revisado e conferido de novo no emulador):
+
+- **B1:** o PowerSync entrega `timestamp` como `2026-10-22T16:48:23.775000`, sem fuso; o app só lia ISO com fuso, e toda data do servidor aparecia como "Não informado".
+- **B2:** o app grava `2026-10-22 16:53:07.672` e o servidor manda com `T`; a ordenação por texto punha toda linha local antes das do servidor. A Cozinha passou a ordenar por `julianday`; Pedidos e Entregas já ordenavam pelo instante lido.
+- **B3:** tipos de produto são só do OWNER na API; o app deixava o MANAGER criar, e a recusa derrubava em cascata o produto, o pedido e a venda que dependiam dele. Agora só o OWNER vê as ações de tipo.
+- **B4:** depois de abrir Recusas a partir de Pedidos, a gaveta reabria Recusas. A gaveta agora abre a raiz da tela; a aba não guarda mais filtro e rolagem ao trocar pela gaveta.
+
+**Números** (build release assinado, com Baseline Profile; a etapa 1 mediu o debug):
+
+- Abertura a frio já logado: 296, 303, 310, 313 e 366 ms; mediana **310 ms** (etapa 1: 663 ms no debug).
+- Memória (`TOTAL PSS`): **40 MB** logo depois de abrir e **56 MB** depois de passar por todas as telas (etapa 1: 98 MB no debug).
+- APK release: **9,4 MB** (etapa 1: 8,4 MB). O crescimento vem das cinco telas novas e do Coil.
+
+**Pendências para a etapa 3:**
+
+- Roteiro de COOK e DRIVER (itens 6 e 7): precisa de um estabelecimento de teste em plano pago, ou de contas criadas de outro jeito.
+- A folha "Adicionar item" da edição de pedido não fecha depois de escolher o produto, e o texto "Pedido para entrega" não marca a caixa (só a caixa marca).
+- Os pontos menores das revisões de cada task, listados no ledger da execução, entram na revisão final da etapa.
